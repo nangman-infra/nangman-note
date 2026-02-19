@@ -247,3 +247,31 @@ input:focus-visible {
   color: #ecf3f7;
   padding: 0.75rem;
 }
+
+.markdown-wysiwyg .toastui-editor-defaultUI {
+  border: none;
+  background: transparent;
+}
+
+.markdown-wysiwyg .toastui-editor-toolbar {
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.markdown-wysiwyg .toastui-editor-contents {
+  color: var(--ink-strong);
+  font-family: var(--font-display), 'Avenir Next', 'Pretendard', 'Noto Sans KR',
+    sans-serif;
+  font-size: 0.96rem;
+  line-height: 1.7;
+}
+
+.markdown-wysiwyg .toastui-editor-contents p,
+.markdown-wysiwyg .toastui-editor-contents li,
+.markdown-wysiwyg .toastui-editor-contents blockquote {
+  margin: 0.4em 0;
+}
+
+.markdown-wysiwyg .toastui-editor-md-tab-container {
+  display: none;
+}

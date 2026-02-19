@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Copy, Download, Edit3, RefreshCw, Save, X } from 'lucide-react';
+import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard } from '@/lib/utils/markdown';
@@ -163,19 +164,13 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
 
       <section className="scroll-muted flex-1 overflow-y-auto px-6 py-5">
         {isEditing ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-            <textarea
+          <div className="surface-card h-[min(64vh,760px)] min-h-[360px] overflow-hidden">
+            <MarkdownWysiwygEditor
               value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="min-h-[320px] w-full resize-y rounded-2xl border border-[var(--line-soft)] bg-white p-4 font-mono text-sm leading-relaxed"
+              onChange={setEditContent}
+              placeholder="마크다운 문법이 입력 위치에서 바로 반영됩니다."
+              height="100%"
             />
-            <article className="result-markdown surface-card min-h-[320px] p-5">
-              {editContent.trim().length > 0 ? (
-                <ReactMarkdown>{editContent}</ReactMarkdown>
-              ) : (
-                <p className="text-sm text-muted">마크다운 미리보기가 여기에 표시됩니다.</p>
-              )}
-            </article>
           </div>
         ) : (
           <article className="result-markdown surface-card p-5">

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { IBM_Plex_Mono, Manrope } from 'next/font/google';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
+import '@toast-ui/editor/dist/toastui-editor.css';
 import './globals.css';
 
 const manrope = Manrope({
