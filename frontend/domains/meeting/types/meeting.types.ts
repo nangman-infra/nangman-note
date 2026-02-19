@@ -4,11 +4,17 @@ export enum MeetingStatus {
   COMPLETED = 'completed',
 }
 
+export enum MeetingTranscriptionMode {
+  BATCH = 'batch',
+  REALTIME = 'realtime',
+}
+
 export interface Meeting {
   id: string;
   title?: string;
   promptId: string;
   status: MeetingStatus;
+  transcriptionMode: MeetingTranscriptionMode;
   startedAt: string;
   endedAt?: string;
   createdAt: string;
@@ -18,6 +24,7 @@ export interface Meeting {
 export interface CreateMeetingDto {
   title?: string;
   promptId?: string; // 선택 사항, 기본값: prompt_default_meeting
+  transcriptionMode?: MeetingTranscriptionMode;
 }
 
 export interface SearchResult {

@@ -1,6 +1,12 @@
-import { IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { MeetingTranscriptionMode } from '../../domain/meeting-transcription-mode.enum';
 
 export class UpdateMeetingDto {
+  @IsOptional()
   @IsString()
-  promptId: string;
+  promptId?: string;
+
+  @IsOptional()
+  @IsEnum(MeetingTranscriptionMode)
+  transcriptionMode?: MeetingTranscriptionMode;
 }

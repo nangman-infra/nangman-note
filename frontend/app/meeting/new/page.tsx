@@ -7,6 +7,7 @@ import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { PromptSelector } from '@/domains/prompt/components/PromptSelector';
 import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
+import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
 import { usePromptStore } from '@/domains/prompt/stores/promptStore';
 
 export default function NewMeetingPage() {
@@ -15,11 +16,15 @@ export default function NewMeetingPage() {
   const { startMeeting, isLoading, error } = useMeeting();
   const { selectedPromptId } = usePromptStore();
   const [title, setTitle] = useState('');
+  const [transcriptionMode, setTranscriptionMode] = useState(
+    MeetingTranscriptionMode.BATCH,
+  );
 
   const handleStart = async () => {
     const meeting = await startMeeting({
       title: title.trim() || undefined,
       promptId: selectedPromptId,
+      transcriptionMode,
     });
 
     if (!meeting) {
@@ -55,8 +60,8 @@ export default function NewMeetingPage() {
             </div>
             <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">회의를 시작하고 노트를 바로 작성하세요</h1>
             <p className="mt-3 max-w-xl text-sm text-muted sm:text-base">
-              회의 중에는 노트를 중심으로 기록하고, 전사는 백그라운드에서 자동 수집됩니다. 종료 후에는 선택한
-              프롬프트로 결과를 생성합니다.
+              회의 중에는 노트를 중심으로 기록하고, 전사 방식은 배치 또는 실시간으로 선택할 수 있습니다. 종료 후에는
+              선택한 프롬프트로 결과를 생성합니다.
             </p>
           </div>
 
@@ -93,6 +98,42 @@ export default function NewMeetingPage() {
                 placeholder="예: 1분기 마케팅 전략 회의"
                 className="input-shell"
               />
+            </div>
+
+            <div>
+              <p className="mb-2 block text-sm font-medium">전사 모드</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setTranscriptionMode(MeetingTranscriptionMode.BATCH)}
+                  className={`surface-card px-3 py-3 text-left transition ${
+                    transcriptionMode === MeetingTranscriptionMode.BATCH
+                      ? 'border-brand bg-brand/5'
+                      : 'border-[var(--line-soft)]'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">Batch (기본)</p>
+                  <p className="mt-1 text-xs text-muted">
+                    회의 종료 후 AWS 배치 전사로 처리합니다. 비용과 안정성이 가장 좋습니다.
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTranscriptionMode(MeetingTranscriptionMode.REALTIME)
+                  }
+                  className={`surface-card px-3 py-3 text-left transition ${
+                    transcriptionMode === MeetingTranscriptionMode.REALTIME
+                      ? 'border-brand bg-brand/5'
+                      : 'border-[var(--line-soft)]'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">Realtime (옵션)</p>
+                  <p className="mt-1 text-xs text-muted">
+                    웹소켓을 통해 실시간 전사 스트림을 활성화합니다.
+                  </p>
+                </button>
+              </div>
             </div>
 
             <PromptSelector />

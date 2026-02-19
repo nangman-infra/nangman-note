@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { meetingApi } from '../api/meetingApi';
-import { MeetingStatus, type CreateMeetingDto, type Meeting, type SearchResult } from '../types/meeting.types';
+import {
+  MeetingStatus,
+  MeetingTranscriptionMode,
+  type CreateMeetingDto,
+  type Meeting,
+  type SearchResult,
+} from '../types/meeting.types';
 
 interface MeetingState {
   currentMeeting: Meeting | null;
@@ -25,6 +31,7 @@ function mapSearchResultToMeeting(result: SearchResult): Meeting {
     title: result.title || result.snippet,
     promptId: DEFAULT_PROMPT_ID,
     status: MeetingStatus.COMPLETED,
+    transcriptionMode: MeetingTranscriptionMode.BATCH,
     startedAt: result.startedAt,
     createdAt: result.startedAt,
     updatedAt: result.startedAt,

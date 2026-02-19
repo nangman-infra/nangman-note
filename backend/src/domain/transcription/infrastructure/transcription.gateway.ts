@@ -77,6 +77,7 @@ export class TranscriptionGateway
     }
 
     try {
+      await this.transcriptionService.ensureRealtimeEnabled(meetingId);
       await this.transcriptionService.listByMeetingId(meetingId);
       await client.join(meetingId);
     } catch (error) {
@@ -104,10 +105,20 @@ export class TranscriptionGateway
       return { ok: false };
     }
 
-    const segment = await this.transcriptionService.createMockSegmentFromAudio(
-      meetingId,
-      payload,
-    );
+    const segment = await this.transcriptionService
+      .createMockSegmentFromAudio(meetingId, payload)
+      .catch((error: unknown): null => {
+        client.emit('error', {
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Failed to process realtime transcription chunk',
+        });
+        return null;
+      });
+    if (!segment) {
+      return { ok: false };
+    }
 
     this.server.to(meetingId).emit('transcript', {
       id: segment.id,

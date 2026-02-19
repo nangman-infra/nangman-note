@@ -8,6 +8,7 @@ import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingStatus } from '../domain/meeting-status.enum';
+import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { ListMeetingsQueryDto } from './dto/list-meetings-query.dto';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
@@ -36,12 +37,15 @@ export class MeetingService {
 
   async create(dto: CreateMeetingDto): Promise<MeetingEntity> {
     const promptId = dto.promptId || DEFAULT_PROMPT_ID;
+    const transcriptionMode =
+      dto.transcriptionMode ?? MeetingTranscriptionMode.BATCH;
     await this.promptService.ensureExists(promptId);
 
     const meeting = this.meetingRepository.create({
       title: dto.title?.trim() || undefined,
       promptId,
       status: MeetingStatus.RECORDING,
+      transcriptionMode,
       startedAt: new Date(),
     });
 
@@ -190,9 +194,24 @@ export class MeetingService {
     dto: UpdateMeetingDto,
   ): Promise<MeetingEntity> {
     const meeting = await this.findById(id);
-    await this.promptService.ensureExists(dto.promptId);
+    const hasPromptId = typeof dto.promptId === 'string';
+    const hasTranscriptionMode = typeof dto.transcriptionMode === 'string';
 
-    meeting.promptId = dto.promptId;
+    if (!hasPromptId && !hasTranscriptionMode) {
+      throw new BadRequestException(
+        'Either promptId or transcriptionMode must be provided',
+      );
+    }
+
+    if (hasPromptId) {
+      await this.promptService.ensureExists(dto.promptId as string);
+      meeting.promptId = dto.promptId as string;
+    }
+
+    if (hasTranscriptionMode) {
+      meeting.transcriptionMode =
+        dto.transcriptionMode as MeetingTranscriptionMode;
+    }
 
     return this.meetingRepository.save(meeting);
   }

@@ -5,6 +5,10 @@ export interface AppEnv {
   ENCRYPTION_KEY: string;
   AWS_REGION: string;
   AWS_PROFILE: string;
+  AWS_TRANSCRIBE_JOB_PREFIX: string;
+  AWS_TRANSCRIBE_LANGUAGE_CODE: string;
+  AWS_TRANSCRIBE_OUTPUT_BUCKET: string;
+  AWS_TRANSCRIBE_MEDIA_FORMAT: string;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -95,6 +99,26 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     ENCRYPTION_KEY: encryptionKey,
     AWS_REGION: readString(config, 'AWS_REGION', 'ap-northeast-2'),
     AWS_PROFILE: readString(config, 'AWS_PROFILE', 'default'),
+    AWS_TRANSCRIBE_JOB_PREFIX: readString(
+      config,
+      'AWS_TRANSCRIBE_JOB_PREFIX',
+      'nangman-note',
+    ),
+    AWS_TRANSCRIBE_LANGUAGE_CODE: readString(
+      config,
+      'AWS_TRANSCRIBE_LANGUAGE_CODE',
+      'ko-KR',
+    ),
+    AWS_TRANSCRIBE_OUTPUT_BUCKET: readString(
+      config,
+      'AWS_TRANSCRIBE_OUTPUT_BUCKET',
+      '',
+    ),
+    AWS_TRANSCRIBE_MEDIA_FORMAT: readString(
+      config,
+      'AWS_TRANSCRIBE_MEDIA_FORMAT',
+      'webm',
+    ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: readString(
       config,

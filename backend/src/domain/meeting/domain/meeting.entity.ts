@@ -12,8 +12,10 @@ import {
 import { NoteEntity } from '../../note/domain/note.entity';
 import { PromptEntity } from '../../prompt/domain/prompt.entity';
 import { ResultEntity } from '../../result/domain/result.entity';
+import { TranscriptionJobEntity } from '../../transcription/domain/transcription-job.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
 import { MeetingStatus } from './meeting-status.enum';
+import { MeetingTranscriptionMode } from './meeting-transcription-mode.enum';
 
 @Entity('meeting')
 export class MeetingEntity {
@@ -32,6 +34,14 @@ export class MeetingEntity {
     default: MeetingStatus.RECORDING,
   })
   status: MeetingStatus;
+
+  @Column({
+    name: 'transcription_mode',
+    type: 'varchar',
+    length: 20,
+    default: MeetingTranscriptionMode.BATCH,
+  })
+  transcriptionMode: MeetingTranscriptionMode;
 
   @Column({ name: 'started_at', type: 'datetime' })
   startedAt: Date;
@@ -59,4 +69,7 @@ export class MeetingEntity {
 
   @OneToMany(() => TranscriptSegmentEntity, (segment) => segment.meeting)
   transcripts?: TranscriptSegmentEntity[];
+
+  @OneToMany(() => TranscriptionJobEntity, (job) => job.meeting)
+  transcriptionJobs?: TranscriptionJobEntity[];
 }

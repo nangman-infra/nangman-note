@@ -15,7 +15,10 @@ function toTranscriptSegment(message: TranscriptionStreamMessage): TranscriptSeg
   };
 }
 
-export function useTranscription(meetingId: string) {
+export function useTranscription(
+  meetingId: string,
+  isRealtimeEnabled: boolean = false,
+) {
   const {
     transcripts,
     isConnected,
@@ -33,7 +36,12 @@ export function useTranscription(meetingId: string) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   useEffect(() => {
-    if (!meetingId) return;
+    if (!meetingId || !isRealtimeEnabled) {
+      setConnected(false);
+      setError(null);
+      clearTranscripts();
+      return;
+    }
     let isDisposed = false;
 
     // WebSocket 연결
@@ -124,7 +132,14 @@ export function useTranscription(meetingId: string) {
       socketRef.current?.disconnect();
       clearTranscripts();
     };
-  }, [meetingId, addSegment, clearTranscripts, setConnected, setError]);
+  }, [
+    isRealtimeEnabled,
+    meetingId,
+    addSegment,
+    clearTranscripts,
+    setConnected,
+    setError,
+  ]);
 
   const sendAudio = (audioData: ArrayBuffer) => {
     socketRef.current?.sendAudio(audioData);

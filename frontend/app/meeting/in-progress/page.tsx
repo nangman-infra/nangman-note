@@ -7,6 +7,7 @@ import { ArrowLeft, Mic, Radio, Square, Timer } from 'lucide-react';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
+import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
 import { NoteEditor } from '@/domains/note/components/NoteEditor';
 import { TranscriptPanel } from '@/domains/transcription/components/TranscriptPanel';
 import { useTranscription } from '@/domains/transcription/hooks/useTranscription';
@@ -19,7 +20,14 @@ export default function InProgressMeetingPage() {
   const [nowTick, setNowTick] = useState(() => Date.now());
 
   const meetingId = currentMeeting?.id || '';
-  const { transcripts, isConnected, error: transcriptionError } = useTranscription(meetingId);
+  const transcriptionMode =
+    currentMeeting?.transcriptionMode ?? MeetingTranscriptionMode.BATCH;
+  const isRealtimeMode =
+    transcriptionMode === MeetingTranscriptionMode.REALTIME;
+  const { transcripts, isConnected, error: transcriptionError } = useTranscription(
+    meetingId,
+    isRealtimeMode,
+  );
 
   useEffect(() => {
     if (!currentMeeting?.startedAt) return;
@@ -36,7 +44,9 @@ export default function InProgressMeetingPage() {
 
   const connectionBadge = !meetingId
     ? { label: '대기', className: 'bg-slate-100 text-slate-700' }
-    : isConnected
+    : !isRealtimeMode
+      ? { label: '배치 전사 모드', className: 'bg-slate-100 text-slate-700' }
+      : isConnected
       ? { label: '전사 연결됨', className: 'bg-emerald-100 text-emerald-800' }
       : { label: '전사 연결중', className: 'bg-amber-100 text-amber-800' };
 
@@ -117,7 +127,7 @@ export default function InProgressMeetingPage() {
         {error ? (
           <StatusBanner variant="error" title="회의 상태 오류" message={error} />
         ) : null}
-        {transcriptionError ? (
+        {isRealtimeMode && transcriptionError ? (
           <StatusBanner
             variant="warning"
             title="전사 연결 불안정"
@@ -133,9 +143,13 @@ export default function InProgressMeetingPage() {
           <aside className="glass-surface min-h-0 overflow-hidden">
             <div className="border-b border-[var(--line-soft)] px-4 py-3">
               <p className="text-xs font-semibold tracking-wide text-muted">TRANSCRIPTION</p>
-              <h2 className="mt-1 text-sm font-semibold">실시간 전사 모니터</h2>
+              <h2 className="mt-1 text-sm font-semibold">
+                {isRealtimeMode ? '실시간 전사 모니터' : '배치 전사 대기'}
+              </h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-                <span className="rounded-full bg-white px-2 py-1">세그먼트: {transcripts.length}개</span>
+                <span className="rounded-full bg-white px-2 py-1">
+                  세그먼트: {transcripts.length}개
+                </span>
                 <span className="rounded-full bg-white px-2 py-1">Meeting ID: {currentMeeting.id.slice(0, 8)}...</span>
               </div>
             </div>
@@ -143,9 +157,17 @@ export default function InProgressMeetingPage() {
             <div className="flex h-[calc(100%-84px)] flex-col">
               <div className="px-4 py-3 text-xs text-muted">
                 <Mic className="mr-1 inline-block h-3.5 w-3.5" />
-                마이크 입력은 백그라운드 수집되며, 노트에 집중할 수 있도록 전사는 접기/펼치기 방식으로 제공됩니다.
+                {isRealtimeMode
+                  ? '마이크 입력은 백그라운드 수집되며, 노트에 집중할 수 있도록 전사는 접기/펼치기 방식으로 제공됩니다.'
+                  : '현재 회의는 배치 전사 모드입니다. 음성 파일 업로드 후 AWS 배치 전사 잡으로 처리됩니다.'}
               </div>
-              <TranscriptPanel meetingId={currentMeeting.id} />
+              {isRealtimeMode ? (
+                <TranscriptPanel meetingId={currentMeeting.id} />
+              ) : (
+                <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted">
+                  실시간 전사가 비활성화되어 있습니다. 회의 종료 후 배치 전사를 실행하세요.
+                </div>
+              )}
             </div>
           </aside>
         </div>
