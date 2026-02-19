@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { existsSync, readFileSync } from 'fs';
+import fontkit from '@pdf-lib/fontkit';
+import { PDFFont, PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Repository } from 'typeorm';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
@@ -251,7 +253,18 @@ export class ResultService {
     content: string,
   ): Promise<Buffer> {
     const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const customFontBytes = this.loadPdfFontBytes();
+    let font: PDFFont;
+    let pdfLines = [`# ${title}`, '', ...content.split('\n')];
+
+    if (customFontBytes) {
+      pdfDoc.registerFontkit(fontkit);
+      font = await pdfDoc.embedFont(customFontBytes, { subset: true });
+    } else {
+      font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      pdfLines = pdfLines.map((line) => line.replace(/[^\x20-\x7e]/g, '?'));
+    }
+
     const margin = 44;
     const fontSize = 10.5;
     const lineHeight = 15;
@@ -261,12 +274,7 @@ export class ResultService {
 
     let page = pdfDoc.addPage([pageWidth, pageHeight]);
     let cursorY = page.getHeight() - margin;
-    const lines = this.wrapLines(
-      [`# ${title}`, '', ...content.split('\n')],
-      font,
-      fontSize,
-      maxLineWidth,
-    );
+    const lines = this.wrapLines(pdfLines, font, fontSize, maxLineWidth);
 
     for (const line of lines) {
       if (cursorY <= margin) {
@@ -334,16 +342,14 @@ export class ResultService {
 
   private wrapLines(
     sourceLines: string[],
-    font: Awaited<ReturnType<PDFDocument['embedFont']>>,
+    font: PDFFont,
     fontSize: number,
     maxLineWidth: number,
   ): string[] {
     const lines: string[] = [];
 
     for (const rawLine of sourceLines) {
-      const normalized = rawLine
-        .replace(/[^\x20-\x7e]/g, '?')
-        .replace(/\t/g, '    ');
+      const normalized = rawLine.replace(/\t/g, '    ');
       if (normalized.length === 0) {
         lines.push('');
         continue;
@@ -379,5 +385,20 @@ export class ResultService {
     }
 
     return lines;
+  }
+
+  private loadPdfFontBytes(): Uint8Array | null {
+    const candidates = [
+      '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+      '/Library/Fonts/Arial Unicode.ttf',
+    ];
+
+    for (const path of candidates) {
+      if (existsSync(path)) {
+        return readFileSync(path);
+      }
+    }
+
+    return null;
   }
 }
