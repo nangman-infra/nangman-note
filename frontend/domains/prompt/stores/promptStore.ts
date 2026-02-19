@@ -1,14 +1,12 @@
 import { create } from 'zustand';
 import { promptApi } from '../api/promptApi';
-import type { Prompt, CreatePromptDto } from '../types/prompt.types';
+import type { CreatePromptDto, Prompt } from '../types/prompt.types';
 
 interface PromptState {
   prompts: Prompt[];
   selectedPromptId: string;
   isLoading: boolean;
   error: string | null;
-
-  // Actions
   fetchPrompts: () => Promise<void>;
   createPrompt: (dto: CreatePromptDto) => Promise<void>;
   updatePrompt: (id: string, dto: Partial<CreatePromptDto>) => Promise<void>;
@@ -16,9 +14,9 @@ interface PromptState {
   setSelectedPrompt: (id: string) => void;
 }
 
-export const usePromptStore = create<PromptState>((set, get) => ({
+export const usePromptStore = create<PromptState>((set) => ({
   prompts: [],
-  selectedPromptId: 'prompt_default_meeting', // 기본값
+  selectedPromptId: 'prompt_default_meeting',
   isLoading: false,
   error: null,
 
@@ -28,9 +26,9 @@ export const usePromptStore = create<PromptState>((set, get) => ({
       const prompts = await promptApi.list();
       set({ prompts, isLoading: false });
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to fetch prompts',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },
@@ -41,12 +39,12 @@ export const usePromptStore = create<PromptState>((set, get) => ({
       const newPrompt = await promptApi.create(dto);
       set((state) => ({
         prompts: [...state.prompts, newPrompt],
-        isLoading: false
+        isLoading: false,
       }));
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to create prompt',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },
@@ -56,13 +54,13 @@ export const usePromptStore = create<PromptState>((set, get) => ({
       set({ isLoading: true, error: null });
       const updated = await promptApi.update(id, dto);
       set((state) => ({
-        prompts: state.prompts.map((p) => (p.id === id ? updated : p)),
-        isLoading: false
+        prompts: state.prompts.map((prompt) => (prompt.id === id ? updated : prompt)),
+        isLoading: false,
       }));
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to update prompt',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },
@@ -72,13 +70,13 @@ export const usePromptStore = create<PromptState>((set, get) => ({
       set({ isLoading: true, error: null });
       await promptApi.delete(id);
       set((state) => ({
-        prompts: state.prompts.filter((p) => p.id !== id),
-        isLoading: false
+        prompts: state.prompts.filter((prompt) => prompt.id !== id),
+        isLoading: false,
       }));
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to delete prompt',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },

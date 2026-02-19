@@ -7,6 +7,6 @@ export const transcriptionApi = {
     const response = await apiClient.get<{ data: { segments: TranscriptSegment[] } }>(
       `/api/v1/meetings/${meetingId}/transcripts`
     );
-    return response.data.segments;
+    return response.data.data.segments;
   },
 };

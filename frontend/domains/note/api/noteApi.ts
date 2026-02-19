@@ -8,7 +8,7 @@ export const noteApi = {
       `/api/v1/meetings/${meetingId}/note`,
       { content }
     );
-    return response.data;
+    return response.data.data;
   },
 
   // 노트 조회
@@ -16,6 +16,6 @@ export const noteApi = {
     const response = await apiClient.get<{ data: Note }>(
       `/api/v1/meetings/${meetingId}/note`
     );
-    return response.data;
+    return response.data.data;
   },
 };

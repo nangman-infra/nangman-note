@@ -1,26 +1,34 @@
 import { create } from 'zustand';
+import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { meetingApi } from '../api/meetingApi';
-import type { Meeting, CreateMeetingDto } from '../types/meeting.types';
+import { MeetingStatus, type CreateMeetingDto, type Meeting, type SearchResult } from '../types/meeting.types';
 
 interface MeetingState {
-  // 현재 회의
   currentMeeting: Meeting | null;
   isRecording: boolean;
   elapsedTime: number;
-
-  // 회의 목록
   meetings: Meeting[];
   isLoading: boolean;
   error: string | null;
-
-  // Actions
-  startMeeting: (dto: CreateMeetingDto) => Promise<void>;
-  endMeeting: () => Promise<void>;
-  updatePrompt: (promptId: string) => Promise<void>;
+  startMeeting: (dto: CreateMeetingDto) => Promise<Meeting | null>;
+  endMeeting: () => Promise<boolean>;
+  updatePrompt: (promptId: string) => Promise<Meeting | null>;
   fetchMeetings: () => Promise<void>;
   searchMeetings: (query: string, scope?: string) => Promise<void>;
   deleteMeeting: (id: string) => Promise<void>;
   setCurrentMeeting: (meeting: Meeting | null) => void;
+}
+
+function mapSearchResultToMeeting(result: SearchResult): Meeting {
+  return {
+    id: result.meetingId,
+    title: result.title || result.snippet,
+    promptId: DEFAULT_PROMPT_ID,
+    status: MeetingStatus.COMPLETED,
+    startedAt: result.startedAt,
+    createdAt: result.startedAt,
+    updatedAt: result.startedAt,
+  };
 }
 
 export const useMeetingStore = create<MeetingState>((set, get) => ({
@@ -35,48 +43,50 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const meeting = await meetingApi.create(dto);
-      set({ 
-        currentMeeting: meeting, 
-        isRecording: true,
-        isLoading: false 
-      });
+      set({ currentMeeting: meeting, isRecording: true, isLoading: false });
+      return meeting;
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to start meeting',
-        isLoading: false 
+        isLoading: false,
       });
+      return null;
     }
   },
 
   endMeeting: async () => {
     const { currentMeeting } = get();
-    if (!currentMeeting) return;
+    if (!currentMeeting) return false;
 
     try {
       set({ isLoading: true, error: null });
       await meetingApi.complete(currentMeeting.id);
       set({ isRecording: false, isLoading: false });
+      return true;
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to end meeting',
-        isLoading: false 
+        isLoading: false,
       });
+      return false;
     }
   },
 
   updatePrompt: async (promptId) => {
     const { currentMeeting } = get();
-    if (!currentMeeting) return;
+    if (!currentMeeting) return null;
 
     try {
       set({ isLoading: true, error: null });
       const updated = await meetingApi.updatePrompt(currentMeeting.id, promptId);
       set({ currentMeeting: updated, isLoading: false });
+      return updated;
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to update prompt',
-        isLoading: false 
+        isLoading: false,
       });
+      return null;
     }
   },
 
@@ -86,9 +96,9 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       const meetings = await meetingApi.list();
       set({ meetings, isLoading: false });
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to fetch meetings',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },
@@ -97,12 +107,11 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const results = await meetingApi.search(query, scope);
-      // SearchResult를 Meeting 형식으로 변환 (간단히 처리)
-      set({ meetings: results as any, isLoading: false });
+      set({ meetings: results.map(mapSearchResultToMeeting), isLoading: false });
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to search meetings',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },
@@ -112,13 +121,13 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       set({ isLoading: true, error: null });
       await meetingApi.delete(id);
       set((state) => ({
-        meetings: state.meetings.filter((m) => m.id !== id),
-        isLoading: false
+        meetings: state.meetings.filter((meeting) => meeting.id !== id),
+        isLoading: false,
       }));
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to delete meeting',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },

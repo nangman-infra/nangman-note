@@ -7,7 +7,7 @@ export const resultApi = {
     const response = await apiClient.get<{ data: MeetingResult }>(
       `/api/v1/meetings/${meetingId}/result`
     );
-    return response.data;
+    return response.data.data;
   },
 
   // 회의록 편집
@@ -16,7 +16,7 @@ export const resultApi = {
       `/api/v1/meetings/${meetingId}/result`,
       { content }
     );
-    return response.data;
+    return response.data.data;
   },
 
   // 회의록 재생성 (프롬프트 변경)
@@ -25,7 +25,7 @@ export const resultApi = {
       `/api/v1/meetings/${meetingId}/result/regenerate`,
       { promptId }
     );
-    return response.data;
+    return response.data.data;
   },
 
   // PDF 다운로드

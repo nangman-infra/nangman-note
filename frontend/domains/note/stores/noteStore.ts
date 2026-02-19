@@ -1,14 +1,11 @@
 import { create } from 'zustand';
 import { noteApi } from '../api/noteApi';
-import type { Note } from '../types/note.types';
 
 interface NoteState {
   noteContent: string;
   isSaving: boolean;
   lastSaved: Date | null;
   error: string | null;
-
-  // Actions
   setContent: (content: string) => void;
   saveNote: (meetingId: string) => Promise<void>;
   loadNote: (meetingId: string) => Promise<void>;
@@ -33,9 +30,9 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       await noteApi.save(meetingId, noteContent);
       set({ isSaving: false, lastSaved: new Date() });
     } catch (error) {
-      set({ 
+      set({
         isSaving: false,
-        error: error instanceof Error ? error.message : 'Failed to save note'
+        error: error instanceof Error ? error.message : 'Failed to save note',
       });
     }
   },
@@ -46,8 +43,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       const note = await noteApi.get(meetingId);
       set({ noteContent: note.content });
     } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to load note'
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load note',
       });
     }
   },

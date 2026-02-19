@@ -1,5 +1,32 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Variables
+
+This project validates frontend environment variables at runtime via `lib/config/env.ts` (Zod schema).
+Environment profiles are managed separately for development and production.
+
+```bash
+# Development
+cp .env.development.example .env.development.local
+
+# Production
+cp .env.production.example .env.production.local
+```
+
+Required keys for both profiles:
+
+- `NEXT_PUBLIC_API_URL` (http/https URL)
+- `NEXT_PUBLIC_WS_URL` (ws/wss URL)
+- `NEXT_PUBLIC_APP_NAME`
+- `NEXT_PUBLIC_APP_VERSION`
+- `NEXT_PUBLIC_ENABLE_OFFLINE` (`true` or `false`)
+- `NEXT_PUBLIC_AUTO_SAVE_DELAY` (number: 500~10000)
+
+Validation policy:
+
+- Development (`NODE_ENV=development`): API/WS URL have localhost defaults.
+- Production (`NODE_ENV=production`): API/WS URL use production defaults and print warning if not explicitly set.
+
 ## Getting Started
 
 First, run the development server:

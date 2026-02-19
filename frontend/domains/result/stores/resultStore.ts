@@ -7,16 +7,14 @@ interface ResultState {
   isLoading: boolean;
   isRegenerating: boolean;
   error: string | null;
-
-  // Actions
   fetchResult: (meetingId: string) => Promise<void>;
-  updateResult: (meetingId: string, content: string) => Promise<void>;
-  regenerateResult: (meetingId: string, promptId: string) => Promise<void>;
-  exportPDF: (meetingId: string) => Promise<void>;
+  updateResult: (meetingId: string, content: string) => Promise<boolean>;
+  regenerateResult: (meetingId: string, promptId: string) => Promise<boolean>;
+  exportPDF: (meetingId: string) => Promise<boolean>;
   clearResult: () => void;
 }
 
-export const useResultStore = create<ResultState>((set, get) => ({
+export const useResultStore = create<ResultState>((set) => ({
   result: null,
   isLoading: false,
   isRegenerating: false,
@@ -28,9 +26,9 @@ export const useResultStore = create<ResultState>((set, get) => ({
       const result = await resultApi.get(meetingId);
       set({ result, isLoading: false });
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to fetch result',
-        isLoading: false 
+        isLoading: false,
       });
     }
   },
@@ -40,11 +38,13 @@ export const useResultStore = create<ResultState>((set, get) => ({
       set({ isLoading: true, error: null });
       const updated = await resultApi.update(meetingId, content);
       set({ result: updated, isLoading: false });
+      return true;
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to update result',
-        isLoading: false 
+        isLoading: false,
       });
+      return false;
     }
   },
 
@@ -53,11 +53,13 @@ export const useResultStore = create<ResultState>((set, get) => ({
       set({ isRegenerating: true, error: null });
       const regenerated = await resultApi.regenerate(meetingId, promptId);
       set({ result: regenerated, isRegenerating: false });
+      return true;
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to regenerate result',
-        isRegenerating: false 
+        isRegenerating: false,
       });
+      return false;
     }
   },
 
@@ -65,20 +67,20 @@ export const useResultStore = create<ResultState>((set, get) => ({
     try {
       set({ error: null });
       const blob = await resultApi.exportPDF(meetingId);
-      
-      // 다운로드 트리거
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `meeting_${meetingId}_result.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `meeting_${meetingId}_result.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
       window.URL.revokeObjectURL(url);
+      return true;
     } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to export PDF'
+      set({
+        error: error instanceof Error ? error.message : 'Failed to export PDF',
       });
+      return false;
     }
   },
 

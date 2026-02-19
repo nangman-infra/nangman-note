@@ -1,11 +1,21 @@
 import { io, Socket } from 'socket.io-client';
-import type { TranscriptSegment } from '@/domains/transcription/types/transcription.types';
+import { env } from '@/lib/config/env';
+
+export interface TranscriptionStreamMessage {
+  id: string;
+  meetingId: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+  confidence: number;
+  createdAt: string;
+}
 
 export class TranscriptionSocket {
   private socket: Socket | null = null;
 
   connect(meetingId: string): Socket {
-    this.socket = io(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3000', {
+    this.socket = io(env.WS_URL, {
       path: '/ws/transcribe',
       query: { meetingId },
       transports: ['websocket'],
@@ -32,7 +42,7 @@ export class TranscriptionSocket {
     }
   }
 
-  onTranscript(callback: (segment: TranscriptSegment) => void) {
+  onTranscript(callback: (segment: TranscriptionStreamMessage) => void) {
     if (this.socket) {
       this.socket.on('transcript', callback);
     }

@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { env } from '@/lib/config/env';
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
+  baseURL: env.API_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -22,12 +23,9 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 응답 인터셉터
+// 응답 인터셉터 (에러 메시지 표준화)
 apiClient.interceptors.response.use(
-  (response) => {
-    // { success: true, data: ... } 형식에서 data 추출
-    return response.data;
-  },
+  (response) => response,
   (error) => {
     const message = error.response?.data?.error?.message || '오류가 발생했습니다';
     return Promise.reject(new Error(message));

@@ -2,64 +2,133 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
+import { ArrowLeft, Clock3, Mic, ShieldCheck, Sparkles } from 'lucide-react';
+import { useFeedback } from '@/components/feedback/FeedbackProvider';
+import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { PromptSelector } from '@/domains/prompt/components/PromptSelector';
+import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
 import { usePromptStore } from '@/domains/prompt/stores/promptStore';
 
 export default function NewMeetingPage() {
   const router = useRouter();
-  const { startMeeting, isLoading } = useMeeting();
+  const { pushToast } = useFeedback();
+  const { startMeeting, isLoading, error } = useMeeting();
   const { selectedPromptId } = usePromptStore();
   const [title, setTitle] = useState('');
 
   const handleStart = async () => {
-    try {
-      await startMeeting({
-        title: title.trim() || undefined,
-        promptId: selectedPromptId,
+    const meeting = await startMeeting({
+      title: title.trim() || undefined,
+      promptId: selectedPromptId,
+    });
+
+    if (!meeting) {
+      pushToast({
+        title: '회의 시작에 실패했습니다',
+        description: error || '서버 연결 상태를 확인해주세요.',
+        variant: 'error',
       });
-      
-      // 회의 진행 화면으로 이동 (추후 구현)
-      router.push('/meeting/in-progress');
-    } catch (error) {
-      console.error('Failed to start meeting:', error);
+      return;
     }
+
+    pushToast({
+      title: '회의를 시작했습니다',
+      description: '실시간 노트 화면으로 이동합니다.',
+      variant: 'success',
+    });
+    router.push('/meeting/in-progress');
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold mb-2">TransNote</h1>
-          <p className="text-sm text-gray-600">실시간 전사 + AI 회의록</p>
-        </div>
-
-        <div className="space-y-6">
+    <div className="app-shell min-h-dvh p-4 sm:p-6">
+      <div className="mx-auto grid min-h-[calc(100dvh-2rem)] w-full max-w-6xl gap-4 lg:grid-cols-[1fr_460px]">
+        <section className="glass-surface motion-rise flex flex-col justify-between p-6 sm:p-8">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              회의 제목 (선택)
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 1분기 마케팅 전략 회의"
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <button type="button" onClick={() => router.push('/')} className="btn-neo mb-5 text-xs text-muted">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              워크스페이스로 돌아가기
+            </button>
+
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[var(--line-soft)] bg-white px-2.5 py-1 text-xs font-semibold text-brand">
+              <Sparkles className="h-3.5 w-3.5" />
+              Start Session
+            </div>
+            <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">회의를 시작하고 노트를 바로 작성하세요</h1>
+            <p className="mt-3 max-w-xl text-sm text-muted sm:text-base">
+              회의 중에는 노트를 중심으로 기록하고, 전사는 백그라운드에서 자동 수집됩니다. 종료 후에는 선택한
+              프롬프트로 결과를 생성합니다.
+            </p>
           </div>
 
-          <PromptSelector />
+          <div className="mt-8 grid gap-2 sm:grid-cols-3">
+            <FeatureCard icon={Clock3} title="실시간 기록" description="노트 자동 저장 + 전사 수집" />
+            <FeatureCard icon={ShieldCheck} title="보안 우선" description="녹음 파일 미저장 정책" />
+            <FeatureCard icon={Mic} title="빠른 시작" description="제목 입력 후 즉시 시작" />
+          </div>
+        </section>
 
-          <button
-            onClick={handleStart}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <span className="text-lg">🎤</span>
-            {isLoading ? '시작 중...' : '회의 시작'}
-          </button>
-        </div>
+        <section className="glass-surface motion-rise p-6 sm:p-7">
+          <p className="text-xs font-semibold tracking-wide text-muted">NEW MEETING</p>
+          <h2 className="mt-1 text-2xl font-semibold">회의 시작 설정</h2>
+
+          {error ? (
+            <StatusBanner
+              variant="error"
+              title="회의 시작 준비 실패"
+              message="연결 상태를 확인한 뒤 다시 시도해주세요."
+              className="mt-4"
+            />
+          ) : null}
+
+          <div className="mt-6 space-y-5">
+            <div>
+              <label htmlFor="meeting-title" className="mb-2 block text-sm font-medium">
+                회의 제목 (선택)
+              </label>
+              <input
+                id="meeting-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: 1분기 마케팅 전략 회의"
+                className="input-shell"
+              />
+            </div>
+
+            <PromptSelector />
+
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={isLoading}
+              className="btn-neo w-full border-transparent bg-brand py-3 text-base text-white hover:bg-brand-strong hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Mic className="h-4 w-4" />
+              {isLoading ? '회의를 준비하는 중...' : '회의 시작'}
+            </button>
+          </div>
+        </section>
       </div>
     </div>
+  );
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+}) {
+  return (
+    <article className="surface-card p-3">
+      <div className="mb-2 inline-flex rounded-full bg-brand/10 p-1.5 text-brand">
+        <Icon className="h-4 w-4" />
+      </div>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="mt-1 text-xs text-muted">{description}</p>
+    </article>
   );
 }

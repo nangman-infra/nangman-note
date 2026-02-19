@@ -11,3 +11,8 @@ export interface CreatePromptDto {
   name: string;
   content: string;
 }
+
+export interface PromptListResponse {
+  default: Prompt[];
+  user: Prompt[];
+}

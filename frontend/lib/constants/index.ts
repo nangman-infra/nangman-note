@@ -1,14 +1,16 @@
+import { env } from '@/lib/config/env';
+
 // API URLs
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3000';
+export const API_URL = env.API_URL;
+export const WS_URL = env.WS_URL;
 
 // App Configuration
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'TransNote';
-export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
+export const APP_NAME = env.APP_NAME;
+export const APP_VERSION = env.APP_VERSION;
 
 // Feature Flags
-export const ENABLE_OFFLINE = process.env.NEXT_PUBLIC_ENABLE_OFFLINE === 'true';
-export const AUTO_SAVE_DELAY = Number(process.env.NEXT_PUBLIC_AUTO_SAVE_DELAY) || 3000;
+export const ENABLE_OFFLINE = env.ENABLE_OFFLINE;
+export const AUTO_SAVE_DELAY = env.AUTO_SAVE_DELAY;
 
 // UI Constants
 export const SIDEBAR_WIDTH = 240;
