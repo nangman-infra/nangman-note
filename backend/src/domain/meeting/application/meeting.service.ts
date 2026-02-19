@@ -1,0 +1,353 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { PromptService } from '../../prompt/application/prompt.service';
+import { MeetingEntity } from '../domain/meeting.entity';
+import { MeetingStatus } from '../domain/meeting-status.enum';
+import { CreateMeetingDto } from './dto/create-meeting.dto';
+import { ListMeetingsQueryDto } from './dto/list-meetings-query.dto';
+import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
+import { UpdateMeetingDto } from './dto/update-meeting.dto';
+
+const DEFAULT_PROMPT_ID = 'prompt_default_meeting';
+const SEARCH_SCOPES = ['all', 'title', 'result', 'transcript', 'note'] as const;
+type SearchScope = (typeof SEARCH_SCOPES)[number];
+export type SearchMatchedIn = Exclude<SearchScope, 'all'>;
+
+export interface MeetingSearchResult {
+  meetingId: string;
+  title?: string;
+  matchedIn: SearchMatchedIn;
+  snippet: string;
+  startedAt: Date;
+}
+
+@Injectable()
+export class MeetingService {
+  constructor(
+    @InjectRepository(MeetingEntity)
+    private readonly meetingRepository: Repository<MeetingEntity>,
+    private readonly promptService: PromptService,
+  ) {}
+
+  async create(dto: CreateMeetingDto): Promise<MeetingEntity> {
+    const promptId = dto.promptId || DEFAULT_PROMPT_ID;
+    await this.promptService.ensureExists(promptId);
+
+    const meeting = this.meetingRepository.create({
+      title: dto.title?.trim() || undefined,
+      promptId,
+      status: MeetingStatus.RECORDING,
+      startedAt: new Date(),
+    });
+
+    return this.meetingRepository.save(meeting);
+  }
+
+  async list(query: ListMeetingsQueryDto): Promise<{
+    meetings: MeetingEntity[];
+    pagination: { page: number; limit: number; total: number };
+  }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const [meetings, total] = await this.meetingRepository.findAndCount({
+      order: { startedAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return {
+      meetings,
+      pagination: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
+  async search(query: SearchMeetingsQueryDto): Promise<{
+    results: MeetingSearchResult[];
+    pagination: { page: number; limit: number; total: number };
+  }> {
+    const keyword = query.q.trim();
+    const scope = query.scope ?? 'all';
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    if (keyword.length === 0) {
+      throw new BadRequestException('Search query must not be empty');
+    }
+
+    if (!SEARCH_SCOPES.includes(scope)) {
+      throw new BadRequestException(`Unsupported search scope: ${scope}`);
+    }
+
+    const loweredKeyword = keyword.toLowerCase();
+    const likeKeyword = `%${loweredKeyword}%`;
+
+    const baseQuery = this.meetingRepository
+      .createQueryBuilder('meeting')
+      .leftJoin('meeting.result', 'result')
+      .leftJoin('meeting.note', 'note')
+      .leftJoin('meeting.transcripts', 'transcript');
+
+    this.applySearchScope(baseQuery, scope, likeKeyword);
+
+    const countRaw = await baseQuery
+      .clone()
+      .select('COUNT(DISTINCT meeting.id)', 'total')
+      .getRawOne<{ total: string | number }>();
+    const total = Number(countRaw?.total ?? 0);
+
+    if (total === 0) {
+      return {
+        results: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+        },
+      };
+    }
+
+    const idRows = await baseQuery
+      .clone()
+      .select('meeting.id', 'id')
+      .distinct(true)
+      .orderBy('meeting.started_at', 'DESC')
+      .offset(skip)
+      .limit(limit)
+      .getRawMany<{ id: string }>();
+
+    const meetingIds = idRows.map((row) => row.id);
+    if (meetingIds.length === 0) {
+      return {
+        results: [],
+        pagination: {
+          page,
+          limit,
+          total,
+        },
+      };
+    }
+
+    const meetings = await this.meetingRepository.find({
+      where: { id: In(meetingIds) },
+      relations: {
+        note: true,
+        result: true,
+        transcripts: true,
+      },
+    });
+
+    const meetingById = new Map(
+      meetings.map((meeting) => [meeting.id, meeting]),
+    );
+    const results = meetingIds
+      .map((id) => meetingById.get(id))
+      .filter((meeting): meeting is MeetingEntity => Boolean(meeting))
+      .map((meeting) =>
+        this.toSearchResult({
+          meeting,
+          scope,
+          keyword,
+          loweredKeyword,
+        }),
+      );
+
+    return {
+      results,
+      pagination: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
+  async findById(id: string): Promise<MeetingEntity> {
+    const meeting = await this.meetingRepository.findOne({
+      where: { id },
+    });
+
+    if (!meeting) {
+      throw new NotFoundException(`Meeting ${id} not found`);
+    }
+
+    return meeting;
+  }
+
+  async updatePrompt(
+    id: string,
+    dto: UpdateMeetingDto,
+  ): Promise<MeetingEntity> {
+    const meeting = await this.findById(id);
+    await this.promptService.ensureExists(dto.promptId);
+
+    meeting.promptId = dto.promptId;
+
+    return this.meetingRepository.save(meeting);
+  }
+
+  async complete(id: string): Promise<MeetingEntity> {
+    const meeting = await this.findById(id);
+
+    meeting.status = MeetingStatus.PROCESSING;
+    meeting.endedAt = new Date();
+
+    return this.meetingRepository.save(meeting);
+  }
+
+  async remove(id: string): Promise<void> {
+    const meeting = await this.findById(id);
+    await this.meetingRepository.remove(meeting);
+  }
+
+  private applySearchScope(
+    queryBuilder: SelectQueryBuilder<MeetingEntity>,
+    scope: SearchScope,
+    likeKeyword: string,
+  ): void {
+    switch (scope) {
+      case 'title':
+        queryBuilder.where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
+          keyword: likeKeyword,
+        });
+        return;
+      case 'result':
+        queryBuilder.where(
+          "LOWER(COALESCE(result.content, '')) LIKE :keyword",
+          {
+            keyword: likeKeyword,
+          },
+        );
+        return;
+      case 'transcript':
+        queryBuilder.where(
+          "LOWER(COALESCE(transcript.text, '')) LIKE :keyword",
+          {
+            keyword: likeKeyword,
+          },
+        );
+        return;
+      case 'note':
+        queryBuilder.where("LOWER(COALESCE(note.content, '')) LIKE :keyword", {
+          keyword: likeKeyword,
+        });
+        return;
+      case 'all':
+      default:
+        queryBuilder
+          .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
+            keyword: likeKeyword,
+          })
+          .orWhere("LOWER(COALESCE(result.content, '')) LIKE :keyword")
+          .orWhere("LOWER(COALESCE(note.content, '')) LIKE :keyword")
+          .orWhere("LOWER(COALESCE(transcript.text, '')) LIKE :keyword");
+    }
+  }
+
+  private toSearchResult(params: {
+    meeting: MeetingEntity;
+    scope: SearchScope;
+    keyword: string;
+    loweredKeyword: string;
+  }): MeetingSearchResult {
+    const { meeting, scope, keyword, loweredKeyword } = params;
+
+    const title = meeting.title?.trim() ?? '';
+    const resultContent = meeting.result?.content?.trim() ?? '';
+    const noteContent = meeting.note?.content?.trim() ?? '';
+    const transcriptContent = this.pickTranscriptContent(
+      meeting,
+      loweredKeyword,
+    );
+
+    const candidateOrder: Array<{
+      matchedIn: SearchMatchedIn;
+      content: string;
+    }> =
+      scope === 'all'
+        ? [
+            { matchedIn: 'title', content: title },
+            { matchedIn: 'result', content: resultContent },
+            { matchedIn: 'note', content: noteContent },
+            { matchedIn: 'transcript', content: transcriptContent },
+          ]
+        : [
+            {
+              matchedIn: scope as SearchMatchedIn,
+              content:
+                scope === 'title'
+                  ? title
+                  : scope === 'result'
+                    ? resultContent
+                    : scope === 'note'
+                      ? noteContent
+                      : transcriptContent,
+            },
+          ];
+
+    const matched =
+      candidateOrder.find((candidate) =>
+        candidate.content.toLowerCase().includes(loweredKeyword),
+      ) ??
+      candidateOrder.find((candidate) => candidate.content.length > 0) ??
+      ({ matchedIn: 'title', content: title || keyword } as const);
+
+    return {
+      meetingId: meeting.id,
+      title: meeting.title,
+      matchedIn: matched.matchedIn,
+      snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
+      startedAt: meeting.startedAt,
+    };
+  }
+
+  private pickTranscriptContent(
+    meeting: MeetingEntity,
+    loweredKeyword: string,
+  ): string {
+    const texts = (meeting.transcripts ?? [])
+      .map((segment) => segment.text?.trim() ?? '')
+      .filter((text) => text.length > 0);
+
+    const matched = texts.find((text) =>
+      text.toLowerCase().includes(loweredKeyword),
+    );
+
+    return matched ?? texts[0] ?? '';
+  }
+
+  private buildSnippet(content: string, loweredKeyword: string): string {
+    const normalized = content.replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return '';
+    }
+
+    const maxLength = 220;
+    const matchIndex = normalized.toLowerCase().indexOf(loweredKeyword);
+    if (matchIndex < 0) {
+      return normalized.slice(0, maxLength);
+    }
+
+    const radius = 90;
+    const start = Math.max(0, matchIndex - radius);
+    const end = Math.min(
+      normalized.length,
+      matchIndex + loweredKeyword.length + radius,
+    );
+    const prefix = start > 0 ? '...' : '';
+    const suffix = end < normalized.length ? '...' : '';
+
+    return `${prefix}${normalized.slice(start, end)}${suffix}`;
+  }
+}

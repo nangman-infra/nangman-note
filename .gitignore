@@ -32,8 +32,16 @@ lerna-debug.log*
 
 # Environment variables
 .env
+.env.development
+.env.production
 .env.local
 .env.*.local
+backend/.env
+backend/.env.development
+backend/.env.production
+frontend/.env
+frontend/.env.development
+frontend/.env.production
 
 # Tests
 coverage/
