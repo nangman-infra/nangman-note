@@ -255,7 +255,7 @@ export class ResultService {
     const pdfDoc = await PDFDocument.create();
     const customFontBytes = this.loadPdfFontBytes();
     let font: PDFFont;
-    let pdfLines = [`# ${title}`, '', ...content.split('\n')];
+    let pdfLines = [title, '', ...this.convertMarkdownToPlainLines(content)];
 
     if (customFontBytes) {
       pdfDoc.registerFontkit(fontkit);
@@ -300,7 +300,7 @@ export class ResultService {
     title: string,
     content: string,
   ): Promise<Buffer> {
-    const bodyLines = content.split('\n');
+    const bodyLines = this.convertMarkdownToPlainLines(content);
     const children: Paragraph[] = [
       new Paragraph({
         children: [
@@ -315,7 +315,7 @@ export class ResultService {
     ];
 
     for (const line of bodyLines) {
-      const cleaned = line.replace(/^#{1,6}\s*/, '').trim();
+      const cleaned = line.trim();
       if (cleaned.length === 0) {
         children.push(new Paragraph({ text: '' }));
         continue;
@@ -338,6 +338,115 @@ export class ResultService {
     });
 
     return Packer.toBuffer(document);
+  }
+
+  private convertMarkdownToPlainLines(markdown: string): string[] {
+    const sourceLines = markdown.replace(/\r\n/g, '\n').split('\n');
+    const lines: string[] = [];
+    let inCodeBlock = false;
+
+    for (const rawLine of sourceLines) {
+      const trimmed = rawLine.trim();
+
+      if (trimmed.startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        lines.push('');
+        continue;
+      }
+
+      if (inCodeBlock) {
+        lines.push(rawLine.length > 0 ? `    ${rawLine}` : '');
+        continue;
+      }
+
+      if (/^([-*_])\1{2,}$/.test(trimmed)) {
+        lines.push('');
+        continue;
+      }
+
+      const headingMatch = rawLine.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        lines.push(this.stripMarkdownInline(headingMatch[2]).trim());
+        lines.push('');
+        continue;
+      }
+
+      const quoteMatch = rawLine.match(/^\s{0,3}>\s?(.*)$/);
+      if (quoteMatch) {
+        const quoteContent = this.stripMarkdownInline(quoteMatch[1]).trim();
+        lines.push(quoteContent.length > 0 ? `인용: ${quoteContent}` : '');
+        continue;
+      }
+
+      const unorderedMatch = rawLine.match(/^(\s*)[-*+]\s+(.*)$/);
+      if (unorderedMatch) {
+        const indent = Math.min(Math.floor(unorderedMatch[1].length / 2), 3);
+        const bulletContent = this.stripMarkdownInline(
+          unorderedMatch[2],
+        ).trim();
+        lines.push(`${'  '.repeat(indent)}• ${bulletContent}`);
+        continue;
+      }
+
+      const orderedMatch = rawLine.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
+      if (orderedMatch) {
+        const indent = Math.min(Math.floor(orderedMatch[1].length / 2), 3);
+        const numberContent = this.stripMarkdownInline(orderedMatch[3]).trim();
+        lines.push(
+          `${'  '.repeat(indent)}${orderedMatch[2]}. ${numberContent}`,
+        );
+        continue;
+      }
+
+      lines.push(this.stripMarkdownInline(rawLine).trim());
+    }
+
+    return this.compressBlankLines(lines);
+  }
+
+  private stripMarkdownInline(source: string): string {
+    let line = source;
+
+    line = line.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, altText: string) =>
+      altText?.trim().length > 0 ? `[이미지: ${altText.trim()}]` : '[이미지]',
+    );
+    line = line.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
+    line = line.replace(/`([^`]+)`/g, '$1');
+    line = line.replace(/\*\*([^*]+)\*\*/g, '$1');
+    line = line.replace(/__([^_]+)__/g, '$1');
+    line = line.replace(/\*([^*]+)\*/g, '$1');
+    line = line.replace(/_([^_]+)_/g, '$1');
+    line = line.replace(/~~([^~]+)~~/g, '$1');
+    line = line.replace(/\\([\\`*_{}()[\]#+\-.!>])/g, '$1');
+    line = line.replace(/\s+/g, ' ');
+
+    return line;
+  }
+
+  private compressBlankLines(lines: string[]): string[] {
+    const compact: string[] = [];
+    let previousWasBlank = false;
+
+    for (const line of lines) {
+      const isBlank = line.trim().length === 0;
+      if (isBlank) {
+        if (!previousWasBlank) {
+          compact.push('');
+        }
+      } else {
+        compact.push(line);
+      }
+      previousWasBlank = isBlank;
+    }
+
+    while (compact.length > 0 && compact[0] === '') {
+      compact.shift();
+    }
+    while (compact.length > 0 && compact[compact.length - 1] === '') {
+      compact.pop();
+    }
+
+    return compact;
   }
 
   private wrapLines(

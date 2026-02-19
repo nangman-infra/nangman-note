@@ -163,11 +163,20 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
 
       <section className="scroll-muted flex-1 overflow-y-auto px-6 py-5">
         {isEditing ? (
-          <textarea
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            className="min-h-[320px] w-full resize-y rounded-2xl border border-[var(--line-soft)] bg-white p-4 font-mono text-sm leading-relaxed"
-          />
+          <div className="grid gap-3 lg:grid-cols-2">
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="min-h-[320px] w-full resize-y rounded-2xl border border-[var(--line-soft)] bg-white p-4 font-mono text-sm leading-relaxed"
+            />
+            <article className="result-markdown surface-card min-h-[320px] p-5">
+              {editContent.trim().length > 0 ? (
+                <ReactMarkdown>{editContent}</ReactMarkdown>
+              ) : (
+                <p className="text-sm text-muted">마크다운 미리보기가 여기에 표시됩니다.</p>
+              )}
+            </article>
+          </div>
         ) : (
           <article className="result-markdown surface-card p-5">
             <ReactMarkdown>{result.content}</ReactMarkdown>
