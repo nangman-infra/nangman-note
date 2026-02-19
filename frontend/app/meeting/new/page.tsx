@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Clock3, Mic, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock3,
+  Mic,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { PromptSelector } from '@/domains/prompt/components/PromptSelector';
@@ -102,38 +109,75 @@ export default function NewMeetingPage() {
 
             <div>
               <p className="mb-2 block text-sm font-medium">전사 모드</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setTranscriptionMode(MeetingTranscriptionMode.BATCH)}
-                  className={`surface-card px-3 py-3 text-left transition ${
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="전사 모드 선택">
+                <label
+                  className={`relative block cursor-pointer rounded-[18px] border px-3 py-3 transition ${
                     transcriptionMode === MeetingTranscriptionMode.BATCH
-                      ? 'border-brand bg-brand/5'
-                      : 'border-[var(--line-soft)]'
+                      ? 'border-brand bg-brand/10 shadow-[0_0_0_2px_rgba(15,118,110,0.12)]'
+                      : 'bg-[var(--bg-card)] border-[var(--line-soft)]'
                   }`}
                 >
+                  <input
+                    type="radio"
+                    name="transcriptionMode"
+                    value={MeetingTranscriptionMode.BATCH}
+                    checked={transcriptionMode === MeetingTranscriptionMode.BATCH}
+                    onChange={() =>
+                      setTranscriptionMode(MeetingTranscriptionMode.BATCH)
+                    }
+                    className="sr-only"
+                  />
+                  {transcriptionMode === MeetingTranscriptionMode.BATCH ? (
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[11px] font-semibold text-brand">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      선택됨
+                    </span>
+                  ) : null}
                   <p className="text-sm font-semibold">Batch (기본)</p>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1 pr-2 text-xs text-muted">
                     회의 종료 후 AWS 배치 전사로 처리합니다. 비용과 안정성이 가장 좋습니다.
                   </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setTranscriptionMode(MeetingTranscriptionMode.REALTIME)
-                  }
-                  className={`surface-card px-3 py-3 text-left transition ${
+                </label>
+
+                <label
+                  className={`relative block cursor-pointer rounded-[18px] border px-3 py-3 transition ${
                     transcriptionMode === MeetingTranscriptionMode.REALTIME
-                      ? 'border-brand bg-brand/5'
-                      : 'border-[var(--line-soft)]'
+                      ? 'border-brand bg-brand/10 shadow-[0_0_0_2px_rgba(15,118,110,0.12)]'
+                      : 'bg-[var(--bg-card)] border-[var(--line-soft)]'
                   }`}
                 >
+                  <input
+                    type="radio"
+                    name="transcriptionMode"
+                    value={MeetingTranscriptionMode.REALTIME}
+                    checked={
+                      transcriptionMode === MeetingTranscriptionMode.REALTIME
+                    }
+                    onChange={() =>
+                      setTranscriptionMode(MeetingTranscriptionMode.REALTIME)
+                    }
+                    className="sr-only"
+                  />
+                  {transcriptionMode === MeetingTranscriptionMode.REALTIME ? (
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[11px] font-semibold text-brand">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      선택됨
+                    </span>
+                  ) : null}
                   <p className="text-sm font-semibold">Realtime (옵션)</p>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1 pr-2 text-xs text-muted">
                     웹소켓을 통해 실시간 전사 스트림을 활성화합니다.
                   </p>
-                </button>
+                </label>
               </div>
+              <p className="mt-2 text-xs text-muted">
+                현재 선택:{' '}
+                <span className="font-semibold text-foreground">
+                  {transcriptionMode === MeetingTranscriptionMode.BATCH
+                    ? 'Batch'
+                    : 'Realtime'}
+                </span>
+              </p>
             </div>
 
             <PromptSelector />
