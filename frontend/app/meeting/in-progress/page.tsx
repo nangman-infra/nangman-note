@@ -92,6 +92,14 @@ export default function InProgressMeetingPage() {
     return () => window.clearInterval(timerId);
   }, [currentMeeting?.startedAt]);
 
+  // 이미 종료된 회의면 자동으로 홈으로 이동
+  useEffect(() => {
+    if (currentMeeting && currentMeeting.status !== MeetingStatus.RECORDING && !showProcessing) {
+      setCurrentMeeting(null);
+      router.push('/');
+    }
+  }, [currentMeeting, showProcessing, setCurrentMeeting, router]);
+
   // 새로고침/재접속 복구: URL의 meetingId로 회의 상태 복원
   useEffect(() => {
     if (currentMeeting || !meetingIdFromQuery) return;
@@ -355,28 +363,8 @@ export default function InProgressMeetingPage() {
     );
   }
 
-  if (currentMeeting.status !== MeetingStatus.RECORDING) {
-    return (
-      <div className="app-shell flex min-h-dvh items-center justify-center p-6">
-        <div className="glass-surface w-full max-w-xl p-7 text-center">
-          <h1 className="text-2xl font-semibold">진행 중인 회의가 아닙니다</h1>
-          <p className="mt-2 text-sm text-muted">
-            이미 종료된 회의입니다. 홈 화면에서 회의 결과를 확인해주세요.
-          </p>
-          <div className="mt-5 flex justify-center gap-2">
-            <Link href="/" className="btn-neo">
-              홈으로 이동
-            </Link>
-            <Link
-              href="/meeting/new"
-              className="btn-neo border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white"
-            >
-              새 회의 시작
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+  if (currentMeeting.status !== MeetingStatus.RECORDING && !showProcessing) {
+    return null; // 홈으로 리다이렉트 중
   }
 
   return (
