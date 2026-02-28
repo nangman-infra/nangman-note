@@ -98,11 +98,14 @@ export class TranscriptionResultCollectorService {
           // 오디오 파일 삭제
           await this.deleteAudioFile(job.mediaUri);
 
-          // Meeting 상태 변경
-          await this.updateMeetingStatus(meetingId);
+          // 결과 생성 단계 진입 이벤트
+          this.emitGeneratingPhase(meetingId);
 
           // AI 결과물 자동 생성
           await this.triggerResultGeneration(meetingId);
+
+          // 생성 완료 후 Meeting 상태 변경
+          await this.updateMeetingStatus(meetingId);
 
           return { success: true, segmentCount };
         }
@@ -285,9 +288,7 @@ export class TranscriptionResultCollectorService {
     return typeof value === 'object' && value !== null;
   }
 
-  private parseS3HttpsUrl(
-    url: string,
-  ): { bucket: string; key: string } | null {
+  private parseS3HttpsUrl(url: string): { bucket: string; key: string } | null {
     try {
       const parsed = new URL(url);
       if (!parsed.hostname.endsWith('.amazonaws.com')) {
@@ -295,7 +296,10 @@ export class TranscriptionResultCollectorService {
       }
 
       // 형식 1: https://s3.{region}.amazonaws.com/{bucket}/{key}
-      if (parsed.hostname.startsWith('s3.') || parsed.hostname === 's3.amazonaws.com') {
+      if (
+        parsed.hostname.startsWith('s3.') ||
+        parsed.hostname === 's3.amazonaws.com'
+      ) {
         const pathParts = parsed.pathname.slice(1).split('/');
         if (pathParts.length < 2) return null;
         const bucket = pathParts[0];
@@ -357,12 +361,6 @@ export class TranscriptionResultCollectorService {
         MeetingStatus.COMPLETED,
       );
       this.logger.log(`Meeting ${meetingId} status updated to COMPLETED`);
-
-      // 도메인 이벤트 발행 → MeetingStatusGateway 가 WebSocket 으로 브로드캐스트
-      this.eventEmitter.emit(
-        MeetingStatusChangedEvent.EVENT_NAME,
-        new MeetingStatusChangedEvent(meetingId, MeetingStatus.COMPLETED),
-      );
     } catch (error) {
       this.logger.warn(
         `Failed to update meeting status for ${meetingId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -372,8 +370,7 @@ export class TranscriptionResultCollectorService {
 
   private async triggerResultGeneration(meetingId: string): Promise<void> {
     try {
-      // findByMeetingId는 결과가 없으면 자동으로 generateAndSave를 호출함
-      await this.resultService.findByMeetingId(meetingId);
+      await this.resultService.generateForPipeline(meetingId);
       this.logger.log(`Result auto-generated for meeting ${meetingId}`);
     } catch (error) {
       this.logger.warn(
@@ -387,11 +384,23 @@ export class TranscriptionResultCollectorService {
     mediaUri: string,
   ): Promise<void> {
     await this.deleteAudioFile(mediaUri);
-    await this.updateMeetingStatus(meetingId);
+    this.emitGeneratingPhase(meetingId);
     await this.triggerResultGeneration(meetingId);
+    await this.updateMeetingStatus(meetingId);
   }
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private emitGeneratingPhase(meetingId: string): void {
+    this.eventEmitter.emit(
+      MeetingStatusChangedEvent.EVENT_NAME,
+      new MeetingStatusChangedEvent(
+        meetingId,
+        MeetingStatus.PROCESSING,
+        'generating',
+      ),
+    );
   }
 }

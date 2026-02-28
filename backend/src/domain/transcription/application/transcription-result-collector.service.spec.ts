@@ -22,7 +22,7 @@ describe('TranscriptionResultCollectorService', () => {
     Pick<BatchTranscriptionProvider, 'getJobStatus'>
   >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'updateStatus'>>;
-  let resultService: jest.Mocked<Pick<ResultService, 'findByMeetingId'>>;
+  let resultService: jest.Mocked<Pick<ResultService, 'generateForPipeline'>>;
   let s3AudioService: jest.Mocked<
     Pick<S3AudioService, 'getObjectAsStringFromBucket' | 'deleteAudioFile'>
   >;
@@ -60,7 +60,7 @@ describe('TranscriptionResultCollectorService', () => {
       updateStatus: jest.fn(),
     };
     resultService = {
-      findByMeetingId: jest.fn(),
+      generateForPipeline: jest.fn(),
     };
     s3AudioService = {
       getObjectAsStringFromBucket: jest.fn(),
@@ -131,7 +131,7 @@ describe('TranscriptionResultCollectorService', () => {
       Promise.resolve(entity as TranscriptSegmentEntity),
     );
     meetingService.updateStatus.mockResolvedValue({} as never);
-    resultService.findByMeetingId.mockResolvedValue({} as never);
+    resultService.generateForPipeline.mockResolvedValue({} as never);
     s3AudioService.deleteAudioFile.mockResolvedValue(undefined);
 
     const result = await service.pollAndCollect('meeting-1', 'job-1');
@@ -146,7 +146,15 @@ describe('TranscriptionResultCollectorService', () => {
       'meeting-1',
       MeetingStatus.COMPLETED,
     );
-    expect(resultService.findByMeetingId).toHaveBeenCalledWith('meeting-1');
+    expect(resultService.generateForPipeline).toHaveBeenCalledWith('meeting-1');
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'meeting.status.changed',
+      expect.objectContaining({
+        meetingId: 'meeting-1',
+        status: MeetingStatus.PROCESSING,
+        phase: 'generating',
+      }),
+    );
   });
 
   it('handles failed transcription by finalizing meeting safely', async () => {
@@ -161,7 +169,7 @@ describe('TranscriptionResultCollectorService', () => {
     });
     s3AudioService.deleteAudioFile.mockResolvedValue(undefined);
     meetingService.updateStatus.mockResolvedValue({} as never);
-    resultService.findByMeetingId.mockResolvedValue({} as never);
+    resultService.generateForPipeline.mockResolvedValue({} as never);
 
     const result = await service.pollAndCollect('meeting-1', 'job-1');
 
@@ -173,6 +181,14 @@ describe('TranscriptionResultCollectorService', () => {
       'meeting-1',
       MeetingStatus.COMPLETED,
     );
-    expect(resultService.findByMeetingId).toHaveBeenCalledWith('meeting-1');
+    expect(resultService.generateForPipeline).toHaveBeenCalledWith('meeting-1');
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'meeting.status.changed',
+      expect.objectContaining({
+        meetingId: 'meeting-1',
+        status: MeetingStatus.PROCESSING,
+        phase: 'generating',
+      }),
+    );
   });
 });

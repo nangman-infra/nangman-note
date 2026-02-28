@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { existsSync, readFileSync } from 'fs';
@@ -7,6 +12,7 @@ import { PDFFont, PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Repository } from 'typeorm';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
+import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { NoteEntity } from '../../note/domain/note.entity';
 import { PromptService } from '../../prompt/application/prompt.service';
 import { PromptEntity } from '../../prompt/domain/prompt.entity';
@@ -46,10 +52,27 @@ export class ResultService {
     }
 
     // COMPLETED 상태에서만 결과 생성 — 전사 완료 전에 조기 생성 방지
-    if (meeting.status !== 'completed') {
+    if (meeting.status !== MeetingStatus.COMPLETED) {
       throw new NotFoundException(
         `Result for meeting ${meetingId} is not ready yet (status: ${meeting.status})`,
       );
+    }
+
+    return this.generateAndSave(meetingId);
+  }
+
+  /**
+   * 전사 파이프라인 내부 호출용 생성 메서드.
+   * 회의 상태가 COMPLETED가 아니어도(예: PROCESSING) 결과를 선생성할 수 있습니다.
+   */
+  async generateForPipeline(meetingId: string): Promise<ResultEntity> {
+    await this.meetingService.findById(meetingId);
+
+    const existing = await this.resultRepository.findOne({
+      where: { meetingId },
+    });
+    if (existing) {
+      return existing;
     }
 
     return this.generateAndSave(meetingId);

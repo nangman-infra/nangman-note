@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Copy, Download, Edit3, RefreshCw, Save, X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
@@ -12,11 +12,15 @@ import {
   resultTabDataApi,
   type ResultTabTranscriptSegment,
 } from '../api/resultTabDataApi';
-import { meetingApi } from '@/domains/meeting/api/meetingApi';
-import { MeetingStatus } from '@/domains/meeting/types/meeting.types';
 
 interface ResultViewerProps {
   meetingId: string;
+  onMeetingUnavailable?: (meetingId: string) => void;
+  promptOptions?: Array<{
+    id: string;
+    name: string;
+    isDefault?: boolean;
+  }>;
 }
 
 function formatSegmentTime(seconds: number): string {
@@ -27,8 +31,22 @@ function formatSegmentTime(seconds: number): string {
 
 type ResultTab = 'result' | 'transcript' | 'note';
 
-export function ResultViewer({ meetingId }: ResultViewerProps) {
-  const { result, isLoading, isRegenerating, error, updateResult, regenerateResult, exportPDF } = useResult(meetingId);
+export function ResultViewer({
+  meetingId,
+  onMeetingUnavailable,
+  promptOptions = [],
+}: ResultViewerProps) {
+  const {
+    result,
+    isLoading,
+    isRegenerating,
+    isPending,
+    isMissingMeeting,
+    error,
+    updateResult,
+    regenerateResult,
+    exportPDF,
+  } = useResult(meetingId);
   const { pushToast } = useFeedback();
   const [activeTab, setActiveTab] = useState<ResultTab>('result');
   const [isEditing, setIsEditing] = useState(false);
@@ -40,37 +58,6 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
   );
   const [noteContent, setNoteContent] = useState<string>('');
   const [tabDataLoaded, setTabDataLoaded] = useState(false);
-  const [meetingStatus, setMeetingStatus] = useState<MeetingStatus | null>(null);
-  const prevMeetingIdRef = useRef(meetingId);
-
-  // meetingId 변경 시 탭 데이터 리셋
-  useEffect(() => {
-    if (prevMeetingIdRef.current !== meetingId) {
-      prevMeetingIdRef.current = meetingId;
-      setTabDataLoaded(false);
-      setTranscripts([]);
-      setNoteContent('');
-      setActiveTab('result');
-      setIsEditing(false);
-      setMeetingStatus(null);
-    }
-  }, [meetingId]);
-
-  // 회의 상태 확인 (PROCESSING이면 결과 생성 방지)
-  useEffect(() => {
-    if (!meetingId) return;
-    let disposed = false;
-    const checkStatus = async () => {
-      try {
-        const meeting = await meetingApi.get(meetingId);
-        if (!disposed) setMeetingStatus(meeting.status as MeetingStatus);
-      } catch {
-        // 무시
-      }
-    };
-    void checkStatus();
-    return () => { disposed = true; };
-  }, [meetingId]);
 
   // 탭 데이터 로드
   useEffect(() => {
@@ -101,6 +88,18 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
     });
   }, [error, pushToast]);
 
+  useEffect(() => {
+    if (!isMissingMeeting) return;
+    pushToast({
+      title: '선택한 회의를 찾을 수 없습니다',
+      description: '이미 삭제되었거나 접근 권한이 없습니다.',
+      variant: 'info',
+    });
+    onMeetingUnavailable?.(meetingId);
+  }, [isMissingMeeting, meetingId, onMeetingUnavailable, pushToast]);
+
+  const resolvedRegeneratePromptId = regeneratePromptId || promptOptions[0]?.id || '';
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center p-6">
@@ -113,18 +112,21 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
   }
 
   if (!result) {
-    const isProcessing = meetingStatus === MeetingStatus.PROCESSING;
     return (
       <div className="flex h-full items-center justify-center p-6">
         <div className="surface-card w-full max-w-xl p-8 text-center">
           <p className="text-sm font-semibold">
-            {isProcessing
+            {isPending
               ? '전사 및 회의록을 생성하고 있습니다'
+              : isMissingMeeting
+                ? '선택한 회의를 찾을 수 없습니다'
               : '선택한 회의의 결과가 아직 없습니다'}
           </p>
           <p className="mt-1 text-xs text-muted">
-            {isProcessing
+            {isPending
               ? '음성 전사와 AI 정리가 진행 중입니다. 완료 시 자동으로 표시됩니다.'
+              : isMissingMeeting
+                ? '목록에서 다른 회의를 선택해주세요.'
               : '회의 종료 후 자동 생성된 문서가 여기에 표시됩니다.'}
           </p>
         </div>
@@ -157,8 +159,8 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
   };
 
   const handleRegenerate = async () => {
-    if (!regeneratePromptId.trim()) return;
-    const success = await regenerateResult(regeneratePromptId.trim());
+    if (!resolvedRegeneratePromptId.trim()) return;
+    const success = await regenerateResult(resolvedRegeneratePromptId.trim());
     if (!success) return;
 
     setShowRegenerate(false);
@@ -167,6 +169,10 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
       title: '새 프롬프트로 회의록을 재생성했습니다',
       variant: 'success',
     });
+  };
+
+  const openRegeneratePanel = () => {
+    setShowRegenerate(true);
   };
 
   const handleExportPDF = async () => {
@@ -320,19 +326,34 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
       {!isEditing && activeTab === 'result' && (
         <footer className="border-t border-[var(--line-soft)] px-6 py-4">
           {!showRegenerate ? (
-            <button type="button" onClick={() => setShowRegenerate(true)} className="btn-neo">
+            <button type="button" onClick={openRegeneratePanel} className="btn-neo">
               <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
               프롬프트 변경 후 재생성
             </button>
           ) : (
             <div className="surface-card flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
-              <input
-                type="text"
-                value={regeneratePromptId}
-                onChange={(e) => setRegeneratePromptId(e.target.value)}
-                placeholder="예: prompt_default_meeting"
-                className="input-shell"
-              />
+              {promptOptions.length > 0 ? (
+                <select
+                  value={resolvedRegeneratePromptId}
+                  onChange={(e) => setRegeneratePromptId(e.target.value)}
+                  className="input-shell"
+                >
+                  {promptOptions.map((prompt) => (
+                    <option key={prompt.id} value={prompt.id}>
+                      {prompt.name}
+                      {prompt.isDefault ? ' (기본)' : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={regeneratePromptId}
+                  onChange={(e) => setRegeneratePromptId(e.target.value)}
+                  placeholder="예: prompt_default_meeting"
+                  className="input-shell"
+                />
+              )}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -344,7 +365,7 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
                 <button
                   type="button"
                   onClick={handleRegenerate}
-                  disabled={isRegenerating || !regeneratePromptId.trim()}
+                  disabled={isRegenerating || !resolvedRegeneratePromptId.trim()}
                   className="btn-neo border-transparent bg-brand px-3 py-2 text-xs text-white disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {isRegenerating ? '재생성 중...' : '재생성 실행'}

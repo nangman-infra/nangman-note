@@ -3,9 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
+import {
+  MeetingStatusChangedEvent,
+  type MeetingStatusPhase,
+} from '../../../shared/events/meeting-status-changed.event';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
@@ -22,6 +27,8 @@ export type SearchMatchedIn = Exclude<SearchScope, 'all'>;
 export interface MeetingSearchResult {
   meetingId: string;
   title?: string;
+  status: MeetingStatus;
+  transcriptionMode: MeetingTranscriptionMode;
   matchedIn: SearchMatchedIn;
   snippet: string;
   startedAt: Date;
@@ -33,6 +40,7 @@ export class MeetingService {
     @InjectRepository(MeetingEntity)
     private readonly meetingRepository: Repository<MeetingEntity>,
     private readonly promptService: PromptService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(dto: CreateMeetingDto): Promise<MeetingEntity> {
@@ -65,6 +73,33 @@ export class MeetingService {
       skip,
       take: limit,
     });
+
+    return {
+      meetings,
+      pagination: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
+  async listTrash(query: ListMeetingsQueryDto): Promise<{
+    meetings: MeetingEntity[];
+    pagination: { page: number; limit: number; total: number };
+  }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    const [meetings, total] = await this.meetingRepository
+      .createQueryBuilder('meeting')
+      .withDeleted()
+      .where('meeting.deletedAt IS NOT NULL')
+      .orderBy('meeting.deletedAt', 'DESC')
+      .offset(skip)
+      .limit(limit)
+      .getManyAndCount();
 
     return {
       meetings,
@@ -231,8 +266,13 @@ export class MeetingService {
       ? MeetingStatus.PROCESSING
       : MeetingStatus.COMPLETED;
     meeting.endedAt = new Date();
-
-    return this.meetingRepository.save(meeting);
+    const updated = await this.meetingRepository.save(meeting);
+    this.emitStatusChanged(
+      updated.id,
+      updated.status,
+      shouldProcessBatch ? 'transcribing' : 'completed',
+    );
+    return updated;
   }
 
   async updateStatus(
@@ -241,11 +281,41 @@ export class MeetingService {
   ): Promise<MeetingEntity> {
     const meeting = await this.findById(id);
     meeting.status = status;
-    return this.meetingRepository.save(meeting);
+    const updated = await this.meetingRepository.save(meeting);
+    this.emitStatusChanged(
+      updated.id,
+      updated.status,
+      status === MeetingStatus.COMPLETED ? 'completed' : undefined,
+    );
+    return updated;
   }
 
   async remove(id: string): Promise<void> {
     const meeting = await this.findById(id);
+    await this.meetingRepository.softRemove(meeting);
+  }
+
+  async restore(id: string): Promise<void> {
+    const meeting = await this.meetingRepository.findOne({
+      where: { id },
+      withDeleted: true,
+    });
+    if (!meeting || !meeting.deletedAt) {
+      throw new NotFoundException(`Meeting ${id} not found in trash`);
+    }
+
+    await this.meetingRepository.restore(id);
+  }
+
+  async purge(id: string): Promise<void> {
+    const meeting = await this.meetingRepository.findOne({
+      where: { id },
+      withDeleted: true,
+    });
+    if (!meeting || !meeting.deletedAt) {
+      throw new NotFoundException(`Meeting ${id} not found in trash`);
+    }
+
     await this.meetingRepository.remove(meeting);
   }
 
@@ -344,6 +414,8 @@ export class MeetingService {
     return {
       meetingId: meeting.id,
       title: meeting.title,
+      status: meeting.status,
+      transcriptionMode: meeting.transcriptionMode,
       matchedIn: matched.matchedIn,
       snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
       startedAt: meeting.startedAt,
@@ -387,5 +459,16 @@ export class MeetingService {
     const suffix = end < normalized.length ? '...' : '';
 
     return `${prefix}${normalized.slice(start, end)}${suffix}`;
+  }
+
+  private emitStatusChanged(
+    meetingId: string,
+    status: MeetingStatus,
+    phase?: MeetingStatusPhase,
+  ): void {
+    this.eventEmitter.emit(
+      MeetingStatusChangedEvent.EVENT_NAME,
+      new MeetingStatusChangedEvent(meetingId, status, phase),
+    );
   }
 }

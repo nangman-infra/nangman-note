@@ -7,6 +7,7 @@ import { createSocket } from '@/lib/api/websocket';
 interface MeetingStatusMessage {
   meetingId: string;
   status: string;
+  phase?: 'transcribing' | 'generating' | 'completed';
 }
 
 interface UseMeetingStatusOptions {
@@ -24,7 +25,10 @@ export function useMeetingStatus({
 }: UseMeetingStatusOptions): void {
   const socketRef = useRef<Socket | null>(null);
   const callbackRef = useRef(onStatusChange);
-  callbackRef.current = onStatusChange;
+
+  useEffect(() => {
+    callbackRef.current = onStatusChange;
+  }, [onStatusChange]);
 
   const cleanup = useCallback(() => {
     if (socketRef.current) {

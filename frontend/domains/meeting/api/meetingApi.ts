@@ -21,6 +21,15 @@ export const meetingApi = {
     return response.data.data.meetings;
   },
 
+  // 휴지통 회의 목록 조회
+  listTrash: async (params?: { page?: number; limit?: number }): Promise<Meeting[]> => {
+    const response = await apiClient.get<{ data: { meetings: Meeting[] } }>(
+      '/api/v1/meetings/trash',
+      { params }
+    );
+    return response.data.data.meetings;
+  },
+
   // 회의 검색
   search: async (query: string, scope: string = 'all'): Promise<SearchResult[]> => {
     const response = await apiClient.get<{ data: { results: SearchResult[] } }>(
@@ -60,5 +69,15 @@ export const meetingApi = {
   // 회의 삭제
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/v1/meetings/${id}`);
+  },
+
+  // 휴지통 복구
+  restore: async (id: string): Promise<void> => {
+    await apiClient.post(`/api/v1/meetings/${id}/restore`);
+  },
+
+  // 영구 삭제
+  purge: async (id: string): Promise<void> => {
+    await apiClient.delete(`/api/v1/meetings/${id}/permanent`);
   },
 };

@@ -32,9 +32,7 @@ export class MeetingStatusGateway
   @WebSocketServer()
   private readonly server!: Server;
 
-  constructor(
-    private readonly configService: ConfigService<AppEnv, true>,
-  ) {}
+  constructor(private readonly configService: ConfigService<AppEnv, true>) {}
 
   async handleConnection(client: Socket): Promise<void> {
     if (!this.isAllowedOrigin(client.handshake.headers.origin)) {
@@ -72,12 +70,11 @@ export class MeetingStatusGateway
     this.logger.log(
       `Broadcasting status change: meeting=${event.meetingId}, status=${event.status}`,
     );
-    this.server
-      .to(event.meetingId)
-      .emit('meeting:status', {
-        meetingId: event.meetingId,
-        status: event.status,
-      });
+    this.server.to(event.meetingId).emit('meeting:status', {
+      meetingId: event.meetingId,
+      status: event.status,
+      phase: event.phase,
+    });
   }
 
   private resolveMeetingId(client: Socket): string | undefined {

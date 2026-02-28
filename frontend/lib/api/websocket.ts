@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { env } from '@/lib/config/env';
 
 /**
  * same-origin WebSocket 연결을 생성하는 공통 팩토리.
@@ -13,7 +14,7 @@ export function createSocket(
   path: string,
   query?: Record<string, string>,
 ): Socket {
-  const socket = io({
+  const socket = io(env.WS_URL || undefined, {
     path,
     query,
     transports: ['websocket'],

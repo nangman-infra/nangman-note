@@ -29,19 +29,27 @@ export function useMeeting() {
 export function useMeetings() {
   const {
     meetings,
+    trashMeetings,
     isLoading,
     error,
     fetchMeetings,
+    fetchTrashMeetings,
     searchMeetings,
     deleteMeeting,
+    restoreMeeting,
+    purgeMeeting,
   } = useMeetingStore();
 
   return {
     meetings,
+    trashMeetings,
     isLoading,
     error,
     fetchMeetings,
+    fetchTrashMeetings,
     searchMeetings,
     deleteMeeting,
+    restoreMeeting,
+    purgeMeeting,
   };
 }

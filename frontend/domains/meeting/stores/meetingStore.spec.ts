@@ -7,11 +7,14 @@ vi.mock('../api/meetingApi', () => ({
   meetingApi: {
     create: vi.fn(),
     list: vi.fn(),
+    listTrash: vi.fn(),
     search: vi.fn(),
     get: vi.fn(),
     updatePrompt: vi.fn(),
     complete: vi.fn(),
     delete: vi.fn(),
+    restore: vi.fn(),
+    purge: vi.fn(),
   },
 }));
 
@@ -36,6 +39,7 @@ describe('useMeetingStore', () => {
       isRecording: false,
       elapsedTime: 0,
       meetings: [],
+      trashMeetings: [],
       isLoading: false,
       error: null,
     });
@@ -146,6 +150,8 @@ describe('useMeetingStore', () => {
       {
         meetingId: 'meeting-search-1',
         title: '',
+        status: MeetingStatus.PROCESSING,
+        transcriptionMode: MeetingTranscriptionMode.BATCH,
         matchedIn: 'note',
         snippet: '검색 스니펫',
         startedAt: '2026-03-01T00:00:00.000Z',
@@ -159,7 +165,7 @@ describe('useMeetingStore', () => {
       expect.objectContaining({
         id: 'meeting-search-1',
         title: '검색 스니펫',
-        status: MeetingStatus.COMPLETED,
+        status: MeetingStatus.PROCESSING,
         transcriptionMode: MeetingTranscriptionMode.BATCH,
       }),
     ]);
@@ -177,5 +183,29 @@ describe('useMeetingStore', () => {
     expect(useMeetingStore.getState().meetings).toEqual([
       expect.objectContaining({ id: 'meeting-2' }),
     ]);
+  });
+
+  it('loads trash meetings list from API', async () => {
+    const trashed = [buildMeeting({ id: 'meeting-trash-1' })];
+    vi.mocked(meetingApi.listTrash).mockResolvedValue(trashed);
+
+    await useMeetingStore.getState().fetchTrashMeetings();
+
+    expect(useMeetingStore.getState().trashMeetings).toEqual(trashed);
+  });
+
+  it('restores meeting by removing it from trash state', async () => {
+    useMeetingStore.setState({
+      trashMeetings: [buildMeeting({ id: 'meeting-trash-1' })],
+    });
+    vi.mocked(meetingApi.restore).mockResolvedValue(undefined);
+
+    const restored = await useMeetingStore
+      .getState()
+      .restoreMeeting('meeting-trash-1');
+
+    expect(restored).toBe(true);
+    expect(meetingApi.restore).toHaveBeenCalledWith('meeting-trash-1');
+    expect(useMeetingStore.getState().trashMeetings).toHaveLength(0);
   });
 });

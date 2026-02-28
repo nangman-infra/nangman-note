@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { History, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import { History, Search, SlidersHorizontal, Sparkles, Trash2, X } from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -10,7 +10,8 @@ import { MeetingStatus } from '../types/meeting.types';
 import { MeetingCard } from './MeetingCard';
 
 interface MeetingListProps {
-  onSelectMeeting?: (meetingId: string) => void;
+  initialShowTrash?: boolean;
+  onSelectMeeting?: (meetingId: string | null) => void;
   selectedMeetingId?: string;
 }
 
@@ -27,19 +28,43 @@ function normalizeKeyword(keyword: string) {
   return keyword.trim();
 }
 
-export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListProps) {
-  const { meetings, isLoading, error, fetchMeetings, searchMeetings } = useMeetings();
+export function MeetingList({
+  initialShowTrash = false,
+  onSelectMeeting,
+  selectedMeetingId,
+}: MeetingListProps) {
+  const {
+    meetings,
+    trashMeetings,
+    isLoading,
+    error,
+    fetchMeetings,
+    fetchTrashMeetings,
+    searchMeetings,
+    deleteMeeting,
+    restoreMeeting,
+    purgeMeeting,
+  } = useMeetings();
   const { pushToast } = useFeedback();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | MeetingStatus>('all');
+  const [showTrash, setShowTrash] = useState(initialShowTrash);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useLocalStorage<string[]>('transnote_recent_meeting_searches', []);
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (showTrash) {
+      void fetchTrashMeetings();
+      return;
+    }
     void fetchMeetings();
-  }, [fetchMeetings]);
+  }, [fetchMeetings, fetchTrashMeetings, showTrash]);
+
+  useEffect(() => {
+    setShowTrash(initialShowTrash);
+  }, [initialShowTrash]);
 
   useEffect(() => {
     if (!error) return;
@@ -49,6 +74,15 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
       variant: 'error',
     });
   }, [error, pushToast]);
+
+  useEffect(() => {
+    if (!selectedMeetingId) return;
+    const source = showTrash ? trashMeetings : meetings;
+    const exists = source.some((meeting) => meeting.id === selectedMeetingId);
+    if (!exists) {
+      onSelectMeeting?.(null);
+    }
+  }, [meetings, onSelectMeeting, selectedMeetingId, showTrash, trashMeetings]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -73,12 +107,16 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
   }, []);
 
   const searchCandidates = useMemo(() => {
+    if (showTrash) {
+      return recentSearches;
+    }
+
     const titleCandidates = meetings
       .map((meeting) => normalizeKeyword(meeting.title || ''))
       .filter(Boolean);
 
     return [...new Set([...recentSearches, ...titleCandidates])];
-  }, [meetings, recentSearches]);
+  }, [meetings, recentSearches, showTrash]);
 
   const suggestions = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
@@ -93,9 +131,13 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
   }, [searchCandidates, searchQuery]);
 
   const filteredMeetings = useMemo(() => {
-    if (activeFilter === 'all') return meetings;
-    return meetings.filter((meeting) => meeting.status === activeFilter);
-  }, [activeFilter, meetings]);
+    const source = showTrash ? trashMeetings : meetings;
+    if (showTrash) {
+      return source;
+    }
+    if (activeFilter === 'all') return source;
+    return source.filter((meeting) => meeting.status === activeFilter);
+  }, [activeFilter, meetings, showTrash, trashMeetings]);
 
   const storeRecentSearch = (keyword: string) => {
     setRecentSearches((prev) => {
@@ -108,6 +150,10 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
   };
 
   const runSearch = (keyword: string) => {
+    if (showTrash) {
+      return;
+    }
+
     const normalized = normalizeKeyword(keyword);
 
     if (!normalized) {
@@ -120,7 +166,7 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
     setSearchQuery(normalized);
     storeRecentSearch(normalized);
     setIsSuggestionOpen(false);
-    void searchMeetings(normalized);
+    void searchMeetings(normalized, 'all');
   };
 
   const handleSearchSubmit = (event: React.FormEvent) => {
@@ -144,6 +190,9 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
   const clearSearch = () => {
     setSearchQuery('');
     setIsSuggestionOpen(false);
+    if (showTrash) {
+      return;
+    }
     void fetchMeetings();
   };
 
@@ -152,15 +201,88 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
     pushToast({ title: '최근 검색어를 비웠습니다', variant: 'info' });
   };
 
+  const handleDeleteMeeting = async (meetingId: string) => {
+    const meeting = meetings.find((item) => item.id === meetingId);
+    const confirmed = window.confirm(
+      `\"${meeting?.title || '제목 없는 회의'}\"를 휴지통으로 이동할까요?`,
+    );
+    if (!confirmed) return;
+
+    const deleted = await deleteMeeting(meetingId);
+    if (!deleted) {
+      pushToast({
+        title: '회의 삭제에 실패했습니다',
+        description: '잠시 후 다시 시도해주세요.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (selectedMeetingId === meetingId) {
+      onSelectMeeting?.(null);
+    }
+    pushToast({
+      title: '회의를 휴지통으로 이동했습니다',
+      variant: 'success',
+    });
+  };
+
+  const handleRestoreMeeting = async (meetingId: string) => {
+    const restored = await restoreMeeting(meetingId);
+    if (!restored) {
+      pushToast({
+        title: '회의 복구에 실패했습니다',
+        description: '잠시 후 다시 시도해주세요.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    pushToast({
+      title: '회의를 복구했습니다',
+      variant: 'success',
+    });
+  };
+
+  const handlePurgeMeeting = async (meetingId: string) => {
+    const meeting = trashMeetings.find((item) => item.id === meetingId);
+    const confirmed = window.confirm(
+      `\"${meeting?.title || '제목 없는 회의'}\"를 영구 삭제할까요?\n이 작업은 되돌릴 수 없습니다.`,
+    );
+    if (!confirmed) return;
+
+    const purged = await purgeMeeting(meetingId);
+    if (!purged) {
+      pushToast({
+        title: '영구 삭제에 실패했습니다',
+        description: '잠시 후 다시 시도해주세요.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (selectedMeetingId === meetingId) {
+      onSelectMeeting?.(null);
+    }
+    pushToast({
+      title: '회의를 영구 삭제했습니다',
+      variant: 'info',
+    });
+  };
+
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-[var(--line-soft)] px-4 py-4">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold tracking-wide text-muted">MEETINGS</p>
-            <h2 className="text-lg font-semibold">회의 아카이브</h2>
+            <h2 className="text-lg font-semibold">
+              {showTrash ? '회의 휴지통' : '회의 아카이브'}
+            </h2>
           </div>
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-muted">{meetings.length}개</span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-muted">
+            {filteredMeetings.length}개
+          </span>
         </div>
 
         {error ? (
@@ -192,6 +314,7 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
               onBlur={handleSearchBlur}
               placeholder="회의 제목 또는 내용 검색"
               className="input-shell h-11 rounded-2xl bg-white/95 !pl-11 !pr-28 shadow-[0_8px_20px_rgba(18,33,43,0.08)]"
+              disabled={showTrash}
             />
 
             {searchQuery ? (
@@ -208,6 +331,7 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
             <button
               type="submit"
               className="btn-neo absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl px-2.5 py-1 text-xs"
+              disabled={showTrash}
             >
               검색
             </button>
@@ -253,7 +377,9 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
             ) : null}
           </div>
 
-          <p className="mt-1.5 text-[11px] text-muted">빠른 검색: Cmd/Ctrl + K</p>
+          <p className="mt-1.5 text-[11px] text-muted">
+            {showTrash ? '휴지통에서는 검색이 비활성화됩니다.' : '빠른 검색: Cmd/Ctrl + K'}
+          </p>
         </form>
 
         <div className="scroll-muted flex items-center gap-2 overflow-x-auto pb-1">
@@ -266,15 +392,33 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
               key={filter.key}
               type="button"
               onClick={() => setActiveFilter(filter.key)}
+              disabled={showTrash}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                activeFilter === filter.key
+                activeFilter === filter.key && !showTrash
                   ? 'bg-brand text-white'
                   : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
-              }`}
+              } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {filter.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              setShowTrash((prev) => !prev);
+              setSearchQuery('');
+              setIsSuggestionOpen(false);
+              onSelectMeeting?.(null);
+            }}
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              showTrash
+                ? 'bg-rose-600 text-white'
+                : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
+            }`}
+          >
+            <Trash2 className="h-3 w-3" />
+            {showTrash ? '휴지통 닫기' : '휴지통 보기'}
+          </button>
         </div>
       </header>
 
@@ -283,15 +427,25 @@ export function MeetingList({ onSelectMeeting, selectedMeetingId }: MeetingListP
           <div className="surface-card p-6 text-center text-sm text-muted">회의를 불러오는 중입니다...</div>
         ) : filteredMeetings.length === 0 ? (
           <div className="surface-card p-6 text-center">
-            <p className="mb-1 text-sm font-semibold">표시할 회의가 없습니다</p>
-            <p className="text-xs text-muted">검색어를 비우거나 다른 필터를 선택해보세요.</p>
+            <p className="mb-1 text-sm font-semibold">
+              {showTrash ? '휴지통이 비어 있습니다' : '표시할 회의가 없습니다'}
+            </p>
+            <p className="text-xs text-muted">
+              {showTrash
+                ? '삭제한 회의가 있으면 이곳에서 복구하거나 영구 삭제할 수 있습니다.'
+                : '검색어를 비우거나 다른 필터를 선택해보세요.'}
+            </p>
           </div>
         ) : (
           filteredMeetings.map((meeting, index) => (
             <div key={meeting.id} className={index < 3 ? 'motion-rise' : ''}>
               <MeetingCard
                 meeting={meeting}
-                onClick={() => onSelectMeeting?.(meeting.id)}
+                mode={showTrash ? 'trash' : 'active'}
+                onClick={showTrash ? undefined : () => onSelectMeeting?.(meeting.id)}
+                onDelete={showTrash ? undefined : () => void handleDeleteMeeting(meeting.id)}
+                onRestore={showTrash ? () => void handleRestoreMeeting(meeting.id) : undefined}
+                onPurge={showTrash ? () => void handlePurgeMeeting(meeting.id) : undefined}
                 isActive={meeting.id === selectedMeetingId}
               />
             </div>

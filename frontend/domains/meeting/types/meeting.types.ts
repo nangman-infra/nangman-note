@@ -19,6 +19,7 @@ export interface Meeting {
   endedAt?: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
 }
 
 export interface CreateMeetingDto {
@@ -30,6 +31,8 @@ export interface CreateMeetingDto {
 export interface SearchResult {
   meetingId: string;
   title?: string;
+  status: MeetingStatus;
+  transcriptionMode: MeetingTranscriptionMode;
   matchedIn: 'title' | 'result' | 'transcript' | 'note';
   snippet: string;
   startedAt: string;

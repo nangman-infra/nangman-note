@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
+import { meetingApi } from '../api/meetingApi';
 import { useMeetingStatus } from '../hooks/useMeetingStatus';
 import { MeetingStatus } from '../types/meeting.types';
 
@@ -35,11 +36,26 @@ export function ProcessingProgress({
 
   // WebSocket 으로 회의 상태 변경 수신 (폴링 대체)
   const handleStatusChange = useCallback(
-    (message: { meetingId: string; status: string }) => {
-      if (message.status === MeetingStatus.COMPLETED) {
+    (message: {
+      meetingId: string;
+      status: string;
+      phase?: 'transcribing' | 'generating' | 'completed';
+    }) => {
+      if (
+        message.status === MeetingStatus.COMPLETED ||
+        message.phase === 'completed'
+      ) {
         setBackendStep('completed');
         onComplete?.();
-      } else if (message.status === MeetingStatus.PROCESSING) {
+        return;
+      }
+
+      if (message.phase === 'transcribing') {
+        setBackendStep('transcribing');
+        return;
+      }
+
+      if (message.phase === 'generating') {
         setBackendStep('generating');
       }
     },
@@ -47,9 +63,34 @@ export function ProcessingProgress({
   );
 
   useMeetingStatus({
-    meetingId: uploadState === 'completed' ? meetingId : null,
+    meetingId: uploadState === 'failed' ? null : meetingId,
     onStatusChange: handleStatusChange,
   });
+
+  // WebSocket 연결 실패/지연 시 폴백: 상태를 주기적으로 확인해서 완료 전환 보장
+  useEffect(() => {
+    if (uploadState !== 'completed') return;
+    if (backendStep === 'completed') return;
+
+    let disposed = false;
+    const timerId = window.setInterval(async () => {
+      try {
+        const meeting = await meetingApi.get(meetingId);
+        if (disposed) return;
+        if (meeting.status === MeetingStatus.COMPLETED) {
+          setBackendStep('completed');
+          onComplete?.();
+        }
+      } catch {
+        // 폴백 확인 실패는 무시하고 다음 틱에서 재시도
+      }
+    }, 5000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timerId);
+    };
+  }, [backendStep, meetingId, onComplete, uploadState]);
 
   const currentStep: ProcessingStep =
     uploadState === 'failed'

@@ -2,20 +2,63 @@
 
 import Link from 'next/link';
 import { ArrowRight, Mic, NotebookText } from 'lucide-react';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MeetingList } from '@/domains/meeting/components/MeetingList';
+import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { ResultViewer } from '@/domains/result/components/ResultViewer';
 
 export default function HomePage() {
+  return (
+    <Suspense fallback={<HomePageContent initialShowTrash={false} />}>
+      <HomePageWithSearchParams />
+    </Suspense>
+  );
+}
+
+function HomePageWithSearchParams() {
+  const searchParams = useSearchParams();
+  const initialShowTrash = searchParams.get('view') === 'trash';
+
+  return <HomePageContent initialShowTrash={initialShowTrash} />;
+}
+
+interface HomePageContentProps {
+  initialShowTrash: boolean;
+}
+
+function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const { prompts } = usePrompt();
 
   return (
     <ThreeColumnLayout
       sidebar={<Sidebar />}
-      list={<MeetingList onSelectMeeting={setSelectedMeetingId} selectedMeetingId={selectedMeetingId || undefined} />}
-      viewer={selectedMeetingId ? <ResultViewer meetingId={selectedMeetingId} /> : <EmptyViewer />}
+      list={
+        <MeetingList
+          initialShowTrash={initialShowTrash}
+          onSelectMeeting={setSelectedMeetingId}
+          selectedMeetingId={selectedMeetingId || undefined}
+        />
+      }
+      viewer={
+        selectedMeetingId ? (
+          <ResultViewer
+            key={selectedMeetingId}
+            meetingId={selectedMeetingId}
+            onMeetingUnavailable={() => setSelectedMeetingId(null)}
+            promptOptions={prompts.map((prompt) => ({
+              id: prompt.id,
+              name: prompt.name,
+              isDefault: prompt.isDefault,
+            }))}
+          />
+        ) : (
+          <EmptyViewer />
+        )
+      }
     />
   );
 }

@@ -1,7 +1,4 @@
-import {
-  isAllowedCorsOrigin,
-  parseAllowedOrigins,
-} from './cors-origin.util';
+import { isAllowedCorsOrigin, parseAllowedOrigins } from './cors-origin.util';
 import type { AppEnv } from './env.validation';
 
 /**

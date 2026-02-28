@@ -6,6 +6,8 @@ export function useResult(meetingId: string) {
     result,
     isLoading,
     isRegenerating,
+    isPending,
+    isMissingMeeting,
     error,
     fetchResult,
     updateResult,
@@ -17,7 +19,7 @@ export function useResult(meetingId: string) {
   // 결과 로드
   useEffect(() => {
     if (meetingId) {
-      fetchResult(meetingId);
+      void fetchResult(meetingId);
     }
 
     return () => {
@@ -25,10 +27,25 @@ export function useResult(meetingId: string) {
     };
   }, [meetingId, fetchResult, clearResult]);
 
+  // 처리 중 결과는 주기적으로 재조회해 새로고침 없이 자동 반영
+  useEffect(() => {
+    if (!meetingId || !isPending) return;
+
+    const timerId = window.setInterval(() => {
+      void fetchResult(meetingId);
+    }, 5000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [meetingId, isPending, fetchResult]);
+
   return {
     result,
     isLoading,
     isRegenerating,
+    isPending,
+    isMissingMeeting,
     error,
     updateResult: (content: string) => updateResult(meetingId, content),
     regenerateResult: (promptId: string) => regenerateResult(meetingId, promptId),

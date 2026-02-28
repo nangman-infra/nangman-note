@@ -9,31 +9,35 @@ describe('env config', () => {
     process.env = { ...ORIGINAL_ENV };
   });
 
-  it('uses same-origin defaults when NEXT_PUBLIC_API_URL is omitted', async () => {
+  it('uses same-origin defaults when public endpoints are omitted', async () => {
     process.env = {
       ...ORIGINAL_ENV,
       NODE_ENV: 'development',
     };
     delete process.env.NEXT_PUBLIC_API_URL;
+    delete process.env.NEXT_PUBLIC_WS_URL;
 
     const { env } = await import('./env');
 
     expect(env.MODE).toBe('development');
     // 빈 문자열 = same-origin (Next.js rewrite 프록시)
     expect(env.API_URL).toBe('');
+    expect(env.WS_URL).toBe('');
   });
 
-  it('uses explicit API_URL when provided', async () => {
+  it('uses explicit endpoint values when provided', async () => {
     process.env = {
       ...ORIGINAL_ENV,
       NODE_ENV: 'development',
       NEXT_PUBLIC_API_URL: 'http://custom-backend:9999',
+      NEXT_PUBLIC_WS_URL: 'http://custom-backend:9999',
     };
 
     const { env } = await import('./env');
 
     expect(env.MODE).toBe('development');
     expect(env.API_URL).toBe('http://custom-backend:9999');
+    expect(env.WS_URL).toBe('http://custom-backend:9999');
   });
 
   it('has correct default app config values', async () => {

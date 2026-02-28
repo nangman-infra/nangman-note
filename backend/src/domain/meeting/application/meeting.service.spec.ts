@@ -1,6 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Repository } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
+import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
@@ -12,6 +14,7 @@ describe('MeetingService', () => {
     Pick<Repository<MeetingEntity>, 'create' | 'findOne' | 'save'>
   >;
   let promptService: jest.Mocked<Pick<PromptService, 'ensureExists'>>;
+  let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
 
   const buildMeeting = (
     overrides: Partial<MeetingEntity> = {},
@@ -35,10 +38,14 @@ describe('MeetingService', () => {
     promptService = {
       ensureExists: jest.fn(),
     };
+    eventEmitter = {
+      emit: jest.fn(),
+    };
 
     service = new MeetingService(
       meetingRepository as unknown as Repository<MeetingEntity>,
       promptService as unknown as PromptService,
+      eventEmitter as unknown as EventEmitter2,
     );
   });
 
@@ -57,6 +64,14 @@ describe('MeetingService', () => {
       expect(result.status).toBe(MeetingStatus.PROCESSING);
       expect(result.endedAt).toBeInstanceOf(Date);
       expect(meetingRepository.save).toHaveBeenCalledWith(meeting);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        MeetingStatusChangedEvent.EVENT_NAME,
+        expect.objectContaining({
+          meetingId: meeting.id,
+          status: MeetingStatus.PROCESSING,
+          phase: 'transcribing',
+        }),
+      );
     });
 
     it('sets realtime meeting to completed', async () => {
@@ -72,6 +87,14 @@ describe('MeetingService', () => {
 
       expect(result.status).toBe(MeetingStatus.COMPLETED);
       expect(result.endedAt).toBeInstanceOf(Date);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        MeetingStatusChangedEvent.EVENT_NAME,
+        expect.objectContaining({
+          meetingId: meeting.id,
+          status: MeetingStatus.COMPLETED,
+          phase: 'completed',
+        }),
+      );
     });
 
     it('sets batch meeting to completed when skipTranscription=true', async () => {
@@ -89,6 +112,14 @@ describe('MeetingService', () => {
 
       expect(result.status).toBe(MeetingStatus.COMPLETED);
       expect(result.endedAt).toBeInstanceOf(Date);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        MeetingStatusChangedEvent.EVENT_NAME,
+        expect.objectContaining({
+          meetingId: meeting.id,
+          status: MeetingStatus.COMPLETED,
+          phase: 'completed',
+        }),
+      );
     });
 
     it('throws NotFoundException when meeting does not exist', async () => {

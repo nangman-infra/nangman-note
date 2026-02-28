@@ -31,6 +31,11 @@ export class MeetingController {
     return this.meetingService.list(query);
   }
 
+  @Get('trash')
+  async listTrash(@Query() query: ListMeetingsQueryDto) {
+    return this.meetingService.listTrash(query);
+  }
+
   @Get('search')
   async search(@Query() query: SearchMeetingsQueryDto) {
     return this.meetingService.search(query);
@@ -55,5 +60,17 @@ export class MeetingController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string): Promise<void> {
     await this.meetingService.remove(id);
+  }
+
+  @Post(':id/restore')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async restore(@Param('id') id: string): Promise<void> {
+    await this.meetingService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async purge(@Param('id') id: string): Promise<void> {
+    await this.meetingService.purge(id);
   }
 }

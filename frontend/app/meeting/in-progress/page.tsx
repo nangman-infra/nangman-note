@@ -96,7 +96,7 @@ export default function InProgressMeetingPage() {
   useEffect(() => {
     if (currentMeeting && currentMeeting.status !== MeetingStatus.RECORDING && !showProcessing) {
       setCurrentMeeting(null);
-      router.push('/');
+      router.replace('/');
     }
   }, [currentMeeting, showProcessing, setCurrentMeeting, router]);
 
@@ -116,7 +116,7 @@ export default function InProgressMeetingPage() {
             description: '회의 결과 화면에서 회의록을 확인해주세요.',
             variant: 'info',
           });
-          router.push('/');
+          router.replace('/');
           return;
         }
         setCurrentMeeting(meeting);
@@ -127,6 +127,7 @@ export default function InProgressMeetingPage() {
           description: '회의가 이미 종료되었거나 접근할 수 없습니다.',
           variant: 'info',
         });
+        router.replace('/');
       } finally {
         if (!disposed) {
           setIsRecoveringMeeting(false);
@@ -290,7 +291,7 @@ export default function InProgressMeetingPage() {
             variant: 'error',
           });
           setCurrentMeeting(null);
-          router.push('/');
+          router.replace('/');
         }
       } else {
         await endMeeting({ skipTranscription: true });
@@ -301,7 +302,7 @@ export default function InProgressMeetingPage() {
           variant: 'info',
         });
         setCurrentMeeting(null);
-        router.push('/');
+        router.replace('/');
       }
     } else {
       // 실시간 모드 또는 오디오 없음: 전사 없이 종료
@@ -313,7 +314,7 @@ export default function InProgressMeetingPage() {
         variant: 'success',
       });
       setCurrentMeeting(null);
-      router.push('/');
+      router.replace('/');
     }
   };
 
@@ -327,8 +328,22 @@ export default function InProgressMeetingPage() {
       variant: 'success',
     });
     setCurrentMeeting(null);
-    router.push('/');
+    router.replace('/');
   };
+
+  const handleGoHome = useCallback(() => {
+    if (currentMeeting?.status === MeetingStatus.RECORDING && !showProcessing) {
+      pushToast({
+        title: '회의가 아직 진행 중입니다',
+        description: '회의를 종료한 뒤 목록으로 이동해주세요.',
+        variant: 'info',
+      });
+      setShowEndDialog(true);
+      return;
+    }
+
+    router.replace('/');
+  }, [currentMeeting?.status, pushToast, router, showProcessing]);
 
   // 회의 없음 상태
   if (!currentMeeting) {
@@ -417,7 +432,7 @@ export default function InProgressMeetingPage() {
                 </select>
               )}
 
-              <button type="button" onClick={() => router.push('/')} className="btn-neo text-xs text-muted">
+              <button type="button" onClick={handleGoHome} className="btn-neo text-xs text-muted">
                 <ArrowLeft className="h-3.5 w-3.5" />
                 목록으로
               </button>

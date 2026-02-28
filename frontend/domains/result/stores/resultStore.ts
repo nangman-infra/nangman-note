@@ -6,6 +6,8 @@ interface ResultState {
   result: MeetingResult | null;
   isLoading: boolean;
   isRegenerating: boolean;
+  isPending: boolean;
+  isMissingMeeting: boolean;
   error: string | null;
   fetchResult: (meetingId: string) => Promise<void>;
   updateResult: (meetingId: string, content: string) => Promise<boolean>;
@@ -18,17 +20,57 @@ export const useResultStore = create<ResultState>((set) => ({
   result: null,
   isLoading: false,
   isRegenerating: false,
+  isPending: false,
+  isMissingMeeting: false,
   error: null,
 
   fetchResult: async (meetingId) => {
     try {
-      set({ isLoading: true, error: null });
-      const result = await resultApi.get(meetingId);
-      set({ result, isLoading: false });
-    } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to fetch result',
+        isLoading: true,
+        error: null,
+        isPending: false,
+        isMissingMeeting: false,
+      });
+      const result = await resultApi.get(meetingId);
+      set({
+        result,
         isLoading: false,
+        isPending: false,
+        isMissingMeeting: false,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to fetch result';
+      const lowered = message.toLowerCase();
+
+      if (lowered.includes('not ready yet')) {
+        set({
+          result: null,
+          isLoading: false,
+          isPending: true,
+          isMissingMeeting: false,
+          error: null,
+        });
+        return;
+      }
+
+      if (lowered.includes('meeting') && lowered.includes('not found')) {
+        set({
+          result: null,
+          isLoading: false,
+          isPending: false,
+          isMissingMeeting: true,
+          error: null,
+        });
+        return;
+      }
+
+      set({
+        error: message,
+        isLoading: false,
+        isPending: false,
+        isMissingMeeting: false,
       });
     }
   },
@@ -85,6 +127,11 @@ export const useResultStore = create<ResultState>((set) => ({
   },
 
   clearResult: () => {
-    set({ result: null, error: null });
+    set({
+      result: null,
+      error: null,
+      isPending: false,
+      isMissingMeeting: false,
+    });
   },
 }));

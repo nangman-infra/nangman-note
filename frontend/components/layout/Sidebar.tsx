@@ -70,10 +70,10 @@ export function Sidebar() {
       </section>
 
       <div className="mt-auto space-y-2 pt-4">
-        <button type="button" className="btn-neo w-full justify-start text-muted">
+        <Link href="/?view=trash" className="btn-neo w-full justify-start text-muted">
           <Trash2 className="h-4 w-4" />
           휴지통
-        </button>
+        </Link>
         <Link href="/meeting/new" className="btn-neo w-full border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white">
           <Plus className="h-4 w-4" />
           새 회의 시작

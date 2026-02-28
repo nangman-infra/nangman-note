@@ -42,6 +42,12 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["next.config.ts"],
+    rules: {
+      "no-restricted-properties": "off",
+    },
+  },
+  {
     files: [
       "**/*.spec.ts",
       "**/*.spec.tsx",
