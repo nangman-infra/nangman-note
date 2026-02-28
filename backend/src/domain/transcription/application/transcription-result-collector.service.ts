@@ -108,6 +108,7 @@ export class TranscriptionResultCollectorService {
           this.logger.error(
             `Transcription job ${job.providerJobId} failed: ${result.errorMessage}`,
           );
+          await this.finalizeAfterFailedTranscription(meetingId, job.mediaUri);
           return { success: false, segmentCount: 0 };
         }
 
@@ -129,6 +130,7 @@ export class TranscriptionResultCollectorService {
     this.logger.error(
       `Transcription job ${job.providerJobId} timed out for meeting ${meetingId}`,
     );
+    await this.finalizeAfterFailedTranscription(meetingId, job.mediaUri);
     return { success: false, segmentCount: 0 };
   }
 
@@ -324,6 +326,15 @@ export class TranscriptionResultCollectorService {
         `Failed to auto-generate result for meeting ${meetingId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
+  }
+
+  private async finalizeAfterFailedTranscription(
+    meetingId: string,
+    mediaUri: string,
+  ): Promise<void> {
+    await this.deleteAudioFile(mediaUri);
+    await this.updateMeetingStatus(meetingId);
+    await this.triggerResultGeneration(meetingId);
   }
 
   private sleep(ms: number): Promise<void> {

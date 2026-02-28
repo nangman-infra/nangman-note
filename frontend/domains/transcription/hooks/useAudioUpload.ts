@@ -5,13 +5,19 @@ import { transcriptionApi } from '../api/transcriptionApi';
 
 export type UploadState = 'idle' | 'requesting-url' | 'uploading' | 'completed' | 'failed';
 
+export interface UploadResult {
+  s3Key: string;
+  bucket: string;
+  mediaUri: string;
+}
+
 interface UseAudioUploadReturn {
   uploadState: UploadState;
   progress: number; // 0 ~ 100
   s3Key: string | null;
   bucket: string | null;
   error: string | null;
-  upload: (meetingId: string, blob: Blob) => Promise<string | null>;
+  upload: (meetingId: string, blob: Blob) => Promise<UploadResult | null>;
   reset: () => void;
 }
 
@@ -59,7 +65,7 @@ export function useAudioUpload(): UseAudioUploadReturn {
   );
 
   const upload = useCallback(
-    async (meetingId: string, blob: Blob): Promise<string | null> => {
+    async (meetingId: string, blob: Blob): Promise<UploadResult | null> => {
       setError(null);
       setProgress(0);
       setS3Key(null);
@@ -96,7 +102,11 @@ export function useAudioUpload(): UseAudioUploadReturn {
           setS3Key(key);
           setBucket(bucketName);
           setUploadState('completed');
-          return key;
+          return {
+            s3Key: key,
+            bucket: bucketName,
+            mediaUri: `s3://${bucketName}/${key}`,
+          };
         }
 
         if (attempt < MAX_RETRIES) {

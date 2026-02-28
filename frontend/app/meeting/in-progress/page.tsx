@@ -11,8 +11,8 @@ import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
 import { useBeforeUnloadGuard } from '@/domains/meeting/hooks/useBeforeUnloadGuard';
 import { EndMeetingDialog } from '@/domains/meeting/components/EndMeetingDialog';
 import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
+import { MeetingStatus } from '@/domains/meeting/types/meeting.types';
 import { NoteEditor } from '@/domains/note/components/NoteEditor';
-import { TranscriptPanel } from '@/domains/transcription/components/TranscriptPanel';
 import { useTranscription } from '@/domains/transcription/hooks/useTranscription';
 import { useAudioCapture, type AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
 import { useMediaRecorder } from '@/domains/transcription/hooks/useMediaRecorder';
@@ -58,7 +58,6 @@ export default function InProgressMeetingPage() {
   const {
     uploadState,
     progress: uploadProgress,
-    bucket: uploadBucket,
     error: uploadError,
     upload: uploadAudio,
     reset: resetUpload,
@@ -74,7 +73,7 @@ export default function InProgressMeetingPage() {
     currentMeeting?.transcriptionMode ?? MeetingTranscriptionMode.BATCH;
   const isRealtimeMode =
     transcriptionMode === MeetingTranscriptionMode.REALTIME;
-  const { transcripts, isConnected, error: transcriptionError } = useTranscription(
+  const { isConnected, error: transcriptionError } = useTranscription(
     meetingId,
     isRealtimeMode,
   );
@@ -102,6 +101,15 @@ export default function InProgressMeetingPage() {
       try {
         const meeting = await meetingApi.get(meetingIdFromQuery);
         if (disposed) return;
+        if (meeting.status !== MeetingStatus.RECORDING) {
+          pushToast({
+            title: '이미 종료된 회의입니다',
+            description: '회의 결과 화면에서 회의록을 확인해주세요.',
+            variant: 'info',
+          });
+          router.push('/');
+          return;
+        }
         setCurrentMeeting(meeting);
       } catch {
         if (disposed) return;
@@ -121,7 +129,13 @@ export default function InProgressMeetingPage() {
     return () => {
       disposed = true;
     };
-  }, [currentMeeting, meetingIdFromQuery, pushToast, setCurrentMeeting]);
+  }, [
+    currentMeeting,
+    meetingIdFromQuery,
+    pushToast,
+    router,
+    setCurrentMeeting,
+  ]);
 
   const elapsedSeconds = currentMeeting?.startedAt
     ? Math.max(0, Math.floor((nowTick - new Date(currentMeeting.startedAt).getTime()) / 1000))
@@ -236,18 +250,17 @@ export default function InProgressMeetingPage() {
       });
 
       // S3 업로드
-      const s3Key = await uploadAudio(meetingId, audioBlob);
+      const uploadResult = await uploadAudio(meetingId, audioBlob);
 
       // IndexedDB 청크 정리
       await cleanupChunks();
 
-      if (s3Key) {
+      if (uploadResult) {
         // 배치 전사 잡 트리거
         try {
-          const mediaUri = uploadBucket
-            ? `s3://${uploadBucket}/${s3Key}`
-            : `s3://${s3Key}`;
-          await transcriptionApi.queueBatchJob(meetingId, { mediaUri });
+          await transcriptionApi.queueBatchJob(meetingId, {
+            mediaUri: uploadResult.mediaUri,
+          });
         } catch {
           await endMeeting({ skipTranscription: true });
           setShowProcessing(false);
@@ -318,6 +331,30 @@ export default function InProgressMeetingPage() {
               홈으로 이동
             </Link>
             <Link href="/meeting/new" className="btn-neo border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white">
+              새 회의 시작
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentMeeting.status !== MeetingStatus.RECORDING) {
+    return (
+      <div className="app-shell flex min-h-dvh items-center justify-center p-6">
+        <div className="glass-surface w-full max-w-xl p-7 text-center">
+          <h1 className="text-2xl font-semibold">진행 중인 회의가 아닙니다</h1>
+          <p className="mt-2 text-sm text-muted">
+            이미 종료된 회의입니다. 홈 화면에서 회의 결과를 확인해주세요.
+          </p>
+          <div className="mt-5 flex justify-center gap-2">
+            <Link href="/" className="btn-neo">
+              홈으로 이동
+            </Link>
+            <Link
+              href="/meeting/new"
+              className="btn-neo border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white"
+            >
               새 회의 시작
             </Link>
           </div>
@@ -440,7 +477,9 @@ export default function InProgressMeetingPage() {
                 </h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span className="rounded-full bg-white px-2 py-1">
-                  세그먼트: {transcripts.length}개
+                  {isRealtimeMode
+                    ? '실시간 텍스트: 준비중'
+                    : '실시간 텍스트: 비활성'}
                 </span>
                 <span className="rounded-full bg-white px-2 py-1">Meeting ID: {currentMeeting.id.slice(0, 8)}...</span>
               </div>
@@ -462,15 +501,13 @@ export default function InProgressMeetingPage() {
                   </>
                 )}
               </div>
-              {isRealtimeMode && permission !== 'denied' ? (
-                <TranscriptPanel meetingId={currentMeeting.id} />
-              ) : (
-                <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted">
-                  {permission === 'denied'
-                    ? '마이크 비활성 — 노트 전용 모드'
+              <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted">
+                {permission === 'denied'
+                  ? '마이크 비활성 — 노트 전용 모드'
+                  : isRealtimeMode
+                    ? '실시간 텍스트 표시는 정식 STT 연동 이후 제공됩니다. 현재는 수집 경로만 활성화됩니다.'
                     : '실시간 전사가 비활성화되어 있습니다. 회의 종료 후 배치 전사를 실행합니다.'}
-                </div>
-              )}
+              </div>
             </div>
           </aside>
         </div>
