@@ -253,7 +253,7 @@ export class ResultService {
     noteContent: string;
     transcripts: TranscriptSegmentEntity[];
   }): string {
-    const { meeting, prompt, noteContent, transcripts } = params;
+    const { meeting, noteContent, transcripts } = params;
 
     const title = meeting.title?.trim() || '제목 없는 회의';
     const generatedAt = new Date().toLocaleString('ko-KR');
@@ -268,26 +268,17 @@ export class ResultService {
     const sections = [
       `# ${title}`,
       '',
-      '> ⚠️ AI 생성에 실패하여 기본 템플릿으로 결과를 생성했습니다.',
+      `> ⚠️ AI 회의록 생성에 일시적 문제가 발생하여 기본 정리 결과를 제공합니다. 프롬프트를 변경하여 재생성하거나, 잠시 후 다시 시도해주세요.`,
       '',
       `- 생성 시각: ${generatedAt}`,
-      `- 적용 프롬프트: ${prompt.name} (\`${prompt.id}\`)`,
       '',
-      '## 프롬프트 지시',
-      prompt.content.trim(),
-      '',
-      '## 노트',
-      noteContent || '_아직 저장된 노트가 없습니다._',
+      '## 노트 내용',
+      noteContent || '_작성된 노트가 없습니다._',
       '',
       '## 전사 하이라이트',
       transcriptHighlights.length > 0
         ? transcriptHighlights.join('\n')
-        : '_아직 수집된 전사 데이터가 없습니다._',
-      '',
-      '## 다음 액션 제안',
-      '- 결정사항 검토',
-      '- 담당자와 마감일 확정',
-      '- 후속 회의 일정 등록',
+        : '_수집된 전사 데이터가 없습니다._',
     ];
 
     return sections.join('\n');

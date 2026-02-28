@@ -14,6 +14,7 @@ import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types'
 import { MeetingStatus } from '@/domains/meeting/types/meeting.types';
 import { NoteEditor } from '@/domains/note/components/NoteEditor';
 import { useTranscription } from '@/domains/transcription/hooks/useTranscription';
+import { useNoteStore } from '@/domains/note/stores/noteStore';
 import { useAudioCapture, type AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
 import { useMediaRecorder } from '@/domains/transcription/hooks/useMediaRecorder';
 import { useAudioUpload } from '@/domains/transcription/hooks/useAudioUpload';
@@ -208,6 +209,17 @@ export default function InProgressMeetingPage() {
   // 종료 다이얼로그 확인 핸들러
   const handleEndConfirm = async () => {
     setIsEnding(true);
+
+    // 0. 노트 마지막 저장 보장 (3초 디바운스 대기 없이 즉시)
+    if (meetingId) {
+      try {
+        const { saveNote } = useNoteStore.getState();
+        await saveNote(meetingId);
+      } catch {
+        // 저장 실패해도 종료 플로우는 계속 진행
+      }
+    }
+
     let audioBlob: Blob | null = null;
 
     // 1. 녹음 중지 + Blob 합성
@@ -269,6 +281,7 @@ export default function InProgressMeetingPage() {
             description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
             variant: 'error',
           });
+          setCurrentMeeting(null);
           router.push('/');
         }
       } else {
@@ -279,6 +292,7 @@ export default function InProgressMeetingPage() {
           description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
           variant: 'info',
         });
+        setCurrentMeeting(null);
         router.push('/');
       }
     } else {
@@ -290,6 +304,7 @@ export default function InProgressMeetingPage() {
         description: '노트 기반으로 결과를 생성합니다.',
         variant: 'success',
       });
+      setCurrentMeeting(null);
       router.push('/');
     }
   };
@@ -303,6 +318,7 @@ export default function InProgressMeetingPage() {
       description: '결과 화면에서 확인하세요.',
       variant: 'success',
     });
+    setCurrentMeeting(null);
     router.push('/');
   };
 

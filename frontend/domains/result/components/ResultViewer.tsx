@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Copy, Download, Edit3, RefreshCw, Save, X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
@@ -12,6 +12,8 @@ import {
   resultTabDataApi,
   type ResultTabTranscriptSegment,
 } from '../api/resultTabDataApi';
+import { meetingApi } from '@/domains/meeting/api/meetingApi';
+import { MeetingStatus } from '@/domains/meeting/types/meeting.types';
 
 interface ResultViewerProps {
   meetingId: string;
@@ -38,6 +40,37 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
   );
   const [noteContent, setNoteContent] = useState<string>('');
   const [tabDataLoaded, setTabDataLoaded] = useState(false);
+  const [meetingStatus, setMeetingStatus] = useState<MeetingStatus | null>(null);
+  const prevMeetingIdRef = useRef(meetingId);
+
+  // meetingId 변경 시 탭 데이터 리셋
+  useEffect(() => {
+    if (prevMeetingIdRef.current !== meetingId) {
+      prevMeetingIdRef.current = meetingId;
+      setTabDataLoaded(false);
+      setTranscripts([]);
+      setNoteContent('');
+      setActiveTab('result');
+      setIsEditing(false);
+      setMeetingStatus(null);
+    }
+  }, [meetingId]);
+
+  // 회의 상태 확인 (PROCESSING이면 결과 생성 방지)
+  useEffect(() => {
+    if (!meetingId) return;
+    let disposed = false;
+    const checkStatus = async () => {
+      try {
+        const meeting = await meetingApi.get(meetingId);
+        if (!disposed) setMeetingStatus(meeting.status as MeetingStatus);
+      } catch {
+        // 무시
+      }
+    };
+    void checkStatus();
+    return () => { disposed = true; };
+  }, [meetingId]);
 
   // 탭 데이터 로드
   useEffect(() => {
@@ -80,11 +113,20 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
   }
 
   if (!result) {
+    const isProcessing = meetingStatus === MeetingStatus.PROCESSING;
     return (
       <div className="flex h-full items-center justify-center p-6">
         <div className="surface-card w-full max-w-xl p-8 text-center">
-          <p className="text-sm font-semibold">선택한 회의의 결과가 아직 없습니다</p>
-          <p className="mt-1 text-xs text-muted">회의 종료 후 자동 생성된 문서가 여기에 표시됩니다.</p>
+          <p className="text-sm font-semibold">
+            {isProcessing
+              ? '전사 및 회의록을 생성하고 있습니다'
+              : '선택한 회의의 결과가 아직 없습니다'}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {isProcessing
+              ? '음성 전사와 AI 정리가 진행 중입니다. 완료 시 자동으로 표시됩니다.'
+              : '회의 종료 후 자동 생성된 문서가 여기에 표시됩니다.'}
+          </p>
         </div>
       </div>
     );
