@@ -225,6 +225,12 @@ export class MeetingService {
     return this.meetingRepository.save(meeting);
   }
 
+  async updateStatus(id: string, status: MeetingStatus): Promise<MeetingEntity> {
+    const meeting = await this.findById(id);
+    meeting.status = status;
+    return this.meetingRepository.save(meeting);
+  }
+
   async remove(id: string): Promise<void> {
     const meeting = await this.findById(id);
     await this.meetingRepository.remove(meeting);

@@ -11,10 +11,18 @@ export interface SubmitBatchTranscriptionJobResult {
   status: TranscriptionJobStatus;
 }
 
+export interface BatchTranscriptionJobStatus {
+  status: TranscriptionJobStatus;
+  transcriptUri?: string;
+  errorMessage?: string;
+}
+
 export interface BatchTranscriptionProvider {
   submitBatchJob(
     input: SubmitBatchTranscriptionJobInput,
   ): Promise<SubmitBatchTranscriptionJobResult>;
+
+  getJobStatus(providerJobId: string): Promise<BatchTranscriptionJobStatus>;
 }
 
 export const BATCH_TRANSCRIPTION_PROVIDER = Symbol(

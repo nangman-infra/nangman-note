@@ -2,15 +2,22 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { ArrowLeft, Mic, Radio, Square, Timer } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Mic, MicOff, Radio, Square, Timer } from 'lucide-react';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
+import { useBeforeUnloadGuard } from '@/domains/meeting/hooks/useBeforeUnloadGuard';
+import { EndMeetingDialog } from '@/domains/meeting/components/EndMeetingDialog';
 import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
 import { NoteEditor } from '@/domains/note/components/NoteEditor';
 import { TranscriptPanel } from '@/domains/transcription/components/TranscriptPanel';
 import { useTranscription } from '@/domains/transcription/hooks/useTranscription';
+import { useAudioCapture, type AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
+import { useMediaRecorder } from '@/domains/transcription/hooks/useMediaRecorder';
+import { useAudioUpload } from '@/domains/transcription/hooks/useAudioUpload';
+import { transcriptionApi } from '@/domains/transcription/api/transcriptionApi';
+import { ProcessingProgress } from '@/domains/meeting/components/ProcessingProgress';
 import { formatTime } from '@/lib/utils/date';
 
 export default function InProgressMeetingPage() {
@@ -18,6 +25,40 @@ export default function InProgressMeetingPage() {
   const { pushToast } = useFeedback();
   const { currentMeeting, isLoading, error, endMeeting } = useMeeting();
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [showEndDialog, setShowEndDialog] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
+  const [showProcessing, setShowProcessing] = useState(false);
+
+  // 오디오 캡처 (마이크 권한 + 디바이스 선택)
+  const {
+    permission,
+    devices,
+    selectedDeviceId,
+    stream,
+    requestPermission,
+    selectDevice,
+    stopCapture,
+  } = useAudioCapture();
+
+  // 녹음 (MediaRecorder + IndexedDB 청크)
+  const {
+    state: recorderState,
+    chunkCount,
+    error: recorderError,
+    startRecording,
+    stopRecording,
+    cleanupChunks,
+  } = useMediaRecorder();
+
+  // S3 업로드
+  const {
+    uploadState,
+    progress: uploadProgress,
+    bucket: uploadBucket,
+    error: uploadError,
+    upload: uploadAudio,
+    reset: resetUpload,
+  } = useAudioUpload();
 
   const meetingId = currentMeeting?.id || '';
   const transcriptionMode =
@@ -29,12 +70,16 @@ export default function InProgressMeetingPage() {
     isRealtimeMode,
   );
 
+  // 탭 닫기 방지: 녹음 중일 때
+  const isActiveRecording = recorderState === 'recording';
+  useBeforeUnloadGuard(isActiveRecording);
+
+  // 타이머
   useEffect(() => {
     if (!currentMeeting?.startedAt) return;
     const timerId = window.setInterval(() => {
       setNowTick(Date.now());
     }, 1000);
-
     return () => window.clearInterval(timerId);
   }, [currentMeeting?.startedAt]);
 
@@ -42,17 +87,87 @@ export default function InProgressMeetingPage() {
     ? Math.max(0, Math.floor((nowTick - new Date(currentMeeting.startedAt).getTime()) / 1000))
     : 0;
 
+  // 회의 시작 시 마이크 권한 요청 + 녹음 시작
+  useEffect(() => {
+    if (!meetingId || permission !== 'prompt') return;
+
+    const init = async () => {
+      const granted = await requestPermission();
+      if (!granted) {
+        pushToast({
+          title: '마이크 접근이 차단되었습니다',
+          description: '노트 전용 모드로 계속합니다. 전사 없이 노트 기반으로 결과를 생성합니다.',
+          variant: 'info',
+        });
+      }
+    };
+    void init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetingId]);
+
+  // 마이크 스트림 획득 후 녹음 시작
+  useEffect(() => {
+    if (!stream || !meetingId || recorderState !== 'idle') return;
+    startRecording(stream, meetingId);
+  }, [stream, meetingId, recorderState, startRecording]);
+
+  // 마이크 디바이스 변경 핸들러
+  const handleDeviceChange = useCallback(
+    async (deviceId: string) => {
+      selectDevice(deviceId);
+      // 디바이스 변경 후 재연결: 녹음 중이면 중지 후 재시작
+      if (recorderState === 'recording') {
+        await stopRecording();
+        await cleanupChunks();
+      }
+      const granted = await requestPermission();
+      if (granted) {
+        // stream이 변경되면 위 useEffect에서 자동 재시작
+      }
+    },
+    [selectDevice, recorderState, stopRecording, cleanupChunks, requestPermission],
+  );
+
+  // 연결 상태 배지
   const connectionBadge = !meetingId
     ? { label: '대기', className: 'bg-slate-100 text-slate-700' }
-    : !isRealtimeMode
-      ? { label: '배치 전사 모드', className: 'bg-slate-100 text-slate-700' }
-      : isConnected
-      ? { label: '전사 연결됨', className: 'bg-emerald-100 text-emerald-800' }
-      : { label: '전사 연결중', className: 'bg-amber-100 text-amber-800' };
+    : permission === 'denied'
+      ? { label: '노트 전용', className: 'bg-amber-100 text-amber-800' }
+      : !isRealtimeMode
+        ? { label: '배치 전사 모드', className: 'bg-slate-100 text-slate-700' }
+        : isConnected
+          ? { label: '전사 연결됨', className: 'bg-emerald-100 text-emerald-800' }
+          : { label: '전사 연결중', className: 'bg-amber-100 text-amber-800' };
 
-  const handleEndMeeting = async () => {
+  // 녹음 상태 배지
+  const recordingBadge = (p: AudioCapturePermission) => {
+    if (p === 'denied' || p === 'unsupported') {
+      return { label: '녹음 비활성', className: 'bg-slate-100 text-slate-600' };
+    }
+    if (recorderState === 'recording') {
+      return { label: `녹음 중 (${chunkCount}청크)`, className: 'bg-rose-100 text-rose-800' };
+    }
+    return { label: '녹음 대기', className: 'bg-slate-100 text-slate-600' };
+  };
+  const recBadge = recordingBadge(permission);
+
+  // 종료 다이얼로그 확인 핸들러
+  const handleEndConfirm = async () => {
+    setIsEnding(true);
+    let audioBlob: Blob | null = null;
+
+    // 1. 녹음 중지 + Blob 합성
+    if (recorderState === 'recording' || recorderState === 'stopping') {
+      audioBlob = await stopRecording();
+      stopCapture();
+    } else {
+      stopCapture();
+    }
+
+    // 2. 백엔드 회의 종료 API 호출
     const success = await endMeeting();
     if (!success) {
+      setIsEnding(false);
       pushToast({
         title: '회의 종료에 실패했습니다',
         description: error || '네트워크 상태를 확인해주세요.',
@@ -61,14 +176,66 @@ export default function InProgressMeetingPage() {
       return;
     }
 
+    setIsEnding(false);
+    setShowEndDialog(false);
+
+    // 3. 오디오가 있으면 S3 업로드 + 배치 잡 트리거
+    if (audioBlob && audioBlob.size > 0 && meetingId) {
+      setShowProcessing(true);
+
+      pushToast({
+        title: '회의를 종료했습니다',
+        description: '오디오 업로드 및 전사를 시작합니다.',
+        variant: 'success',
+      });
+
+      // S3 업로드
+      const s3Key = await uploadAudio(meetingId, audioBlob);
+
+      // IndexedDB 청크 정리
+      await cleanupChunks();
+
+      if (s3Key) {
+        // 배치 전사 잡 트리거
+        try {
+          const mediaUri = uploadBucket
+            ? `s3://${uploadBucket}/${s3Key}`
+            : `s3://${s3Key}`;
+          await transcriptionApi.queueBatchJob(meetingId, { mediaUri });
+        } catch {
+          pushToast({
+            title: '배치 전사 잡 생성에 실패했습니다',
+            description: '결과 화면에서 재시도할 수 있습니다.',
+            variant: 'error',
+          });
+        }
+      }
+    } else {
+      // 오디오 없음 (노트 전용 모드) → 바로 홈으로
+      await cleanupChunks();
+
+      pushToast({
+        title: '회의를 종료했습니다',
+        description: '노트 기반으로 결과를 생성합니다.',
+        variant: 'success',
+      });
+      router.push('/');
+    }
+  };
+
+  // 처리 완료 시 홈으로 이동
+  const handleProcessingComplete = () => {
+    setShowProcessing(false);
+    resetUpload();
     pushToast({
-      title: '회의를 종료했습니다',
-      description: '결과 확인 화면으로 이동합니다.',
+      title: '회의록이 준비되었습니다',
+      description: '결과 화면에서 확인하세요.',
       variant: 'success',
     });
     router.push('/');
   };
 
+  // 회의 없음 상태
   if (!currentMeeting) {
     return (
       <div className="app-shell flex min-h-dvh items-center justify-center p-6">
@@ -91,6 +258,7 @@ export default function InProgressMeetingPage() {
   return (
     <div className="app-shell min-h-dvh p-4 sm:p-5">
       <div className="mx-auto flex h-[calc(100dvh-2rem)] w-full max-w-[1400px] flex-col gap-3">
+        {/* 헤더 */}
         <header className="glass-surface px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -99,33 +267,81 @@ export default function InProgressMeetingPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* 녹음 상태 배지 */}
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${recBadge.className}`}>
+                {permission === 'denied' || permission === 'unsupported' ? (
+                  <MicOff className="mr-1 inline-block h-3.5 w-3.5" />
+                ) : (
+                  <Mic className="mr-1 inline-block h-3.5 w-3.5" />
+                )}
+                {recBadge.label}
+              </span>
+
+              {/* 연결 상태 배지 */}
               <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${connectionBadge.className}`}>
                 <Radio className="mr-1 inline-block h-3.5 w-3.5" />
                 {connectionBadge.label}
               </span>
+
+              {/* 타이머 */}
               <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-muted">
                 <Timer className="mr-1 inline-block h-3.5 w-3.5" />
                 {formatTime(elapsedSeconds)}
               </span>
+
+              {/* 마이크 선택 (디바이스 2개 이상일 때만) */}
+              {devices.length > 1 && (
+                <select
+                  value={selectedDeviceId || ''}
+                  onChange={(e) => handleDeviceChange(e.target.value)}
+                  className="rounded-lg border border-[var(--line-soft)] bg-white px-2 py-1 text-xs"
+                  aria-label="마이크 선택"
+                >
+                  {devices.map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+
               <button type="button" onClick={() => router.push('/')} className="btn-neo text-xs text-muted">
                 <ArrowLeft className="h-3.5 w-3.5" />
                 목록으로
               </button>
               <button
                 type="button"
-                onClick={handleEndMeeting}
-                disabled={isLoading}
+                onClick={() => setShowEndDialog(true)}
+                disabled={isLoading || isEnding}
                 className="btn-neo border-transparent bg-rose-600 px-3 py-2 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Square className="h-3.5 w-3.5" />
-                {isLoading ? '종료 중...' : '회의 종료'}
+                회의 종료
               </button>
             </div>
           </div>
         </header>
 
+        {/* 상태 배너들 */}
         {error ? (
           <StatusBanner variant="error" title="회의 상태 오류" message={error} />
+        ) : null}
+        {recorderError ? (
+          <StatusBanner variant="warning" title="녹음 오류" message={recorderError} />
+        ) : null}
+        {permission === 'denied' ? (
+          <StatusBanner
+            variant="warning"
+            title="마이크 접근이 차단되었습니다"
+            message="노트 전용 모드로 진행 중입니다. 전사 데이터 없이 노트 기반으로만 결과를 생성합니다. 브라우저 설정에서 마이크 권한을 허용하면 녹음이 가능합니다."
+          />
+        ) : null}
+        {permission === 'unsupported' ? (
+          <StatusBanner
+            variant="error"
+            title="마이크 미지원 브라우저"
+            message="현재 브라우저는 마이크 캡처를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요."
+          />
         ) : null}
         {isRealtimeMode && transcriptionError ? (
           <StatusBanner
@@ -135,6 +351,7 @@ export default function InProgressMeetingPage() {
           />
         ) : null}
 
+        {/* 메인 콘텐츠: 노트 + 전사 패널 */}
         <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">
           <section className="glass-surface min-h-0 overflow-hidden">
             <NoteEditor meetingId={currentMeeting.id} />
@@ -144,7 +361,11 @@ export default function InProgressMeetingPage() {
             <div className="border-b border-[var(--line-soft)] px-4 py-3">
               <p className="text-xs font-semibold tracking-wide text-muted">TRANSCRIPTION</p>
               <h2 className="mt-1 text-sm font-semibold">
-                {isRealtimeMode ? '실시간 전사 모니터' : '배치 전사 대기'}
+                {permission === 'denied'
+                  ? '노트 전용 모드'
+                  : isRealtimeMode
+                    ? '실시간 전사 모니터'
+                    : '배치 전사 대기'}
               </h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span className="rounded-full bg-white px-2 py-1">
@@ -156,22 +377,56 @@ export default function InProgressMeetingPage() {
 
             <div className="flex h-[calc(100%-84px)] flex-col">
               <div className="px-4 py-3 text-xs text-muted">
-                <Mic className="mr-1 inline-block h-3.5 w-3.5" />
-                {isRealtimeMode
-                  ? '마이크 입력은 백그라운드 수집되며, 노트에 집중할 수 있도록 전사는 접기/펼치기 방식으로 제공됩니다.'
-                  : '현재 회의는 배치 전사 모드입니다. 음성 파일 업로드 후 AWS 배치 전사 잡으로 처리됩니다.'}
+                {permission === 'denied' ? (
+                  <>
+                    <MicOff className="mr-1 inline-block h-3.5 w-3.5" />
+                    마이크 접근이 차단되어 전사가 비활성화되었습니다. 노트 작성에 집중해주세요.
+                  </>
+                ) : (
+                  <>
+                    <Mic className="mr-1 inline-block h-3.5 w-3.5" />
+                    {isRealtimeMode
+                      ? '마이크 입력은 백그라운드 수집되며, 노트에 집중할 수 있도록 전사는 접기/펼치기 방식으로 제공됩니다.'
+                      : '현재 회의는 배치 전사 모드입니다. 회의 종료 후 수집된 오디오가 AWS 배치 전사로 처리됩니다.'}
+                  </>
+                )}
               </div>
-              {isRealtimeMode ? (
+              {isRealtimeMode && permission !== 'denied' ? (
                 <TranscriptPanel meetingId={currentMeeting.id} />
               ) : (
                 <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted">
-                  실시간 전사가 비활성화되어 있습니다. 회의 종료 후 배치 전사를 실행하세요.
+                  {permission === 'denied'
+                    ? '마이크 비활성 — 노트 전용 모드'
+                    : '실시간 전사가 비활성화되어 있습니다. 회의 종료 후 배치 전사를 실행합니다.'}
                 </div>
               )}
             </div>
           </aside>
         </div>
       </div>
+
+      {/* 처리 진행 상태 (회의 종료 후) */}
+      {showProcessing && meetingId && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="w-full max-w-lg p-4">
+            <ProcessingProgress
+              meetingId={meetingId}
+              uploadState={uploadState}
+              uploadProgress={uploadProgress}
+              uploadError={uploadError}
+              onComplete={handleProcessingComplete}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 종료 확인 모달 */}
+      <EndMeetingDialog
+        open={showEndDialog}
+        isLoading={isEnding}
+        onConfirm={handleEndConfirm}
+        onCancel={() => setShowEndDialog(false)}
+      />
     </div>
   );
 }

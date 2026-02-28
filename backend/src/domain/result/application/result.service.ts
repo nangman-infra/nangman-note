@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { existsSync, readFileSync } from 'fs';
@@ -14,11 +14,14 @@ import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-s
 import { RegenerateResultDto } from './dto/regenerate-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 import { ResultEntity } from '../domain/result.entity';
+import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 
 type ExportFormat = 'pdf' | 'docx' | 'md';
 
 @Injectable()
 export class ResultService {
+  private readonly logger = new Logger(ResultService.name);
+
   constructor(
     @InjectRepository(ResultEntity)
     private readonly resultRepository: Repository<ResultEntity>,
@@ -28,6 +31,7 @@ export class ResultService {
     private readonly transcriptRepository: Repository<TranscriptSegmentEntity>,
     private readonly meetingService: MeetingService,
     private readonly promptService: PromptService,
+    private readonly bedrockService: BedrockService,
   ) {}
 
   async findByMeetingId(meetingId: string): Promise<ResultEntity> {
@@ -162,7 +166,6 @@ export class ResultService {
       this.transcriptRepository.find({
         where: { meetingId },
         order: { startTime: 'ASC' },
-        take: 24,
       }),
     ]);
 
@@ -188,7 +191,7 @@ export class ResultService {
 
     return {
       promptId,
-      content: this.buildGeneratedContent({
+      content: await this.generateContentWithAI({
         meeting,
         prompt,
         noteContent,
@@ -204,7 +207,47 @@ export class ResultService {
     };
   }
 
-  private buildGeneratedContent(params: {
+  private async generateContentWithAI(params: {
+    meeting: MeetingEntity;
+    prompt: PromptEntity;
+    noteContent: string;
+    transcripts: TranscriptSegmentEntity[];
+  }): Promise<string> {
+    const { meeting, prompt, noteContent, transcripts } = params;
+
+    const transcriptText = transcripts
+      .filter((segment) => segment.text?.trim())
+      .map(
+        (segment) =>
+          `[${segment.startTime.toFixed(1)}s ~ ${segment.endTime.toFixed(1)}s] ${segment.text.trim()}`,
+      )
+      .join('\n');
+
+    try {
+      const aiContent = await this.bedrockService.generateMeetingResult({
+        promptContent: prompt.content.trim(),
+        noteContent: noteContent || '',
+        transcriptText,
+        meetingTitle: meeting.title?.trim(),
+      });
+
+      if (aiContent && aiContent.trim().length > 0) {
+        return aiContent;
+      }
+
+      this.logger.warn(
+        `Bedrock returned empty content for meeting ${meeting.id}, using fallback`,
+      );
+      return this.buildFallbackContent(params);
+    } catch (error) {
+      this.logger.error(
+        `Bedrock generation failed for meeting ${meeting.id}: ${error instanceof Error ? error.message : 'Unknown error'}. Using fallback template.`,
+      );
+      return this.buildFallbackContent(params);
+    }
+  }
+
+  private buildFallbackContent(params: {
     meeting: MeetingEntity;
     prompt: PromptEntity;
     noteContent: string;
@@ -224,6 +267,8 @@ export class ResultService {
 
     const sections = [
       `# ${title}`,
+      '',
+      '> ⚠️ AI 생성에 실패하여 기본 템플릿으로 결과를 생성했습니다.',
       '',
       `- 생성 시각: ${generatedAt}`,
       `- 적용 프롬프트: ${prompt.name} (\`${prompt.id}\`)`,

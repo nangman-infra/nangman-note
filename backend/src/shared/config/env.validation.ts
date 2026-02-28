@@ -9,6 +9,11 @@ export interface AppEnv {
   AWS_TRANSCRIBE_LANGUAGE_CODE: string;
   AWS_TRANSCRIBE_OUTPUT_BUCKET: string;
   AWS_TRANSCRIBE_MEDIA_FORMAT: string;
+  AWS_S3_AUDIO_BUCKET: string;
+  AWS_S3_AUDIO_KEY_PREFIX: string;
+  AWS_BEDROCK_MODEL_ID: string;
+  AWS_BEDROCK_MAX_TOKENS: number;
+  AWS_BEDROCK_TEMPERATURE: string;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -118,6 +123,27 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       config,
       'AWS_TRANSCRIBE_MEDIA_FORMAT',
       'webm',
+    ),
+    AWS_S3_AUDIO_BUCKET: readString(
+      config,
+      'AWS_S3_AUDIO_BUCKET',
+      '',
+    ),
+    AWS_S3_AUDIO_KEY_PREFIX: readString(
+      config,
+      'AWS_S3_AUDIO_KEY_PREFIX',
+      'meeting-audio',
+    ),
+    AWS_BEDROCK_MODEL_ID: readString(
+      config,
+      'AWS_BEDROCK_MODEL_ID',
+      'amazon.nova-pro-v1:0',
+    ),
+    AWS_BEDROCK_MAX_TOKENS: readNumber(config, 'AWS_BEDROCK_MAX_TOKENS', 4096),
+    AWS_BEDROCK_TEMPERATURE: readString(
+      config,
+      'AWS_BEDROCK_TEMPERATURE',
+      '0.3',
     ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: readString(

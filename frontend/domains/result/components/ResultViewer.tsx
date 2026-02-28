@@ -8,18 +8,53 @@ import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard } from '@/lib/utils/markdown';
 import { useResult } from '../hooks/useResult';
+import { transcriptionApi } from '@/domains/transcription/api/transcriptionApi';
+import { noteApi } from '@/domains/note/api/noteApi';
+import type { TranscriptSegment } from '@/domains/transcription/types/transcription.types';
 
 interface ResultViewerProps {
   meetingId: string;
 }
 
+function formatSegmentTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+type ResultTab = 'result' | 'transcript' | 'note';
+
 export function ResultViewer({ meetingId }: ResultViewerProps) {
   const { result, isLoading, isRegenerating, error, updateResult, regenerateResult, exportPDF } = useResult(meetingId);
   const { pushToast } = useFeedback();
+  const [activeTab, setActiveTab] = useState<ResultTab>('result');
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [regeneratePromptId, setRegeneratePromptId] = useState('');
+  const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
+  const [noteContent, setNoteContent] = useState<string>('');
+  const [tabDataLoaded, setTabDataLoaded] = useState(false);
+
+  // 탭 데이터 로드
+  useEffect(() => {
+    if (tabDataLoaded || !meetingId) return;
+
+    const loadTabData = async () => {
+      try {
+        const [segments, note] = await Promise.all([
+          transcriptionApi.list(meetingId).catch(() => []),
+          noteApi.get(meetingId).catch(() => null),
+        ]);
+        setTranscripts(segments);
+        setNoteContent(note?.content ?? '');
+        setTabDataLoaded(true);
+      } catch {
+        // 에러 무시 — 탭에서 빈 상태로 표시
+      }
+    };
+    void loadTabData();
+  }, [meetingId, tabDataLoaded]);
 
   useEffect(() => {
     if (!error) return;
@@ -162,8 +197,33 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
         </div>
       </header>
 
+      {/* 탭 네비게이션 */}
+      <div className="border-b border-[var(--line-soft)] px-6">
+        <div className="flex gap-1">
+          {([
+            { key: 'result' as ResultTab, label: '회의록' },
+            { key: 'transcript' as ResultTab, label: `전사 원본 (${transcripts.length})` },
+            { key: 'note' as ResultTab, label: '메모' },
+          ]).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-2 text-sm font-semibold transition ${
+                activeTab === tab.key
+                  ? 'border-b-2 border-brand text-brand'
+                  : 'text-muted hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <section className="scroll-muted flex-1 overflow-y-auto px-6 py-5">
-        {isEditing ? (
+        {/* 회의록 탭 */}
+        {activeTab === 'result' && isEditing ? (
           <div className="surface-card h-[min(64vh,760px)] min-h-[360px] overflow-hidden">
             <MarkdownWysiwygEditor
               value={editContent}
@@ -172,14 +232,47 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
               height="100%"
             />
           </div>
-        ) : (
+        ) : activeTab === 'result' ? (
           <article className="result-markdown surface-card p-5">
             <ReactMarkdown>{result.content}</ReactMarkdown>
           </article>
+        ) : null}
+
+        {/* 전사 원본 탭 */}
+        {activeTab === 'transcript' && (
+          <div className="surface-card p-5">
+            {transcripts.length === 0 ? (
+              <p className="text-center text-sm text-muted">아직 수집된 전사 데이터가 없습니다.</p>
+            ) : (
+              <div className="space-y-2">
+                {transcripts.map((segment) => (
+                  <div key={segment.id} className="flex gap-3 text-sm">
+                    <span className="shrink-0 font-mono text-xs text-muted">
+                      [{formatSegmentTime(segment.startTime)} ~ {formatSegmentTime(segment.endTime)}]
+                    </span>
+                    <span>{segment.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 메모 탭 */}
+        {activeTab === 'note' && (
+          <div className="surface-card p-5">
+            {noteContent.trim() ? (
+              <article className="result-markdown">
+                <ReactMarkdown>{noteContent}</ReactMarkdown>
+              </article>
+            ) : (
+              <p className="text-center text-sm text-muted">작성된 메모가 없습니다.</p>
+            )}
+          </div>
         )}
       </section>
 
-      {!isEditing && (
+      {!isEditing && activeTab === 'result' && (
         <footer className="border-t border-[var(--line-soft)] px-6 py-4">
           {!showRegenerate ? (
             <button type="button" onClick={() => setShowRegenerate(true)} className="btn-neo">

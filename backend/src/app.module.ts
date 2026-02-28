@@ -10,6 +10,7 @@ import { NoteModule } from './domain/note/note.module';
 import { PromptModule } from './domain/prompt/prompt.module';
 import { ResultModule } from './domain/result/result.module';
 import { TranscriptionModule } from './domain/transcription/transcription.module';
+import { AwsModule } from './shared/aws/aws.module';
 import { AppEnv, validateEnv } from './shared/config/env.validation';
 
 function resolveDatabasePath(dbPath: string): string {
@@ -46,6 +47,7 @@ function resolveDatabasePath(dbPath: string): string {
         };
       },
     }),
+    AwsModule,
     PromptModule,
     MeetingModule,
     NoteModule,
