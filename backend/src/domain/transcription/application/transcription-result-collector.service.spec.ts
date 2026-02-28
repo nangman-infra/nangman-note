@@ -7,6 +7,7 @@ import type { BatchTranscriptionProvider } from './ports/batch-transcription-pro
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 
 describe('TranscriptionResultCollectorService', () => {
@@ -25,21 +26,23 @@ describe('TranscriptionResultCollectorService', () => {
   let s3AudioService: jest.Mocked<
     Pick<S3AudioService, 'getObjectAsStringFromBucket' | 'deleteAudioFile'>
   >;
+  let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
 
   const buildJob = (
     overrides: Partial<TranscriptionJobEntity> = {},
-  ): TranscriptionJobEntity => ({
-    id: 'job-1',
-    meetingId: 'meeting-1',
-    provider: 'aws-transcribe' as TranscriptionJobEntity['provider'],
-    providerJobId: 'aws-job-1',
-    status: TranscriptionJobStatus.QUEUED,
-    mediaUri: 's3://audio-bucket/meeting-1/audio.webm',
-    languageCode: 'ko-KR',
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:00:00.000Z'),
-    ...overrides,
-  });
+  ): TranscriptionJobEntity =>
+    ({
+      id: 'job-1',
+      meetingId: 'meeting-1',
+      provider: 'aws-transcribe' as TranscriptionJobEntity['provider'],
+      providerJobId: 'aws-job-1',
+      status: TranscriptionJobStatus.QUEUED,
+      mediaUri: 's3://audio-bucket/meeting-1/audio.webm',
+      languageCode: 'ko-KR',
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      ...overrides,
+    }) as TranscriptionJobEntity;
 
   beforeEach(() => {
     jobRepository = {
@@ -63,6 +66,9 @@ describe('TranscriptionResultCollectorService', () => {
       getObjectAsStringFromBucket: jest.fn(),
       deleteAudioFile: jest.fn(),
     };
+    eventEmitter = {
+      emit: jest.fn(),
+    };
 
     service = new TranscriptionResultCollectorService(
       jobRepository as unknown as Repository<TranscriptionJobEntity>,
@@ -71,6 +77,7 @@ describe('TranscriptionResultCollectorService', () => {
       meetingService as unknown as MeetingService,
       resultService as unknown as ResultService,
       s3AudioService as unknown as S3AudioService,
+      eventEmitter as unknown as EventEmitter2,
     );
   });
 
@@ -86,7 +93,9 @@ describe('TranscriptionResultCollectorService', () => {
   it('collects completed batch transcription and finalizes meeting', async () => {
     const job = buildJob();
     jobRepository.findOne.mockResolvedValue(job);
-    jobRepository.save.mockImplementation((entity) => Promise.resolve(entity));
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
     batchProvider.getJobStatus.mockResolvedValue({
       status: TranscriptionJobStatus.COMPLETED,
       transcriptUri: 's3://transcript-bucket/meeting-1/result.json',
@@ -119,7 +128,7 @@ describe('TranscriptionResultCollectorService', () => {
       (entity) => entity as TranscriptSegmentEntity,
     );
     segmentRepository.save.mockImplementation((entity) =>
-      Promise.resolve(entity),
+      Promise.resolve(entity as TranscriptSegmentEntity),
     );
     meetingService.updateStatus.mockResolvedValue({} as never);
     resultService.findByMeetingId.mockResolvedValue({} as never);
@@ -143,7 +152,9 @@ describe('TranscriptionResultCollectorService', () => {
   it('handles failed transcription by finalizing meeting safely', async () => {
     const job = buildJob();
     jobRepository.findOne.mockResolvedValue(job);
-    jobRepository.save.mockImplementation((entity) => Promise.resolve(entity));
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
     batchProvider.getJobStatus.mockResolvedValue({
       status: TranscriptionJobStatus.FAILED,
       errorMessage: 'provider failed',

@@ -1,45 +1,44 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
-  ConnectedSocket,
-  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  SubscribeMessage,
   WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
 import { AppEnv } from '../../../shared/config/env.validation';
 import {
   isAllowedCorsOrigin,
   parseAllowedOrigins,
 } from '../../../shared/config/cors-origin.util';
 import { createWsCorsOriginHandler } from '../../../shared/config/ws-cors.factory';
-import { Socket } from 'socket.io';
-import { TranscriptionService } from '../application/transcription.service';
+import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
 
 @WebSocketGateway({
-  path: '/ws/transcribe',
+  path: '/ws/meeting-status',
   cors: {
     origin: createWsCorsOriginHandler(),
     credentials: true,
   },
   transports: ['websocket'],
 })
-export class TranscriptionGateway
+export class MeetingStatusGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  private readonly logger = new Logger(TranscriptionGateway.name);
+  private readonly logger = new Logger(MeetingStatusGateway.name);
+
+  @WebSocketServer()
+  private readonly server!: Server;
 
   constructor(
-    private readonly transcriptionService: TranscriptionService,
     private readonly configService: ConfigService<AppEnv, true>,
   ) {}
 
   async handleConnection(client: Socket): Promise<void> {
     if (!this.isAllowedOrigin(client.handshake.headers.origin)) {
-      client.emit('error', {
-        message: 'Origin is not allowed',
-      });
+      client.emit('error', { message: 'Origin is not allowed' });
       client.disconnect(true);
       return;
     }
@@ -54,51 +53,31 @@ export class TranscriptionGateway
       return;
     }
 
-    try {
-      await this.transcriptionService.ensureRealtimeEnabled(meetingId);
-      await this.transcriptionService.listByMeetingId(meetingId);
-      await client.join(meetingId);
-    } catch (error) {
-      this.logger.warn(
-        `Failed to connect socket ${client.id} to meeting ${meetingId}`,
-      );
-      client.emit('error', {
-        message: error instanceof Error ? error.message : 'Invalid meeting id',
-      });
-      client.disconnect(true);
-    }
+    await client.join(meetingId);
+    this.logger.debug(
+      `Client ${client.id} joined meeting-status room: ${meetingId}`,
+    );
   }
 
   handleDisconnect(client: Socket): void {
-    this.logger.debug(`Socket disconnected: ${client.id}`);
+    this.logger.debug(`Client ${client.id} disconnected from meeting-status`);
   }
 
-  @SubscribeMessage('audio')
-  async handleAudio(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: unknown,
-  ): Promise<{ ok: boolean }> {
-    const meetingId = this.resolveMeetingId(client);
-    if (!meetingId) {
-      return { ok: false };
-    }
-
-    const processed = await this.transcriptionService
-      .acceptRealtimeAudioChunk(meetingId, payload)
-      .catch((error: unknown): null => {
-        client.emit('error', {
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Failed to process realtime transcription chunk',
-        });
-        return null;
+  /**
+   * EventEmitter 를 통해 도메인 이벤트를 수신하고,
+   * 해당 meetingId 룸에 WebSocket 메시지를 브로드캐스트합니다.
+   */
+  @OnEvent(MeetingStatusChangedEvent.EVENT_NAME)
+  handleMeetingStatusChanged(event: MeetingStatusChangedEvent): void {
+    this.logger.log(
+      `Broadcasting status change: meeting=${event.meetingId}, status=${event.status}`,
+    );
+    this.server
+      .to(event.meetingId)
+      .emit('meeting:status', {
+        meetingId: event.meetingId,
+        status: event.status,
       });
-    if (!processed) {
-      return { ok: false };
-    }
-
-    return { ok: true };
   }
 
   private resolveMeetingId(client: Socket): string | undefined {

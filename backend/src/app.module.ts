@@ -1,6 +1,7 @@
 import { mkdirSync } from 'fs';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dirname, resolve } from 'path';
 import { AppController } from './app.controller';
@@ -30,6 +31,7 @@ function resolveDatabasePath(dbPath: string): string {
       envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
       validate: validateEnv,
     }),
+    EventEmitterModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService<AppEnv, true>) => {

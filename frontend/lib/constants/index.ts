@@ -2,7 +2,6 @@ import { env } from '@/lib/config/env';
 
 // API URLs
 export const API_URL = env.API_URL;
-export const WS_URL = env.WS_URL;
 
 // App Configuration
 export const APP_NAME = env.APP_NAME;

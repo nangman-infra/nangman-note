@@ -9,49 +9,43 @@ describe('env config', () => {
     process.env = { ...ORIGINAL_ENV };
   });
 
-  it('uses development defaults when public endpoints are omitted', async () => {
+  it('uses same-origin defaults when NEXT_PUBLIC_API_URL is omitted', async () => {
     process.env = {
       ...ORIGINAL_ENV,
       NODE_ENV: 'development',
     };
     delete process.env.NEXT_PUBLIC_API_URL;
-    delete process.env.NEXT_PUBLIC_WS_URL;
 
     const { env } = await import('./env');
 
     expect(env.MODE).toBe('development');
-    expect(env.API_URL).toBe('http://localhost:9999');
-    expect(env.WS_URL).toBe('ws://localhost:9999');
+    // 빈 문자열 = same-origin (Next.js rewrite 프록시)
+    expect(env.API_URL).toBe('');
   });
 
-  it('uses production defaults and warns when explicit endpoints are missing', async () => {
-    process.env = {
-      ...ORIGINAL_ENV,
-      NODE_ENV: 'production',
-    };
-    delete process.env.NEXT_PUBLIC_API_URL;
-    delete process.env.NEXT_PUBLIC_WS_URL;
-
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { env } = await import('./env');
-
-    expect(env.MODE).toBe('production');
-    expect(env.API_URL).toBe('https://api.example.com');
-    expect(env.WS_URL).toBe('wss://api.example.com');
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[env] Production mode is using fallback endpoints. Set NEXT_PUBLIC_API_URL and NEXT_PUBLIC_WS_URL explicitly.',
-    );
-  });
-
-  it('throws when URL schema is invalid', async () => {
+  it('uses explicit API_URL when provided', async () => {
     process.env = {
       ...ORIGINAL_ENV,
       NODE_ENV: 'development',
-      NEXT_PUBLIC_API_URL: 'not-a-url',
+      NEXT_PUBLIC_API_URL: 'http://custom-backend:9999',
     };
 
-    await expect(import('./env')).rejects.toThrow(
-      'Invalid frontend environment variables',
-    );
+    const { env } = await import('./env');
+
+    expect(env.MODE).toBe('development');
+    expect(env.API_URL).toBe('http://custom-backend:9999');
+  });
+
+  it('has correct default app config values', async () => {
+    process.env = {
+      ...ORIGINAL_ENV,
+      NODE_ENV: 'development',
+    };
+
+    const { env } = await import('./env');
+
+    expect(env.APP_NAME).toBe('TransNote');
+    expect(env.ENABLE_OFFLINE).toBe(false);
+    expect(env.AUTO_SAVE_DELAY).toBe(3000);
   });
 });

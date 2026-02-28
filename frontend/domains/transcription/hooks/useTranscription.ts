@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { Socket } from 'socket.io-client';
 import { useTranscriptionStore } from '../stores/transcriptionStore';
-import { TranscriptionSocket } from '@/lib/api/websocket';
+import { createSocket } from '@/lib/api/websocket';
 
 export function useTranscription(
   meetingId: string,
@@ -16,7 +17,7 @@ export function useTranscription(
     setError,
   } = useTranscriptionStore();
 
-  const socketRef = useRef<TranscriptionSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (!meetingId || !isRealtimeEnabled) {
@@ -26,9 +27,9 @@ export function useTranscription(
       return;
     }
 
-    // WebSocket 연결
-    socketRef.current = new TranscriptionSocket();
-    const socket = socketRef.current.connect(meetingId);
+    // same-origin WebSocket 연결 (Next.js rewrite 프록시)
+    const socket = createSocket('/ws/transcribe', { meetingId });
+    socketRef.current = socket;
 
     socket.on('connect', () => {
       setConnected(true);
@@ -39,13 +40,14 @@ export function useTranscription(
       setConnected(false);
     });
 
-    socket.on('error', (err) => {
+    socket.on('error', (err: { message?: string }) => {
       setError(err.message || 'Transcription error');
     });
 
     // Cleanup
     return () => {
       socketRef.current?.disconnect();
+      socketRef.current = null;
       clearTranscripts();
     };
   }, [

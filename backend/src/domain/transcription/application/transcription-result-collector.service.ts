@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -12,6 +13,7 @@ import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum'
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { ResultService } from '../../result/application/result.service';
 import { S3AudioService } from '../../../shared/aws/s3/s3.service';
+import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
 
 const POLL_INTERVAL_MS = 5_000; // 5초
 const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10분
@@ -49,6 +51,7 @@ export class TranscriptionResultCollectorService {
     private readonly meetingService: MeetingService,
     private readonly resultService: ResultService,
     private readonly s3AudioService: S3AudioService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -354,6 +357,12 @@ export class TranscriptionResultCollectorService {
         MeetingStatus.COMPLETED,
       );
       this.logger.log(`Meeting ${meetingId} status updated to COMPLETED`);
+
+      // 도메인 이벤트 발행 → MeetingStatusGateway 가 WebSocket 으로 브로드캐스트
+      this.eventEmitter.emit(
+        MeetingStatusChangedEvent.EVENT_NAME,
+        new MeetingStatusChangedEvent(meetingId, MeetingStatus.COMPLETED),
+      );
     } catch (error) {
       this.logger.warn(
         `Failed to update meeting status for ${meetingId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
