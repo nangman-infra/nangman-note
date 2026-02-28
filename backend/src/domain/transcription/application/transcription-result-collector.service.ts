@@ -255,7 +255,20 @@ export class TranscriptionResultCollectorService {
       );
     }
 
-    // HTTPS URL (AWS가 직접 제공하는 presigned URL)
+    // HTTPS S3 URL 형식: https://s3.{region}.amazonaws.com/{bucket}/{key}
+    // 또는: https://{bucket}.s3.{region}.amazonaws.com/{key}
+    const s3HttpsParsed = this.parseS3HttpsUrl(transcriptUri);
+    if (s3HttpsParsed) {
+      this.logger.log(
+        `Fetching transcript via SDK: bucket=${s3HttpsParsed.bucket}, key=${s3HttpsParsed.key}`,
+      );
+      return this.s3AudioService.getObjectAsStringFromBucket(
+        s3HttpsParsed.bucket,
+        s3HttpsParsed.key,
+      );
+    }
+
+    // 기타 URL (presigned 등) — 직접 fetch
     const response = await fetch(transcriptUri);
     if (!response.ok) {
       throw new Error(`Failed to fetch transcript: ${response.status}`);
@@ -267,6 +280,38 @@ export class TranscriptionResultCollectorService {
     value: unknown,
   ): value is TranscribeResultJson {
     return typeof value === 'object' && value !== null;
+  }
+
+  private parseS3HttpsUrl(
+    url: string,
+  ): { bucket: string; key: string } | null {
+    try {
+      const parsed = new URL(url);
+      if (!parsed.hostname.endsWith('.amazonaws.com')) {
+        return null;
+      }
+
+      // 형식 1: https://s3.{region}.amazonaws.com/{bucket}/{key}
+      if (parsed.hostname.startsWith('s3.') || parsed.hostname === 's3.amazonaws.com') {
+        const pathParts = parsed.pathname.slice(1).split('/');
+        if (pathParts.length < 2) return null;
+        const bucket = pathParts[0];
+        const key = pathParts.slice(1).join('/');
+        return { bucket, key };
+      }
+
+      // 형식 2: https://{bucket}.s3.{region}.amazonaws.com/{key}
+      const hostParts = parsed.hostname.split('.s3.');
+      if (hostParts.length === 2) {
+        const bucket = hostParts[0];
+        const key = parsed.pathname.slice(1);
+        return { bucket, key };
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   private parseS3Uri(uri: string): { bucket: string; key: string } | null {
