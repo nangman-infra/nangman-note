@@ -57,7 +57,7 @@ Required/used variables:
 - `AWS_S3_AUDIO_KEY_PREFIX`
 - `AWS_BEDROCK_MODEL_ID`
 - `AWS_BEDROCK_MAX_TOKENS`
-- `AWS_BEDROCK_TEMPERATURE`
+- `AWS_BEDROCK_TEMPERATURE` (`0` ~ `1`, default recommended: `0`)
 - `LOG_LEVEL`
 - `CORS_ORIGIN` (comma-separated)
 

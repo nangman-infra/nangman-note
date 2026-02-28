@@ -28,10 +28,9 @@ export class BedrockService {
     this.maxTokens = this.configService.get('AWS_BEDROCK_MAX_TOKENS', {
       infer: true,
     });
-    const tempStr = this.configService.get('AWS_BEDROCK_TEMPERATURE', {
+    this.temperature = this.configService.get('AWS_BEDROCK_TEMPERATURE', {
       infer: true,
     });
-    this.temperature = parseFloat(tempStr) || 0;
   }
 
   /**

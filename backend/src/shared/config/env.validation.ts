@@ -13,7 +13,7 @@ export interface AppEnv {
   AWS_S3_AUDIO_KEY_PREFIX: string;
   AWS_BEDROCK_MODEL_ID: string;
   AWS_BEDROCK_MAX_TOKENS: number;
-  AWS_BEDROCK_TEMPERATURE: string;
+  AWS_BEDROCK_TEMPERATURE: number;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -52,6 +52,35 @@ function readNumber(
   }
 
   throw new Error(`Environment variable ${key} must be a positive integer.`);
+}
+
+function readFloatInRange(
+  config: Record<string, unknown>,
+  key: string,
+  options: {
+    fallback: number;
+    min: number;
+    max: number;
+  },
+): number {
+  const rawValue = config[key];
+  const value =
+    typeof rawValue === 'string' && rawValue.trim().length > 0
+      ? Number(rawValue)
+      : options.fallback;
+
+  if (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= options.min &&
+    value <= options.max
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    `Environment variable ${key} must be a number between ${options.min} and ${options.max}.`,
+  );
 }
 
 function isLikelyPlaceholderEncryptionKey(value: string): boolean {
@@ -136,10 +165,14 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       'amazon.nova-pro-v1:0',
     ),
     AWS_BEDROCK_MAX_TOKENS: readNumber(config, 'AWS_BEDROCK_MAX_TOKENS', 4096),
-    AWS_BEDROCK_TEMPERATURE: readString(
+    AWS_BEDROCK_TEMPERATURE: readFloatInRange(
       config,
       'AWS_BEDROCK_TEMPERATURE',
-      '0.3',
+      {
+        fallback: 0,
+        min: 0,
+        max: 1,
+      },
     ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: readString(
