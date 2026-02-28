@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { fromIni } from '@aws-sdk/credential-providers';
+import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { S3Client } from '@aws-sdk/client-s3';
 import { TranscribeClient } from '@aws-sdk/client-transcribe';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
@@ -9,12 +9,15 @@ import { AppEnv } from '../config/env.validation';
 @Injectable()
 export class AwsClientFactory {
   private readonly region: string;
-  private readonly credentials: ReturnType<typeof fromIni>;
+  private readonly credentials: ReturnType<typeof fromNodeProviderChain>;
 
   constructor(private readonly configService: ConfigService<AppEnv, true>) {
     this.region = this.configService.get('AWS_REGION', { infer: true });
     const profile = this.configService.get('AWS_PROFILE', { infer: true });
-    this.credentials = fromIni({ profile });
+
+    // fromNodeProviderChain은 credential_process, SSO, fromIni, 환경 변수 등
+    // 모든 AWS 인증 방식을 자동으로 지원합니다.
+    this.credentials = fromNodeProviderChain({ profile });
   }
 
   createS3Client(): S3Client {
