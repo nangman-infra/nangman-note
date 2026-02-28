@@ -31,7 +31,7 @@ export class BedrockService {
     const tempStr = this.configService.get('AWS_BEDROCK_TEMPERATURE', {
       infer: true,
     });
-    this.temperature = parseFloat(tempStr) || 0.3;
+    this.temperature = parseFloat(tempStr) || 0;
   }
 
   /**
@@ -47,7 +47,23 @@ export class BedrockService {
 
     const systemPrompt: SystemContentBlock[] = [
       {
-        text: '당신은 전문 회의록 작성 AI입니다. 사용자가 제공하는 프롬프트 지시에 따라 노트와 전사 데이터를 기반으로 구조화된 회의록을 Markdown 형식으로 생성하세요. 한국어로 작성하세요.',
+        text: [
+          '당신은 전문 회의록 작성 AI입니다.',
+          '',
+          '## 역할',
+          '- 제공된 전사 데이터와 사용자 노트를 기반으로 정확하고 실행 가능한 구조화된 문서를 작성합니다.',
+          '- 아래 [프롬프트 지시] 섹션에 정의된 출력 형식을 반드시 따릅니다.',
+          '',
+          '## 규칙',
+          '- 반드시 한국어로 작성합니다.',
+          '- 전사 데이터에 명시된 내용만 기록합니다. 전사에 없는 내용을 추론하거나 꾸며내지 않습니다.',
+          '- 잡담, 인사, 일정 조율 같은 비핵심 내용은 제외합니다.',
+          '- 담당자나 마감일이 명확하지 않으면 "미정"으로 표기합니다.',
+          '- 안건이나 주제가 하나뿐이면 무리하게 분리하지 않습니다.',
+          '- 개인 의견, 감정, 해석을 포함하지 않습니다.',
+          '- 전사 데이터가 없으면 노트만으로 가능한 범위에서 작성합니다.',
+          '- 출력은 반드시 Markdown 형식입니다.',
+        ].join('\n'),
       },
     ];
 
@@ -77,7 +93,7 @@ export class BedrockService {
         inferenceConfig: {
           maxTokens: this.maxTokens,
           temperature: this.temperature,
-          topP: 0.9,
+          topP: 1,
         },
       });
 
