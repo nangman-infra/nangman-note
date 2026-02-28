@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { existsSync, readFileSync } from 'fs';
@@ -35,7 +35,7 @@ export class ResultService {
   ) {}
 
   async findByMeetingId(meetingId: string): Promise<ResultEntity> {
-    await this.meetingService.findById(meetingId);
+    const meeting = await this.meetingService.findById(meetingId);
 
     const existing = await this.resultRepository.findOne({
       where: { meetingId },
@@ -43,6 +43,13 @@ export class ResultService {
 
     if (existing) {
       return existing;
+    }
+
+    // COMPLETED 상태에서만 결과 생성 — 전사 완료 전에 조기 생성 방지
+    if (meeting.status !== 'completed') {
+      throw new NotFoundException(
+        `Result for meeting ${meetingId} is not ready yet (status: ${meeting.status})`,
+      );
     }
 
     return this.generateAndSave(meetingId);
