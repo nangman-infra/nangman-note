@@ -28,6 +28,10 @@ import { TranscriptionGateway } from './infrastructure/transcription.gateway';
       useExisting: AwsBatchTranscriptionProvider,
     },
   ],
-  exports: [TranscriptionService, TranscriptionResultCollectorService, TypeOrmModule],
+  exports: [
+    TranscriptionService,
+    TranscriptionResultCollectorService,
+    TypeOrmModule,
+  ],
 })
 export class TranscriptionModule {}

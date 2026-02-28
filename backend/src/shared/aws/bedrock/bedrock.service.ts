@@ -83,8 +83,7 @@ export class BedrockService {
 
       const response = await this.client.send(command);
 
-      const outputText =
-        response.output?.message?.content?.[0]?.text ?? '';
+      const outputText = response.output?.message?.content?.[0]?.text ?? '';
 
       if (!outputText) {
         this.logger.warn('Bedrock returned empty response');

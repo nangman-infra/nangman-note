@@ -33,7 +33,6 @@ Environment validation is centralized in:
 
 Example env files:
 
-- `.env.example` (base)
 - `.env.development.example`
 - `.env.production.example`
 
@@ -50,6 +49,15 @@ Required/used variables:
 - `ENCRYPTION_KEY`
 - `AWS_REGION`
 - `AWS_PROFILE`
+- `AWS_TRANSCRIBE_JOB_PREFIX`
+- `AWS_TRANSCRIBE_LANGUAGE_CODE`
+- `AWS_TRANSCRIBE_OUTPUT_BUCKET`
+- `AWS_TRANSCRIBE_MEDIA_FORMAT`
+- `AWS_S3_AUDIO_BUCKET`
+- `AWS_S3_AUDIO_KEY_PREFIX`
+- `AWS_BEDROCK_MODEL_ID`
+- `AWS_BEDROCK_MAX_TOKENS`
+- `AWS_BEDROCK_TEMPERATURE`
 - `LOG_LEVEL`
 - `CORS_ORIGIN` (comma-separated)
 
@@ -104,9 +112,12 @@ pnpm build
 ### Transcription
 
 - `GET /api/v1/meetings/:meetingId/transcripts`
+- `POST /api/v1/meetings/:meetingId/transcripts/upload-url`
+- `GET /api/v1/meetings/:meetingId/transcripts/jobs`
+- `POST /api/v1/meetings/:meetingId/transcripts/jobs`
 - WebSocket: `ws://host/ws/transcribe?meetingId=<uuid>`
   - client event: `audio`
-  - server event: `transcript`
+  - server event: `error` (유효성/권한/처리 오류)
 
 ## Response Convention
 

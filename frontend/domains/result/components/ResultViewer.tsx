@@ -8,9 +8,10 @@ import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard } from '@/lib/utils/markdown';
 import { useResult } from '../hooks/useResult';
-import { transcriptionApi } from '@/domains/transcription/api/transcriptionApi';
-import { noteApi } from '@/domains/note/api/noteApi';
-import type { TranscriptSegment } from '@/domains/transcription/types/transcription.types';
+import {
+  resultTabDataApi,
+  type ResultTabTranscriptSegment,
+} from '../api/resultTabDataApi';
 
 interface ResultViewerProps {
   meetingId: string;
@@ -32,7 +33,9 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
   const [editContent, setEditContent] = useState('');
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [regeneratePromptId, setRegeneratePromptId] = useState('');
-  const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
+  const [transcripts, setTranscripts] = useState<ResultTabTranscriptSegment[]>(
+    [],
+  );
   const [noteContent, setNoteContent] = useState<string>('');
   const [tabDataLoaded, setTabDataLoaded] = useState(false);
 
@@ -43,11 +46,11 @@ export function ResultViewer({ meetingId }: ResultViewerProps) {
     const loadTabData = async () => {
       try {
         const [segments, note] = await Promise.all([
-          transcriptionApi.list(meetingId).catch(() => []),
-          noteApi.get(meetingId).catch(() => null),
+          resultTabDataApi.listTranscripts(meetingId).catch(() => []),
+          resultTabDataApi.getNoteContent(meetingId).catch(() => ''),
         ]);
         setTranscripts(segments);
-        setNoteContent(note?.content ?? '');
+        setNoteContent(note ?? '');
         setTabDataLoaded(true);
       } catch {
         // 에러 무시 — 탭에서 빈 상태로 표시

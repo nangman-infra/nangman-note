@@ -17,7 +17,7 @@ interface MeetingState {
   isLoading: boolean;
   error: string | null;
   startMeeting: (dto: CreateMeetingDto) => Promise<Meeting | null>;
-  endMeeting: () => Promise<boolean>;
+  endMeeting: (options?: { skipTranscription?: boolean }) => Promise<boolean>;
   updatePrompt: (promptId: string) => Promise<Meeting | null>;
   fetchMeetings: () => Promise<void>;
   searchMeetings: (query: string, scope?: string) => Promise<void>;
@@ -61,14 +61,18 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     }
   },
 
-  endMeeting: async () => {
+  endMeeting: async (options) => {
     const { currentMeeting } = get();
     if (!currentMeeting) return false;
 
     try {
       set({ isLoading: true, error: null });
-      await meetingApi.complete(currentMeeting.id);
-      set({ isRecording: false, isLoading: false });
+      const completedMeeting = await meetingApi.complete(currentMeeting.id, options);
+      set({
+        currentMeeting: completedMeeting,
+        isRecording: false,
+        isLoading: false,
+      });
       return true;
     } catch (error) {
       set({

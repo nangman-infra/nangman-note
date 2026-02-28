@@ -1,6 +1,10 @@
 import { apiClient } from '@/lib/api/client';
 import type { Meeting, CreateMeetingDto, SearchResult } from '../types/meeting.types';
 
+interface CompleteMeetingOptions {
+  skipTranscription?: boolean;
+}
+
 export const meetingApi = {
   // 회의 생성
   create: async (dto: CreateMeetingDto): Promise<Meeting> => {
@@ -42,9 +46,13 @@ export const meetingApi = {
   },
 
   // 회의 종료
-  complete: async (id: string): Promise<Meeting> => {
+  complete: async (
+    id: string,
+    options?: CompleteMeetingOptions,
+  ): Promise<Meeting> => {
     const response = await apiClient.post<{ data: Meeting }>(
-      `/api/v1/meetings/${id}/complete`
+      `/api/v1/meetings/${id}/complete`,
+      options ?? {}
     );
     return response.data.data;
   },

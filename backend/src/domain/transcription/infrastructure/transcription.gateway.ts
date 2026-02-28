@@ -7,19 +7,27 @@ import {
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
-  WebSocketServer,
 } from '@nestjs/websockets';
 import { AppEnv } from '../../../shared/config/env.validation';
-import { Server, Socket } from 'socket.io';
+import {
+  isAllowedCorsOrigin,
+  parseAllowedOrigins,
+} from '../../../shared/config/cors-origin.util';
+import { Socket } from 'socket.io';
 import { TranscriptionService } from '../application/transcription.service';
 
+function resolveNodeEnv(): AppEnv['NODE_ENV'] {
+  const nodeEnv = process.env.NODE_ENV;
+  if (nodeEnv === 'production' || nodeEnv === 'test') {
+    return nodeEnv;
+  }
+  return 'development';
+}
+
 function resolveAllowedWsOrigins(): string[] {
-  return (
-    process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://127.0.0.1:3000'
-  )
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const configured =
+    process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://127.0.0.1:3000';
+  return parseAllowedOrigins(configured);
 }
 
 @WebSocketGateway({
@@ -27,13 +35,15 @@ function resolveAllowedWsOrigins(): string[] {
   cors: {
     origin: (origin, callback) => {
       const allowedOrigins = resolveAllowedWsOrigins();
+      const nodeEnv = resolveNodeEnv();
+      const allowed = isAllowedCorsOrigin({
+        origin,
+        allowedOrigins,
+        nodeEnv,
+        allowWithoutOrigin: false,
+      });
 
-      if (!origin) {
-        callback(new Error('Origin is required for websocket connection'));
-        return;
-      }
-
-      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      if (allowed) {
         callback(null, true);
         return;
       }
@@ -47,9 +57,6 @@ function resolveAllowedWsOrigins(): string[] {
 export class TranscriptionGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  @WebSocketServer()
-  private server: Server;
-
   private readonly logger = new Logger(TranscriptionGateway.name);
 
   constructor(
@@ -105,8 +112,8 @@ export class TranscriptionGateway
       return { ok: false };
     }
 
-    const segment = await this.transcriptionService
-      .createMockSegmentFromAudio(meetingId, payload)
+    const processed = await this.transcriptionService
+      .acceptRealtimeAudioChunk(meetingId, payload)
       .catch((error: unknown): null => {
         client.emit('error', {
           message:
@@ -116,19 +123,9 @@ export class TranscriptionGateway
         });
         return null;
       });
-    if (!segment) {
+    if (!processed) {
       return { ok: false };
     }
-
-    this.server.to(meetingId).emit('transcript', {
-      id: segment.id,
-      meetingId: segment.meetingId,
-      startTime: segment.startTime,
-      endTime: segment.endTime,
-      text: segment.text,
-      confidence: segment.confidence,
-      createdAt: segment.createdAt.toISOString(),
-    });
 
     return { ok: true };
   }
@@ -153,21 +150,17 @@ export class TranscriptionGateway
   private isAllowedOrigin(
     originHeader: string | string[] | undefined,
   ): boolean {
-    const allowedOrigins = this.configService
-      .get('CORS_ORIGIN', { infer: true })
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean);
+    const allowedOrigins = parseAllowedOrigins(
+      this.configService.get('CORS_ORIGIN', { infer: true }),
+    );
+    const nodeEnv = this.configService.get('NODE_ENV', { infer: true });
     const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
 
-    if (!origin) {
-      return false;
-    }
-
-    if (allowedOrigins.includes('*')) {
-      return true;
-    }
-
-    return allowedOrigins.includes(origin);
+    return isAllowedCorsOrigin({
+      origin,
+      allowedOrigins,
+      nodeEnv,
+      allowWithoutOrigin: false,
+    });
   }
 }

@@ -124,11 +124,7 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       'AWS_TRANSCRIBE_MEDIA_FORMAT',
       'webm',
     ),
-    AWS_S3_AUDIO_BUCKET: readString(
-      config,
-      'AWS_S3_AUDIO_BUCKET',
-      '',
-    ),
+    AWS_S3_AUDIO_BUCKET: readString(config, 'AWS_S3_AUDIO_BUCKET', ''),
     AWS_S3_AUDIO_KEY_PREFIX: readString(
       config,
       'AWS_S3_AUDIO_KEY_PREFIX',

@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react';
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
 import { meetingApi } from '../api/meetingApi';
 import { MeetingStatus } from '../types/meeting.types';
-import type { UploadState } from '@/domains/transcription/hooks/useAudioUpload';
+
+type UploadState =
+  | 'idle'
+  | 'requesting-url'
+  | 'uploading'
+  | 'completed'
+  | 'failed';
 
 type ProcessingStep = 'uploading' | 'transcribing' | 'generating' | 'completed' | 'failed';
 
@@ -25,24 +31,26 @@ export function ProcessingProgress({
   uploadError,
   onComplete,
 }: ProcessingProgressProps) {
-  const [currentStep, setCurrentStep] = useState<ProcessingStep>('uploading');
-  const [error, setError] = useState<string | null>(null);
+  const [backendStep, setBackendStep] = useState<
+    'transcribing' | 'generating' | 'completed'
+  >('transcribing');
+  const [backendError, setBackendError] = useState<string | null>(null);
 
-  // 업로드 상태 반영
-  useEffect(() => {
-    if (uploadState === 'uploading' || uploadState === 'requesting-url') {
-      setCurrentStep('uploading');
-    } else if (uploadState === 'completed') {
-      setCurrentStep('transcribing');
-    } else if (uploadState === 'failed') {
-      setCurrentStep('failed');
-      setError(uploadError || '오디오 업로드에 실패했습니다.');
-    }
-  }, [uploadState, uploadError]);
+  const currentStep: ProcessingStep =
+    uploadState === 'failed'
+      ? 'failed'
+      : uploadState === 'completed'
+        ? backendStep
+        : 'uploading';
+  const error =
+    uploadState === 'failed'
+      ? uploadError || '오디오 업로드에 실패했습니다.'
+      : backendError;
 
   // 전사/결과 생성 상태 폴링
   useEffect(() => {
-    if (currentStep !== 'transcribing' && currentStep !== 'generating') return;
+    if (uploadState !== 'completed') return;
+    if (backendStep !== 'transcribing' && backendStep !== 'generating') return;
     if (!meetingId) return;
 
     const pollTimer = setInterval(async () => {
@@ -50,20 +58,23 @@ export function ProcessingProgress({
         const meeting = await meetingApi.get(meetingId);
 
         if (meeting.status === MeetingStatus.COMPLETED) {
-          setCurrentStep('completed');
+          setBackendStep('completed');
+          setBackendError(null);
           clearInterval(pollTimer);
           onComplete?.();
         } else if (meeting.status === MeetingStatus.PROCESSING) {
           // PROCESSING 상태에서 결과가 있으면 generating 단계
-          setCurrentStep('generating');
+          setBackendStep('generating');
+          setBackendError(null);
         }
       } catch {
         // 폴링 에러는 무시하고 재시도
+        setBackendError('처리 상태를 확인하는 중입니다. 잠시 후 자동으로 재시도합니다.');
       }
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(pollTimer);
-  }, [meetingId, currentStep, onComplete]);
+  }, [meetingId, uploadState, backendStep, onComplete]);
 
   const steps: Array<{
     key: ProcessingStep;

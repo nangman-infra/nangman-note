@@ -7,8 +7,8 @@ interface NoteState {
   lastSaved: Date | null;
   error: string | null;
   setContent: (content: string) => void;
-  saveNote: (meetingId: string) => Promise<void>;
-  loadNote: (meetingId: string) => Promise<void>;
+  saveNote: (meetingId: string) => Promise<boolean>;
+  loadNote: (meetingId: string) => Promise<string>;
   clearNote: () => void;
 }
 
@@ -29,11 +29,13 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       await noteApi.save(meetingId, noteContent);
       set({ isSaving: false, lastSaved: new Date() });
+      return true;
     } catch (error) {
       set({
         isSaving: false,
         error: error instanceof Error ? error.message : 'Failed to save note',
       });
+      return false;
     }
   },
 
@@ -42,10 +44,12 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       set({ error: null });
       const note = await noteApi.get(meetingId);
       set({ noteContent: note.content });
+      return note.content;
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load note',
       });
+      return '';
     }
   },
 

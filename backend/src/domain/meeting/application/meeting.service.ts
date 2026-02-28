@@ -216,16 +216,29 @@ export class MeetingService {
     return this.meetingRepository.save(meeting);
   }
 
-  async complete(id: string): Promise<MeetingEntity> {
+  async complete(
+    id: string,
+    options?: { skipTranscription?: boolean },
+  ): Promise<MeetingEntity> {
     const meeting = await this.findById(id);
+    const skipTranscription = options?.skipTranscription ?? false;
 
-    meeting.status = MeetingStatus.PROCESSING;
+    const shouldProcessBatch =
+      meeting.transcriptionMode === MeetingTranscriptionMode.BATCH &&
+      !skipTranscription;
+
+    meeting.status = shouldProcessBatch
+      ? MeetingStatus.PROCESSING
+      : MeetingStatus.COMPLETED;
     meeting.endedAt = new Date();
 
     return this.meetingRepository.save(meeting);
   }
 
-  async updateStatus(id: string, status: MeetingStatus): Promise<MeetingEntity> {
+  async updateStatus(
+    id: string,
+    status: MeetingStatus,
+  ): Promise<MeetingEntity> {
     const meeting = await this.findById(id);
     meeting.status = status;
     return this.meetingRepository.save(meeting);

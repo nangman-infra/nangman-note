@@ -17,9 +17,7 @@ import {
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
 
 @Injectable()
-export class AwsBatchTranscriptionProvider
-  implements BatchTranscriptionProvider
-{
+export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider {
   private readonly transcribeClient: TranscribeClient;
   private readonly jobPrefix: string;
   private readonly defaultLanguageCode: string;
@@ -102,9 +100,7 @@ export class AwsBatchTranscriptionProvider
   }
 
   private buildJobName(meetingId: string): string {
-    const normalized = meetingId
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .slice(0, 20);
+    const normalized = meetingId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
     return `${this.jobPrefix}-${normalized}-${Date.now().toString(36)}`;
   }
 

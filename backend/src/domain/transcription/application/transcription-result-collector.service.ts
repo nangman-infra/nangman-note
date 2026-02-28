@@ -35,7 +35,9 @@ interface TranscribeResultJson {
 
 @Injectable()
 export class TranscriptionResultCollectorService {
-  private readonly logger = new Logger(TranscriptionResultCollectorService.name);
+  private readonly logger = new Logger(
+    TranscriptionResultCollectorService.name,
+  );
 
   constructor(
     @InjectRepository(TranscriptionJobEntity)
@@ -67,9 +69,7 @@ export class TranscriptionResultCollectorService {
 
     while (Date.now() - startTime < MAX_POLL_DURATION_MS) {
       try {
-        const result = await this.batchProvider.getJobStatus(
-          job.providerJobId,
-        );
+        const result = await this.batchProvider.getJobStatus(job.providerJobId);
 
         // 상태 업데이트
         job.status = result.status;
@@ -144,9 +144,15 @@ export class TranscriptionResultCollectorService {
     try {
       // transcriptUri는 S3 URI (s3://bucket/key) 또는 HTTPS URL
       const jsonContent = await this.fetchTranscriptJson(transcriptUri);
-      const parsed: TranscribeResultJson = JSON.parse(jsonContent);
+      const parsedUnknown: unknown = JSON.parse(jsonContent);
+      if (!this.isTranscribeResultJson(parsedUnknown)) {
+        this.logger.warn(
+          `Unexpected transcript json shape for meeting ${meetingId}`,
+        );
+        return 0;
+      }
 
-      const items = parsed.results?.items ?? [];
+      const items = parsedUnknown.results?.items ?? [];
       const segments = this.itemsToSegments(meetingId, items);
 
       if (segments.length > 0) {
@@ -186,7 +192,9 @@ export class TranscriptionResultCollectorService {
 
       // pronunciation (단어)
       const content = item.alternatives?.[0]?.content ?? '';
-      const confidence = parseFloat(item.alternatives?.[0]?.confidence ?? '0.9');
+      const confidence = parseFloat(
+        item.alternatives?.[0]?.confidence ?? '0.9',
+      );
       const startTime = parseFloat(item.start_time ?? '0');
       const endTime = parseFloat(item.end_time ?? '0');
 
@@ -234,10 +242,15 @@ export class TranscriptionResultCollectorService {
   private async fetchTranscriptJson(transcriptUri: string): Promise<string> {
     // S3 URI 형식: s3://bucket/key
     if (transcriptUri.startsWith('s3://')) {
-      const withoutProtocol = transcriptUri.slice(5);
-      const slashIndex = withoutProtocol.indexOf('/');
-      const key = withoutProtocol.slice(slashIndex + 1);
-      return this.s3AudioService.getObjectAsString(key);
+      const parsed = this.parseS3Uri(transcriptUri);
+      if (!parsed) {
+        throw new Error(`Invalid S3 URI: ${transcriptUri}`);
+      }
+
+      return this.s3AudioService.getObjectAsStringFromBucket(
+        parsed.bucket,
+        parsed.key,
+      );
     }
 
     // HTTPS URL (AWS가 직접 제공하는 presigned URL)
@@ -246,6 +259,29 @@ export class TranscriptionResultCollectorService {
       throw new Error(`Failed to fetch transcript: ${response.status}`);
     }
     return response.text();
+  }
+
+  private isTranscribeResultJson(
+    value: unknown,
+  ): value is TranscribeResultJson {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private parseS3Uri(uri: string): { bucket: string; key: string } | null {
+    if (!uri.startsWith('s3://')) {
+      return null;
+    }
+
+    const withoutProtocol = uri.slice(5);
+    const slashIndex = withoutProtocol.indexOf('/');
+    if (slashIndex <= 0 || slashIndex === withoutProtocol.length - 1) {
+      return null;
+    }
+
+    return {
+      bucket: withoutProtocol.slice(0, slashIndex),
+      key: withoutProtocol.slice(slashIndex + 1),
+    };
   }
 
   private async deleteAudioFile(mediaUri: string): Promise<void> {
@@ -266,7 +302,10 @@ export class TranscriptionResultCollectorService {
 
   private async updateMeetingStatus(meetingId: string): Promise<void> {
     try {
-      await this.meetingService.updateStatus(meetingId, MeetingStatus.COMPLETED);
+      await this.meetingService.updateStatus(
+        meetingId,
+        MeetingStatus.COMPLETED,
+      );
       this.logger.log(`Meeting ${meetingId} status updated to COMPLETED`);
     } catch (error) {
       this.logger.warn(

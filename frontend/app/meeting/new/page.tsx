@@ -48,7 +48,7 @@ export default function NewMeetingPage() {
       description: '실시간 노트 화면으로 이동합니다.',
       variant: 'success',
     });
-    router.push('/meeting/in-progress');
+    router.push(`/meeting/in-progress?meetingId=${meeting.id}`);
   };
 
   return (
@@ -164,9 +164,9 @@ export default function NewMeetingPage() {
                       선택됨
                     </span>
                   ) : null}
-                  <p className="text-sm font-semibold">Realtime (옵션)</p>
+                  <p className="text-sm font-semibold">Realtime (확장 준비)</p>
                   <p className="mt-1 pr-2 text-xs text-muted">
-                    웹소켓을 통해 실시간 전사 스트림을 활성화합니다.
+                    웹소켓 기반 실시간 수집 경로를 활성화합니다. 안정 운영은 Batch 모드를 권장합니다.
                   </p>
                 </label>
               </div>

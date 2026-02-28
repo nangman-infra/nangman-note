@@ -37,31 +37,13 @@ export class TranscriptionService {
     });
   }
 
-  async createMockSegmentFromAudio(
+  async acceptRealtimeAudioChunk(
     meetingId: string,
     payload: unknown,
-  ): Promise<TranscriptSegmentEntity> {
+  ): Promise<boolean> {
     await this.ensureRealtimeEnabled(meetingId);
-
-    const last = await this.transcriptRepository.findOne({
-      where: { meetingId },
-      order: { endTime: 'DESC' },
-    });
-
-    const now = new Date();
-    const startTime = last?.endTime ?? 0;
-    const duration = 2.2;
-    const size = this.estimatePayloadSize(payload);
-
-    const segment = this.transcriptRepository.create({
-      meetingId,
-      startTime,
-      endTime: Number((startTime + duration).toFixed(1)),
-      text: `임시 전사 텍스트 (${now.toLocaleTimeString('ko-KR')}, ${size} bytes)`,
-      confidence: 0.82,
-    });
-
-    return this.transcriptRepository.save(segment);
+    this.estimatePayloadSize(payload);
+    return true;
   }
 
   async ensureRealtimeEnabled(meetingId: string): Promise<void> {

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Mic, MicOff, Radio, Square, Timer } from 'lucide-react';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
+import { meetingApi } from '@/domains/meeting/api/meetingApi';
 import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
 import { useBeforeUnloadGuard } from '@/domains/meeting/hooks/useBeforeUnloadGuard';
 import { EndMeetingDialog } from '@/domains/meeting/components/EndMeetingDialog';
@@ -23,11 +24,14 @@ import { formatTime } from '@/lib/utils/date';
 export default function InProgressMeetingPage() {
   const router = useRouter();
   const { pushToast } = useFeedback();
-  const { currentMeeting, isLoading, error, endMeeting } = useMeeting();
+  const { currentMeeting, isLoading, error, endMeeting, setCurrentMeeting } =
+    useMeeting();
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [showProcessing, setShowProcessing] = useState(false);
+  const [isRecoveringMeeting, setIsRecoveringMeeting] = useState(false);
+  const [meetingIdFromQuery, setMeetingIdFromQuery] = useState('');
 
   // 오디오 캡처 (마이크 권한 + 디바이스 선택)
   const {
@@ -60,7 +64,12 @@ export default function InProgressMeetingPage() {
     reset: resetUpload,
   } = useAudioUpload();
 
-  const meetingId = currentMeeting?.id || '';
+  const meetingId = currentMeeting?.id || meetingIdFromQuery;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setMeetingIdFromQuery(params.get('meetingId')?.trim() ?? '');
+  }, []);
   const transcriptionMode =
     currentMeeting?.transcriptionMode ?? MeetingTranscriptionMode.BATCH;
   const isRealtimeMode =
@@ -82,6 +91,37 @@ export default function InProgressMeetingPage() {
     }, 1000);
     return () => window.clearInterval(timerId);
   }, [currentMeeting?.startedAt]);
+
+  // 새로고침/재접속 복구: URL의 meetingId로 회의 상태 복원
+  useEffect(() => {
+    if (currentMeeting || !meetingIdFromQuery) return;
+
+    let disposed = false;
+    const recoverMeeting = async () => {
+      setIsRecoveringMeeting(true);
+      try {
+        const meeting = await meetingApi.get(meetingIdFromQuery);
+        if (disposed) return;
+        setCurrentMeeting(meeting);
+      } catch {
+        if (disposed) return;
+        pushToast({
+          title: '진행 중 회의를 복구하지 못했습니다',
+          description: '회의가 이미 종료되었거나 접근할 수 없습니다.',
+          variant: 'info',
+        });
+      } finally {
+        if (!disposed) {
+          setIsRecoveringMeeting(false);
+        }
+      }
+    };
+
+    void recoverMeeting();
+    return () => {
+      disposed = true;
+    };
+  }, [currentMeeting, meetingIdFromQuery, pushToast, setCurrentMeeting]);
 
   const elapsedSeconds = currentMeeting?.startedAt
     ? Math.max(0, Math.floor((nowTick - new Date(currentMeeting.startedAt).getTime()) / 1000))
@@ -133,11 +173,11 @@ export default function InProgressMeetingPage() {
     ? { label: '대기', className: 'bg-slate-100 text-slate-700' }
     : permission === 'denied'
       ? { label: '노트 전용', className: 'bg-amber-100 text-amber-800' }
-      : !isRealtimeMode
-        ? { label: '배치 전사 모드', className: 'bg-slate-100 text-slate-700' }
-        : isConnected
-          ? { label: '전사 연결됨', className: 'bg-emerald-100 text-emerald-800' }
-          : { label: '전사 연결중', className: 'bg-amber-100 text-amber-800' };
+    : !isRealtimeMode
+      ? { label: '배치 전사 모드', className: 'bg-slate-100 text-slate-700' }
+      : isConnected
+        ? { label: '실시간 수집 연결됨', className: 'bg-emerald-100 text-emerald-800' }
+        : { label: '실시간 수집 연결중', className: 'bg-amber-100 text-amber-800' };
 
   // 녹음 상태 배지
   const recordingBadge = (p: AudioCapturePermission) => {
@@ -164,8 +204,14 @@ export default function InProgressMeetingPage() {
       stopCapture();
     }
 
+    const shouldRunBatchTranscription =
+      transcriptionMode === MeetingTranscriptionMode.BATCH &&
+      Boolean(audioBlob && audioBlob.size > 0);
+
     // 2. 백엔드 회의 종료 API 호출
-    const success = await endMeeting();
+    const success = await endMeeting({
+      skipTranscription: !shouldRunBatchTranscription,
+    });
     if (!success) {
       setIsEnding(false);
       pushToast({
@@ -179,8 +225,8 @@ export default function InProgressMeetingPage() {
     setIsEnding(false);
     setShowEndDialog(false);
 
-    // 3. 오디오가 있으면 S3 업로드 + 배치 잡 트리거
-    if (audioBlob && audioBlob.size > 0 && meetingId) {
+    // 3. 배치 전사 대상이면 S3 업로드 + 배치 잡 트리거
+    if (shouldRunBatchTranscription && audioBlob && meetingId) {
       setShowProcessing(true);
 
       pushToast({
@@ -203,15 +249,27 @@ export default function InProgressMeetingPage() {
             : `s3://${s3Key}`;
           await transcriptionApi.queueBatchJob(meetingId, { mediaUri });
         } catch {
+          await endMeeting({ skipTranscription: true });
+          setShowProcessing(false);
           pushToast({
             title: '배치 전사 잡 생성에 실패했습니다',
-            description: '결과 화면에서 재시도할 수 있습니다.',
+            description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
             variant: 'error',
           });
+          router.push('/');
         }
+      } else {
+        await endMeeting({ skipTranscription: true });
+        setShowProcessing(false);
+        pushToast({
+          title: '오디오 업로드에 실패했습니다',
+          description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
+          variant: 'info',
+        });
+        router.push('/');
       }
     } else {
-      // 오디오 없음 (노트 전용 모드) → 바로 홈으로
+      // 실시간 모드 또는 오디오 없음: 전사 없이 종료
       await cleanupChunks();
 
       pushToast({
@@ -237,6 +295,19 @@ export default function InProgressMeetingPage() {
 
   // 회의 없음 상태
   if (!currentMeeting) {
+    if (isRecoveringMeeting) {
+      return (
+        <div className="app-shell flex min-h-dvh items-center justify-center p-6">
+          <div className="glass-surface w-full max-w-xl p-7 text-center">
+            <h1 className="text-2xl font-semibold">회의 상태를 복구하는 중입니다</h1>
+            <p className="mt-2 text-sm text-muted">
+              잠시만 기다려주세요. 마지막으로 열었던 회의를 확인하고 있습니다.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="app-shell flex min-h-dvh items-center justify-center p-6">
         <div className="glass-surface w-full max-w-xl p-7 text-center">
@@ -360,13 +431,13 @@ export default function InProgressMeetingPage() {
           <aside className="glass-surface min-h-0 overflow-hidden">
             <div className="border-b border-[var(--line-soft)] px-4 py-3">
               <p className="text-xs font-semibold tracking-wide text-muted">TRANSCRIPTION</p>
-              <h2 className="mt-1 text-sm font-semibold">
-                {permission === 'denied'
-                  ? '노트 전용 모드'
-                  : isRealtimeMode
-                    ? '실시간 전사 모니터'
-                    : '배치 전사 대기'}
-              </h2>
+                <h2 className="mt-1 text-sm font-semibold">
+                  {permission === 'denied'
+                    ? '노트 전용 모드'
+                    : isRealtimeMode
+                      ? '실시간 수집 모니터'
+                      : '배치 전사 대기'}
+                </h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span className="rounded-full bg-white px-2 py-1">
                   세그먼트: {transcripts.length}개
@@ -386,7 +457,7 @@ export default function InProgressMeetingPage() {
                   <>
                     <Mic className="mr-1 inline-block h-3.5 w-3.5" />
                     {isRealtimeMode
-                      ? '마이크 입력은 백그라운드 수집되며, 노트에 집중할 수 있도록 전사는 접기/펼치기 방식으로 제공됩니다.'
+                      ? '실시간 모드는 확장 준비를 위한 수집 경로를 유지합니다. 최종 회의록은 노트와 배치/후처리 결과를 기준으로 생성됩니다.'
                       : '현재 회의는 배치 전사 모드입니다. 회의 종료 후 수집된 오디오가 AWS 배치 전사로 처리됩니다.'}
                   </>
                 )}

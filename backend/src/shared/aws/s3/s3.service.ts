@@ -80,8 +80,15 @@ export class S3AudioService {
   }
 
   async getObjectAsString(s3Key: string): Promise<string> {
+    return this.getObjectAsStringFromBucket(this.bucket, s3Key);
+  }
+
+  async getObjectAsStringFromBucket(
+    bucket: string,
+    s3Key: string,
+  ): Promise<string> {
     const command = new GetObjectCommand({
-      Bucket: this.bucket,
+      Bucket: bucket,
       Key: s3Key,
     });
 

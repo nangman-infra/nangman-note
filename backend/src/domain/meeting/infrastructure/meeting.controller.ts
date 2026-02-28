@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { CreateMeetingDto } from '../application/dto/create-meeting.dto';
+import { CompleteMeetingDto } from '../application/dto/complete-meeting.dto';
 import { ListMeetingsQueryDto } from '../application/dto/list-meetings-query.dto';
 import { SearchMeetingsQueryDto } from '../application/dto/search-meetings-query.dto';
 import { UpdateMeetingDto } from '../application/dto/update-meeting.dto';
@@ -46,8 +47,8 @@ export class MeetingController {
   }
 
   @Post(':id/complete')
-  async complete(@Param('id') id: string) {
-    return this.meetingService.complete(id);
+  async complete(@Param('id') id: string, @Body() dto: CompleteMeetingDto) {
+    return this.meetingService.complete(id, dto);
   }
 
   @Delete(':id')
