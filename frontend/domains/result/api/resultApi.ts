@@ -36,4 +36,13 @@ export const resultApi = {
     );
     return response.data;
   },
+
+  // DOCX 다운로드
+  exportDOCX: async (meetingId: string): Promise<Blob> => {
+    const response = await apiClient.get(
+      `/api/v1/meetings/${meetingId}/result/export?format=docx`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
 };

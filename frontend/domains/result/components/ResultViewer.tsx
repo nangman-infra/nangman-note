@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Copy, Download, Edit3, RefreshCw, Save, X } from 'lucide-react';
+import { Copy, Download, Edit3, FileText, RefreshCw, Save, X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
@@ -46,6 +46,7 @@ export function ResultViewer({
     updateResult,
     regenerateResult,
     exportPDF,
+    exportDOCX,
   } = useResult(meetingId);
   const { pushToast } = useFeedback();
   const [activeTab, setActiveTab] = useState<ResultTab>('result');
@@ -185,6 +186,16 @@ export function ResultViewer({
     });
   };
 
+  const handleExportDOCX = async () => {
+    const success = await exportDOCX();
+    if (!success) return;
+
+    pushToast({
+      title: 'DOCX 다운로드를 시작했습니다',
+      variant: 'info',
+    });
+  };
+
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-[var(--line-soft)] px-6 py-5">
@@ -209,6 +220,10 @@ export function ResultViewer({
                 <button type="button" onClick={handleExportPDF} className="btn-neo">
                   <Download className="h-4 w-4" />
                   PDF
+                </button>
+                <button type="button" onClick={handleExportDOCX} className="btn-neo">
+                  <FileText className="h-4 w-4" />
+                  DOCX
                 </button>
               </>
             ) : (

@@ -13,6 +13,7 @@ interface ResultState {
   updateResult: (meetingId: string, content: string) => Promise<boolean>;
   regenerateResult: (meetingId: string, promptId: string) => Promise<boolean>;
   exportPDF: (meetingId: string) => Promise<boolean>;
+  exportDOCX: (meetingId: string) => Promise<boolean>;
   clearResult: () => void;
 }
 
@@ -121,6 +122,27 @@ export const useResultStore = create<ResultState>((set) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to export PDF',
+      });
+      return false;
+    }
+  },
+
+  exportDOCX: async (meetingId) => {
+    try {
+      set({ error: null });
+      const blob = await resultApi.exportDOCX(meetingId);
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `meeting_${meetingId}_result.docx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+      return true;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to export DOCX',
       });
       return false;
     }

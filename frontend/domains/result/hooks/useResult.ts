@@ -13,6 +13,7 @@ export function useResult(meetingId: string) {
     updateResult,
     regenerateResult,
     exportPDF,
+    exportDOCX,
     clearResult,
   } = useResultStore();
 
@@ -50,5 +51,6 @@ export function useResult(meetingId: string) {
     updateResult: (content: string) => updateResult(meetingId, content),
     regenerateResult: (promptId: string) => regenerateResult(meetingId, promptId),
     exportPDF: () => exportPDF(meetingId),
+    exportDOCX: () => exportDOCX(meetingId),
   };
 }
