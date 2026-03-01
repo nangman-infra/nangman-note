@@ -6,7 +6,9 @@ describe('EncryptionService', () => {
 
   beforeEach(() => {
     const configService = {
-      get: jest.fn().mockReturnValue('dev-only-encryption-key-replace-in-production'),
+      get: jest
+        .fn()
+        .mockReturnValue('dev-only-encryption-key-replace-in-production'),
     } as unknown as ConfigService;
 
     service = new EncryptionService(configService);

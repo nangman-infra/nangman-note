@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
 import {
   MeetingStatusChangedEvent,
@@ -135,75 +135,52 @@ export class MeetingService {
     const loweredKeyword = keyword.toLowerCase();
     const likeKeyword = `%${loweredKeyword}%`;
 
-    const baseQuery = this.meetingRepository
-      .createQueryBuilder('meeting')
-      .leftJoin('meeting.result', 'result')
-      .leftJoin('meeting.note', 'note')
-      .leftJoin('meeting.transcripts', 'transcript');
+    let total = 0;
+    let pagedMeetings: MeetingEntity[] = [];
 
-    this.applySearchScope(baseQuery, scope, likeKeyword);
+    if (scope === 'title') {
+      const titleQuery = this.meetingRepository
+        .createQueryBuilder('meeting')
+        .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
+          keyword: likeKeyword,
+        });
 
-    const countRaw = await baseQuery
-      .clone()
-      .select('COUNT(DISTINCT meeting.id)', 'total')
-      .getRawOne<{ total: string | number }>();
-    const total = Number(countRaw?.total ?? 0);
-
-    if (total === 0) {
-      return {
-        results: [],
-        pagination: {
-          page,
-          limit,
-          total: 0,
+      total = await titleQuery.clone().getCount();
+      if (total > 0) {
+        pagedMeetings = await titleQuery
+          .clone()
+          .orderBy('meeting.started_at', 'DESC')
+          .offset(skip)
+          .limit(limit)
+          .getMany();
+      }
+    } else {
+      // 암호화된 컬럼(result/note/transcript)은 DB LIKE 검색이 불가능하므로
+      // 복호화된 엔티티 로드 후 애플리케이션 레벨에서 필터링합니다.
+      const meetings = await this.meetingRepository.find({
+        relations: {
+          note: true,
+          result: true,
+          transcripts: true,
         },
-      };
-    }
+        order: { startedAt: 'DESC' },
+      });
 
-    const idRows = await baseQuery
-      .clone()
-      .select('meeting.id', 'id')
-      .distinct(true)
-      .orderBy('meeting.started_at', 'DESC')
-      .offset(skip)
-      .limit(limit)
-      .getRawMany<{ id: string }>();
-
-    const meetingIds = idRows.map((row) => row.id);
-    if (meetingIds.length === 0) {
-      return {
-        results: [],
-        pagination: {
-          page,
-          limit,
-          total,
-        },
-      };
-    }
-
-    const meetings = await this.meetingRepository.find({
-      where: { id: In(meetingIds) },
-      relations: {
-        note: true,
-        result: true,
-        transcripts: true,
-      },
-    });
-
-    const meetingById = new Map(
-      meetings.map((meeting) => [meeting.id, meeting]),
-    );
-    const results = meetingIds
-      .map((id) => meetingById.get(id))
-      .filter((meeting): meeting is MeetingEntity => Boolean(meeting))
-      .map((meeting) =>
-        this.toSearchResult({
-          meeting,
-          scope,
-          keyword,
-          loweredKeyword,
-        }),
+      const filtered = meetings.filter((meeting) =>
+        this.matchesSearchScope(meeting, scope, loweredKeyword),
       );
+      total = filtered.length;
+      pagedMeetings = filtered.slice(skip, skip + limit);
+    }
+
+    const results = pagedMeetings.map((meeting) =>
+      this.toSearchResult({
+        meeting,
+        scope,
+        keyword,
+        loweredKeyword,
+      }),
+    );
 
     return {
       results,
@@ -221,7 +198,10 @@ export class MeetingService {
     });
 
     if (!meeting) {
-      throw new NotFoundException(`Meeting ${id} not found`);
+      throw new NotFoundException({
+        code: 'MEETING_NOT_FOUND',
+        message: `Meeting ${id} not found`,
+      });
     }
 
     return meeting;
@@ -322,47 +302,35 @@ export class MeetingService {
     await this.meetingRepository.remove(meeting);
   }
 
-  private applySearchScope(
-    queryBuilder: SelectQueryBuilder<MeetingEntity>,
+  private matchesSearchScope(
+    meeting: MeetingEntity,
     scope: SearchScope,
-    likeKeyword: string,
-  ): void {
+    loweredKeyword: string,
+  ): boolean {
+    const title = meeting.title?.trim().toLowerCase() ?? '';
+    const resultContent = meeting.result?.content?.trim().toLowerCase() ?? '';
+    const noteContent = meeting.note?.content?.trim().toLowerCase() ?? '';
+    const transcriptContent = (meeting.transcripts ?? [])
+      .map((segment) => segment.text?.trim().toLowerCase() ?? '')
+      .join(' ');
+
     switch (scope) {
       case 'title':
-        queryBuilder.where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
-          keyword: likeKeyword,
-        });
-        return;
+        return title.includes(loweredKeyword);
       case 'result':
-        queryBuilder.where(
-          "LOWER(COALESCE(result.content, '')) LIKE :keyword",
-          {
-            keyword: likeKeyword,
-          },
-        );
-        return;
-      case 'transcript':
-        queryBuilder.where(
-          "LOWER(COALESCE(transcript.text, '')) LIKE :keyword",
-          {
-            keyword: likeKeyword,
-          },
-        );
-        return;
+        return resultContent.includes(loweredKeyword);
       case 'note':
-        queryBuilder.where("LOWER(COALESCE(note.content, '')) LIKE :keyword", {
-          keyword: likeKeyword,
-        });
-        return;
+        return noteContent.includes(loweredKeyword);
+      case 'transcript':
+        return transcriptContent.includes(loweredKeyword);
       case 'all':
       default:
-        queryBuilder
-          .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
-            keyword: likeKeyword,
-          })
-          .orWhere("LOWER(COALESCE(result.content, '')) LIKE :keyword")
-          .orWhere("LOWER(COALESCE(note.content, '')) LIKE :keyword")
-          .orWhere("LOWER(COALESCE(transcript.text, '')) LIKE :keyword");
+        return (
+          title.includes(loweredKeyword) ||
+          resultContent.includes(loweredKeyword) ||
+          noteContent.includes(loweredKeyword) ||
+          transcriptContent.includes(loweredKeyword)
+        );
     }
   }
 

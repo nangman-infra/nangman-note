@@ -25,6 +25,10 @@ interface MeetingState {
   restoreMeeting: (id: string) => Promise<boolean>;
   purgeMeeting: (id: string) => Promise<boolean>;
   setCurrentMeeting: (meeting: Meeting | null) => void;
+  applyMeetingStatusUpdate: (update: {
+    meetingId: string;
+    status: Meeting['status'];
+  }) => void;
 }
 
 function mapSearchResultToMeeting(result: SearchResult): Meeting {
@@ -218,5 +222,31 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
 
   setCurrentMeeting: (meeting) => {
     set({ currentMeeting: meeting });
+  },
+
+  applyMeetingStatusUpdate: ({ meetingId, status }) => {
+    set((state) => {
+      const nextMeetings = state.meetings.map((meeting) =>
+        meeting.id === meetingId
+          ? {
+              ...meeting,
+              status,
+            }
+          : meeting,
+      );
+
+      const nextCurrentMeeting =
+        state.currentMeeting?.id === meetingId
+          ? {
+              ...state.currentMeeting,
+              status,
+            }
+          : state.currentMeeting;
+
+      return {
+        meetings: nextMeetings,
+        currentMeeting: nextCurrentMeeting,
+      };
+    });
   },
 }));

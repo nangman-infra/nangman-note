@@ -24,7 +24,9 @@ describe('TranscriptionService', () => {
   let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
   let batchTranscriptionProvider: jest.Mocked<BatchTranscriptionProvider>;
   let streamingProvider: jest.Mocked<StreamingTranscriptionProvider>;
-  let translateService: jest.Mocked<Pick<TranslateService, 'translateText' | 'isSameLanguage'>>;
+  let translateService: jest.Mocked<
+    Pick<TranslateService, 'translateText' | 'isSameLanguage'>
+  >;
 
   const buildMeeting = (
     overrides: Partial<MeetingEntity> = {},

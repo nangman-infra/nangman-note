@@ -53,9 +53,10 @@ export class ResultService {
 
     // COMPLETED 상태에서만 결과 생성 — 전사 완료 전에 조기 생성 방지
     if (meeting.status !== MeetingStatus.COMPLETED) {
-      throw new NotFoundException(
-        `Result for meeting ${meetingId} is not ready yet (status: ${meeting.status})`,
-      );
+      throw new NotFoundException({
+        code: 'RESULT_NOT_READY',
+        message: `Result for meeting ${meetingId} is not ready yet (status: ${meeting.status})`,
+      });
     }
 
     return this.generateAndSave(meetingId);

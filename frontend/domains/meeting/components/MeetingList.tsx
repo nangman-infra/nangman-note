@@ -6,6 +6,7 @@ import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMeetings } from '../hooks/useMeeting';
+import { useMeetingStatus } from '../hooks/useMeetingStatus';
 import { MeetingStatus } from '../types/meeting.types';
 import {
   MeetingActionDialog,
@@ -37,6 +38,14 @@ function normalizeKeyword(keyword: string) {
   return keyword.trim();
 }
 
+function isMeetingStatus(value: string): value is MeetingStatus {
+  return (
+    value === MeetingStatus.RECORDING ||
+    value === MeetingStatus.PROCESSING ||
+    value === MeetingStatus.COMPLETED
+  );
+}
+
 export function MeetingList({
   initialShowTrash = false,
   refreshToken = 0,
@@ -56,6 +65,7 @@ export function MeetingList({
     deleteMeeting,
     restoreMeeting,
     purgeMeeting,
+    applyMeetingStatusUpdate,
   } = useMeetings();
   const { pushToast } = useFeedback();
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +81,16 @@ export function MeetingList({
   const [isActionProcessing, setIsActionProcessing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimerRef = useRef<number | null>(null);
+
+  useMeetingStatus({
+    onStatusChange: (message) => {
+      if (!isMeetingStatus(message.status)) return;
+      applyMeetingStatusUpdate({
+        meetingId: message.meetingId,
+        status: message.status,
+      });
+    },
+  });
 
   useEffect(() => {
     if (showTrash) {

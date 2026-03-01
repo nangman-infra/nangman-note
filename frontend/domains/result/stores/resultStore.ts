@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { resultApi } from '../api/resultApi';
 import type { MeetingResult } from '../types/result.types';
+import { ApiError } from '@/lib/api/client';
 
 interface ResultState {
   result: MeetingResult | null;
@@ -44,8 +45,12 @@ export const useResultStore = create<ResultState>((set) => ({
       const message =
         error instanceof Error ? error.message : 'Failed to fetch result';
       const lowered = message.toLowerCase();
+      const apiError = error instanceof ApiError ? error : null;
 
-      if (lowered.includes('not ready yet')) {
+      if (
+        apiError?.code === 'RESULT_NOT_READY' ||
+        lowered.includes('not ready yet')
+      ) {
         set({
           result: null,
           isLoading: false,
@@ -56,7 +61,10 @@ export const useResultStore = create<ResultState>((set) => ({
         return;
       }
 
-      if (lowered.includes('meeting') && lowered.includes('not found')) {
+      if (
+        apiError?.code === 'MEETING_NOT_FOUND' ||
+        (lowered.includes('meeting') && lowered.includes('not found'))
+      ) {
         set({
           result: null,
           isLoading: false,

@@ -48,11 +48,21 @@ export class MeetingEntity {
   transcriptionMode: MeetingTranscriptionMode;
 
   /** 전사 언어 코드 (e.g. 'ko-KR', 'en-US'). null이면 자동 감지 */
-  @Column({ name: 'language_code', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'language_code',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   languageCode?: string;
 
   /** 번역 대상 언어 (e.g. 'ko', 'en'). null이면 번역 안 함 */
-  @Column({ name: 'translate_target_language', type: 'varchar', length: 10, nullable: true })
+  @Column({
+    name: 'translate_target_language',
+    type: 'varchar',
+    length: 10,
+    nullable: true,
+  })
   translateTargetLanguage?: string;
 
   @Column({ name: 'started_at' })

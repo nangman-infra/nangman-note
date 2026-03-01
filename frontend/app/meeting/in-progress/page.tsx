@@ -90,6 +90,7 @@ export default function InProgressMeetingPage() {
     isConnected,
     hasActiveSession,
     error: transcriptionError,
+    stopSession: stopTranscriptionSession,
     socketRef: transcriptionSocketRef,
   } = useTranscription(meetingId, isRealtimeMode);
 
@@ -266,6 +267,11 @@ export default function InProgressMeetingPage() {
 
     let audioBlob: Blob | null = null;
 
+    if (isRealtimeMode) {
+      stopStreaming();
+      await stopTranscriptionSession();
+    }
+
     // 1. 녹음 중지 + Blob 합성
     if (recorderState === 'recording' || recorderState === 'stopping') {
       audioBlob = await stopRecording();
@@ -333,13 +339,13 @@ export default function InProgressMeetingPage() {
       } else {
         await endMeeting({ skipTranscription: true });
         setShowProcessing(false);
-          pushToast({
-            title: '오디오 업로드에 실패했습니다',
-            description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
-            variant: 'info',
-          });
-          setMeetingIdFromQuery('');
-          setCurrentMeeting(null);
+        pushToast({
+          title: '오디오 업로드에 실패했습니다',
+          description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
+          variant: 'info',
+        });
+        setMeetingIdFromQuery('');
+        setCurrentMeeting(null);
         router.replace('/');
       }
     } else {

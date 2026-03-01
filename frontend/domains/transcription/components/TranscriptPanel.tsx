@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Mic, MicOff, Languages } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, Mic, MicOff, Languages } from 'lucide-react';
 import type { FinalSegment, PartialSegment } from '../stores/transcriptionStore';
 
 interface TranscriptPanelProps {
@@ -32,13 +32,57 @@ export function TranscriptPanel({
   error,
 }: TranscriptPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [followLive, setFollowLive] = useState(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
-  // 새 세그먼트가 추가되면 자동 스크롤
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  const hasTranscriptData = useMemo(
+    () => segments.length > 0 || Boolean(partial),
+    [segments.length, partial],
+  );
+
+  const isNearBottom = useCallback((el: HTMLDivElement): boolean => {
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    return distance < 24;
+  }, []);
+
+  const scrollToBottom = useCallback((opts?: { forceFollow?: boolean }) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    if (opts?.forceFollow) {
+      setFollowLive(true);
+      setShowJumpToLatest(false);
     }
-  }, [segments.length, partial?.text]);
+  }, []);
+
+  // 스크롤 위치에 따라 live follow 상태 제어
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const nearBottom = isNearBottom(el);
+      setShowJumpToLatest(!nearBottom);
+      setFollowLive((prev) => (nearBottom ? true : prev ? false : prev));
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+    };
+  }, [isNearBottom]);
+
+  // 새 전사가 와도 사용자가 위를 보고 있으면 강제 스크롤하지 않음
+  useEffect(() => {
+    if (!followLive) return;
+    if (!hasTranscriptData) return;
+
+    requestAnimationFrame(() => {
+      scrollToBottom();
+    });
+  }, [followLive, hasTranscriptData, partial?.text, scrollToBottom, segments.length]);
 
   // 마이크 비활성 상태
   if (micPermission === 'denied' || micPermission === 'unsupported') {
@@ -148,6 +192,40 @@ export function TranscriptPanel({
             </div>
           </div>
         )}
+      </div>
+      <div className="border-t border-[var(--line-soft)] px-3 py-2">
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <button
+            type="button"
+            onClick={() => {
+              if (followLive) {
+                setFollowLive(false);
+                return;
+              }
+              scrollToBottom({ forceFollow: true });
+            }}
+            className={`rounded-full px-2 py-1 transition ${
+              followLive
+                ? 'bg-emerald-100 text-emerald-800'
+                : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            자동 따라가기 {followLive ? 'ON' : 'OFF'}
+          </button>
+
+          {showJumpToLatest ? (
+            <button
+              type="button"
+              onClick={() => scrollToBottom({ forceFollow: true })}
+              className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 font-medium text-brand transition hover:bg-brand/15"
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+              최신으로 이동
+            </button>
+          ) : (
+            <span className="text-muted">최신 전사 위치</span>
+          )}
+        </div>
       </div>
     </PanelWrapper>
   );

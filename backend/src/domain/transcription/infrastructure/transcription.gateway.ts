@@ -108,9 +108,7 @@ export class TranscriptionGateway
       // 더 이상 연결된 클라이언트가 없으면 세션 종료
       if (clients.size === 0) {
         this.meetingClients.delete(meetingId);
-        if (
-          this.transcriptionService.hasActiveRealtimeSession(meetingId)
-        ) {
+        if (this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
           await this.transcriptionService.stopRealtimeSession(meetingId);
           this.logger.log(
             `Realtime session stopped (no clients) for meeting ${meetingId}`,
@@ -192,6 +190,37 @@ export class TranscriptionGateway
           error instanceof Error
             ? error.message
             : 'Failed to process audio chunk',
+      });
+      return { ok: false };
+    }
+  }
+
+  @SubscribeMessage('transcript:stop')
+  async handleStopSession(
+    @ConnectedSocket() client: Socket,
+  ): Promise<{ ok: boolean }> {
+    const meetingId = this.resolveMeetingId(client);
+    if (!meetingId) {
+      return { ok: false };
+    }
+
+    try {
+      if (this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
+        await this.transcriptionService.stopRealtimeSession(meetingId);
+      }
+
+      this.server.to(meetingId).emit('connected', {
+        meetingId,
+        hasActiveSession: false,
+      });
+      this.server.to(meetingId).emit('transcript:session-ended', { meetingId });
+      return { ok: true };
+    } catch (error) {
+      client.emit('transcript:error', {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to stop transcription session',
       });
       return { ok: false };
     }

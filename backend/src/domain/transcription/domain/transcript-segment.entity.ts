@@ -33,7 +33,12 @@ export class TranscriptSegmentEntity {
   translatedText?: string;
 
   /** Transcribe가 감지한 언어 코드 (e.g. 'ko-KR') */
-  @Column({ name: 'detected_language', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'detected_language',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   detectedLanguage?: string;
 
   @CreateDateColumn({ name: 'created_at' })

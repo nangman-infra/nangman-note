@@ -5,7 +5,6 @@ import {
   EntitySubscriberInterface,
   InsertEvent,
   UpdateEvent,
-  LoadEvent,
   DataSource,
 } from 'typeorm';
 import { EncryptionService } from './encryption.service';
@@ -46,7 +45,7 @@ export class EncryptionSubscriber implements EntitySubscriberInterface {
     }
   }
 
-  afterLoad(entity: EncryptableEntity, _event?: LoadEvent<EncryptableEntity>): void {
+  afterLoad(entity: EncryptableEntity): void {
     this.decryptFields(entity);
   }
 
@@ -57,8 +56,13 @@ export class EncryptionSubscriber implements EntitySubscriberInterface {
       if (entity instanceof target.entityClass) {
         for (const field of target.fields) {
           const value = (entity as unknown as Record<string, unknown>)[field];
-          if (typeof value === 'string' && value.length > 0 && !this.encryptionService.isEncrypted(value)) {
-            (entity as unknown as Record<string, unknown>)[field] = this.encryptionService.encrypt(value);
+          if (
+            typeof value === 'string' &&
+            value.length > 0 &&
+            !this.encryptionService.isEncrypted(value)
+          ) {
+            (entity as unknown as Record<string, unknown>)[field] =
+              this.encryptionService.encrypt(value);
           }
         }
         break;
@@ -73,8 +77,12 @@ export class EncryptionSubscriber implements EntitySubscriberInterface {
       if (entity instanceof target.entityClass) {
         for (const field of target.fields) {
           const value = (entity as unknown as Record<string, unknown>)[field];
-          if (typeof value === 'string' && this.encryptionService.isEncrypted(value)) {
-            (entity as unknown as Record<string, unknown>)[field] = this.encryptionService.decrypt(value);
+          if (
+            typeof value === 'string' &&
+            this.encryptionService.isEncrypted(value)
+          ) {
+            (entity as unknown as Record<string, unknown>)[field] =
+              this.encryptionService.decrypt(value);
           }
         }
         break;

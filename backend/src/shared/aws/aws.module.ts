@@ -6,7 +6,12 @@ import { TranslateService } from './translate/translate.service';
 
 @Global()
 @Module({
-  providers: [AwsClientFactory, S3AudioService, BedrockService, TranslateService],
+  providers: [
+    AwsClientFactory,
+    S3AudioService,
+    BedrockService,
+    TranslateService,
+  ],
   exports: [AwsClientFactory, S3AudioService, BedrockService, TranslateService],
 })
 export class AwsModule {}

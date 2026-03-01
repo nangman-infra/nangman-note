@@ -16,6 +16,7 @@ import type {
 } from '../application/ports/streaming-transcription-provider.port';
 
 const DEFAULT_SAMPLE_RATE = 16_000;
+const MAX_BUFFERED_AUDIO_CHUNKS = 120; // 약 12초(100ms 청크 기준)
 const DEFAULT_LANGUAGE_OPTIONS = [
   'ko-KR',
   'en-US',
@@ -34,6 +35,8 @@ interface ActiveSession {
   closed: boolean;
   /** abort signal */
   abortController: AbortController;
+  droppedChunkCount: number;
+  lastBackpressureLogAt: number;
 }
 
 /**
@@ -44,9 +47,21 @@ class AudioChunkQueue {
   private queue: Buffer[] = [];
   private resolve: ((value: IteratorResult<Buffer>) => void) | null = null;
   private done = false;
+  private readonly maxChunks: number;
 
-  push(chunk: Buffer): void {
-    if (this.done) return;
+  constructor(maxChunks: number) {
+    this.maxChunks = maxChunks;
+  }
+
+  push(chunk: Buffer): number {
+    if (this.done) return 0;
+
+    let dropped = 0;
+    if (this.queue.length >= this.maxChunks) {
+      this.queue.shift();
+      dropped = 1;
+    }
+
     if (this.resolve) {
       const r = this.resolve;
       this.resolve = null;
@@ -54,6 +69,7 @@ class AudioChunkQueue {
     } else {
       this.queue.push(chunk);
     }
+    return dropped;
   }
 
   end(): void {
@@ -89,12 +105,8 @@ class AudioChunkQueue {
 }
 
 @Injectable()
-export class AwsStreamingTranscriptionProvider
-  implements StreamingTranscriptionProvider
-{
-  private readonly logger = new Logger(
-    AwsStreamingTranscriptionProvider.name,
-  );
+export class AwsStreamingTranscriptionProvider implements StreamingTranscriptionProvider {
+  private readonly logger = new Logger(AwsStreamingTranscriptionProvider.name);
   private readonly sessions = new Map<string, ActiveSession>();
   private readonly client: TranscribeStreamingClient;
 
@@ -103,8 +115,15 @@ export class AwsStreamingTranscriptionProvider
   }
 
   async startSession(options: StreamingSessionOptions): Promise<void> {
-    const { meetingId, languageCode, languageOptions, sampleRate, onTranscript, onError, onClose } =
-      options;
+    const {
+      meetingId,
+      languageCode,
+      languageOptions,
+      sampleRate,
+      onTranscript,
+      onError,
+      onClose,
+    } = options;
 
     if (this.sessions.has(meetingId)) {
       this.logger.warn(
@@ -113,7 +132,7 @@ export class AwsStreamingTranscriptionProvider
       await this.stopSession(meetingId);
     }
 
-    const audioQueue = new AudioChunkQueue();
+    const audioQueue = new AudioChunkQueue(MAX_BUFFERED_AUDIO_CHUNKS);
     const abortController = new AbortController();
 
     const session: ActiveSession = {
@@ -121,6 +140,8 @@ export class AwsStreamingTranscriptionProvider
       audioQueue,
       closed: false,
       abortController,
+      droppedChunkCount: 0,
+      lastBackpressureLogAt: 0,
     };
     this.sessions.set(meetingId, session);
 
@@ -164,12 +185,22 @@ export class AwsStreamingTranscriptionProvider
   feedAudio(meetingId: string, chunk: Buffer): void {
     const session = this.sessions.get(meetingId);
     if (!session || session.closed) return;
-    session.audioQueue.push(chunk);
+    const dropped = session.audioQueue.push(chunk);
+    if (dropped > 0) {
+      session.droppedChunkCount += dropped;
+      const now = Date.now();
+      if (now - session.lastBackpressureLogAt >= 5000) {
+        session.lastBackpressureLogAt = now;
+        this.logger.warn(
+          `Backpressure detected for meeting ${meetingId}: dropped=${session.droppedChunkCount}`,
+        );
+      }
+    }
   }
 
-  async stopSession(meetingId: string): Promise<void> {
+  stopSession(meetingId: string): Promise<void> {
     const session = this.sessions.get(meetingId);
-    if (!session) return;
+    if (!session) return Promise.resolve();
 
     this.logger.log(`Stopping streaming session for meeting ${meetingId}`);
 
@@ -177,6 +208,7 @@ export class AwsStreamingTranscriptionProvider
     session.audioQueue.end();
     session.abortController.abort();
     this.sessions.delete(meetingId);
+    return Promise.resolve();
   }
 
   hasActiveSession(meetingId: string): boolean {
@@ -220,10 +252,7 @@ export class AwsStreamingTranscriptionProvider
 
           if (event.TranscriptEvent?.Transcript?.Results) {
             for (const result of event.TranscriptEvent.Transcript.Results) {
-              if (
-                !result.Alternatives ||
-                result.Alternatives.length === 0
-              ) {
+              if (!result.Alternatives || result.Alternatives.length === 0) {
                 continue;
               }
 
@@ -254,8 +283,7 @@ export class AwsStreamingTranscriptionProvider
         // AbortError는 정상 종료 (stopSession 호출)
         if (
           error instanceof Error &&
-          (error.name === 'AbortError' ||
-            error.message.includes('aborted'))
+          (error.name === 'AbortError' || error.message.includes('aborted'))
         ) {
           this.logger.debug(
             `Streaming session aborted (normal) for meeting ${meetingId}`,
@@ -265,11 +293,7 @@ export class AwsStreamingTranscriptionProvider
             `Streaming session error for meeting ${meetingId}: ${error}`,
           );
           try {
-            onError(
-              error instanceof Error
-                ? error
-                : new Error(String(error)),
-            );
+            onError(error instanceof Error ? error : new Error(String(error)));
           } catch {
             // 콜백 에러 무시
           }
@@ -288,9 +312,7 @@ export class AwsStreamingTranscriptionProvider
           // 콜백 에러 무시
         }
 
-        this.logger.log(
-          `Streaming session ended for meeting ${meetingId}`,
-        );
+        this.logger.log(`Streaming session ended for meeting ${meetingId}`);
       }
     })();
   }

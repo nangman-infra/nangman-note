@@ -11,8 +11,9 @@ interface MeetingStatusMessage {
 }
 
 interface UseMeetingStatusOptions {
-  meetingId: string | null;
+  meetingId?: string | null;
   onStatusChange?: (message: MeetingStatusMessage) => void;
+  enabled?: boolean;
 }
 
 /**
@@ -22,6 +23,7 @@ interface UseMeetingStatusOptions {
 export function useMeetingStatus({
   meetingId,
   onStatusChange,
+  enabled = true,
 }: UseMeetingStatusOptions): void {
   const socketRef = useRef<Socket | null>(null);
   const callbackRef = useRef(onStatusChange);
@@ -38,31 +40,19 @@ export function useMeetingStatus({
   }, []);
 
   useEffect(() => {
-    if (!meetingId) {
+    if (!enabled) {
       cleanup();
       return;
     }
 
-    const socket = createSocket('/ws/meeting-status', { meetingId });
+    const query = meetingId ? { meetingId } : undefined;
+    const socket = createSocket('/ws/meeting-status', query);
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      console.log('[MeetingStatus] WebSocket connected');
-    });
-
-    socket.on('disconnect', () => {
-      console.log('[MeetingStatus] WebSocket disconnected');
-    });
-
-    socket.on('error', (error: unknown) => {
-      console.error('[MeetingStatus] WebSocket error:', error);
-    });
-
     socket.on('meeting:status', (message: MeetingStatusMessage) => {
-      console.log('[MeetingStatus] Status changed:', message);
       callbackRef.current?.(message);
     });
 
     return cleanup;
-  }, [meetingId, cleanup]);
+  }, [meetingId, cleanup, enabled]);
 }

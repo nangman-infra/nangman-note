@@ -26,6 +26,7 @@ import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status
 export class MeetingStatusGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
+  private static readonly GLOBAL_ROOM = 'meeting-status:global';
   private readonly logger = new Logger(MeetingStatusGateway.name);
 
   @WebSocketServer()
@@ -43,10 +44,10 @@ export class MeetingStatusGateway
     const meetingId = this.resolveMeetingId(client);
 
     if (!meetingId) {
-      client.emit('error', {
-        message: 'meetingId query parameter is required',
-      });
-      client.disconnect(true);
+      await client.join(MeetingStatusGateway.GLOBAL_ROOM);
+      this.logger.debug(
+        `Client ${client.id} joined global meeting-status room`,
+      );
       return;
     }
 
@@ -70,6 +71,11 @@ export class MeetingStatusGateway
       `Broadcasting status change: meeting=${event.meetingId}, status=${event.status}`,
     );
     this.server.to(event.meetingId).emit('meeting:status', {
+      meetingId: event.meetingId,
+      status: event.status,
+      phase: event.phase,
+    });
+    this.server.to(MeetingStatusGateway.GLOBAL_ROOM).emit('meeting:status', {
       meetingId: event.meetingId,
       status: event.status,
       phase: event.phase,

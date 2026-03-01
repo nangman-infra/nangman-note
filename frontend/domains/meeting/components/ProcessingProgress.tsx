@@ -63,7 +63,8 @@ export function ProcessingProgress({
   );
 
   useMeetingStatus({
-    meetingId: uploadState === 'failed' ? null : meetingId,
+    meetingId,
+    enabled: uploadState !== 'failed',
     onStatusChange: handleStatusChange,
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Socket } from 'socket.io-client';
 import { useTranscriptionStore } from '../stores/transcriptionStore';
 import { createSocket } from '@/lib/api/websocket';
@@ -24,6 +24,37 @@ export function useTranscription(
   } = useTranscriptionStore();
 
   const socketRef = useRef<Socket | null>(null);
+
+  const stopSession = useCallback(async (): Promise<boolean> => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) {
+      setHasActiveSession(false);
+      return false;
+    }
+
+    const success = await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const done = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(ok);
+      };
+
+      const timerId = window.setTimeout(() => done(false), 1500);
+      socket.emit(
+        'transcript:stop',
+        (response?: { ok?: boolean }) => {
+          window.clearTimeout(timerId);
+          done(Boolean(response?.ok));
+        },
+      );
+    });
+
+    if (success) {
+      setHasActiveSession(false);
+    }
+    return success;
+  }, [setHasActiveSession]);
 
   useEffect(() => {
     if (!meetingId || !isRealtimeEnabled) {
@@ -69,6 +100,10 @@ export function useTranscription(
       setError(err.message || 'Transcription stream error');
     });
 
+    socket.on('transcript:session-ended', () => {
+      setHasActiveSession(false);
+    });
+
     // Cleanup
     return () => {
       socketRef.current?.disconnect();
@@ -95,6 +130,7 @@ export function useTranscription(
     hasActiveSession,
     error,
     toggleExpanded,
+    stopSession,
     /** socket.io 인스턴스 (useAudioStreaming에서 사용) */
     socketRef,
   };

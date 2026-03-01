@@ -66,9 +66,17 @@ export function useAudioCapture(): UseAudioCaptureReturn {
       // 이전 스트림이 남아있으면 정리
       stopCapture();
 
-      const audioConstraints: MediaTrackConstraints = selectedDeviceId
-        ? { deviceId: { exact: selectedDeviceId } }
-        : {};
+      const audioConstraints: MediaTrackConstraints = {
+        // 장치 선택
+        ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {}),
+        // 전사 품질 개선을 위한 기본 DSP 옵션
+        channelCount: { ideal: 1 },
+        sampleRate: { ideal: 48_000 },
+        sampleSize: { ideal: 16 },
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
 
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({

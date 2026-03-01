@@ -16,7 +16,9 @@ class PcmProcessor extends AudioWorkletProcessor {
 
     // 다운샘플링용 버퍼
     this._inputBuffer = [];
-    this._outputBufferSize = 4096; // 다운샘플링 후 이 크기가 되면 전송
+    this._resampleCursor = 0;
+    // AWS 권장 청크(50~200ms) 중 100ms로 고정
+    this._outputBufferSize = 1600; // 16kHz * 0.1s
     this._outputBuffer = [];
 
     this.port.onmessage = (event) => {
@@ -32,6 +34,10 @@ class PcmProcessor extends AudioWorkletProcessor {
         this._nativeSampleRate = event.data.nativeSampleRate || 48000;
         this._targetSampleRate = event.data.targetSampleRate || 16000;
         this._resampleRatio = this._nativeSampleRate / this._targetSampleRate;
+        this._outputBufferSize = Math.max(
+          320,
+          Math.round(this._targetSampleRate * 0.1),
+        );
       }
     };
   }
@@ -46,26 +52,33 @@ class PcmProcessor extends AudioWorkletProcessor {
     const channelData = input[0];
     if (!channelData) return true;
 
-    // 다운샘플링: ratio만큼 건너뛰기 (linear interpolation)
+    // 다운샘플링: fractional ratio 지원 linear interpolation
     const ratio = this._resampleRatio;
+    if (!Number.isFinite(ratio) || ratio <= 0) return true;
 
     for (let i = 0; i < channelData.length; i++) {
       this._inputBuffer.push(channelData[i]);
     }
 
-    // 충분한 입력이 쌓이면 다운샘플링
-    while (this._inputBuffer.length >= ratio) {
-      // 간단한 linear 다운샘플링: ratio 간격으로 샘플 추출
-      const sample = this._inputBuffer[0];
+    while (this._resampleCursor + 1 < this._inputBuffer.length) {
+      const leftIndex = Math.floor(this._resampleCursor);
+      const rightIndex = leftIndex + 1;
+      const frac = this._resampleCursor - leftIndex;
+      const left = this._inputBuffer[leftIndex];
+      const right = this._inputBuffer[rightIndex];
+      const sample = left + (right - left) * frac;
       this._outputBuffer.push(sample);
-
-      // ratio만큼 건너뛰기 (정수가 아닐 수 있으므로 floor)
-      const skip = Math.max(1, Math.floor(ratio));
-      this._inputBuffer.splice(0, skip);
+      this._resampleCursor += ratio;
 
       if (this._outputBuffer.length >= this._outputBufferSize) {
         this._flush();
       }
+    }
+
+    const consumed = Math.floor(this._resampleCursor);
+    if (consumed > 0) {
+      this._inputBuffer = this._inputBuffer.slice(consumed);
+      this._resampleCursor -= consumed;
     }
 
     return true;

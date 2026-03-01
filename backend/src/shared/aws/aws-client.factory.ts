@@ -44,6 +44,8 @@ export class AwsClientFactory {
   }
 
   createTranslateClient(): TranslateClient {
+    // AWS SDK v3 Translate 타입 해석 이슈로 no-unsafe-call 오탐 방지
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     return new TranslateClient({
       region: this.region,
       credentials: this.credentials,
