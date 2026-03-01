@@ -26,6 +26,9 @@ export class MeetingEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   title?: string;
 
+  @Column({ type: 'text', nullable: true })
+  agenda?: string;
+
   @Column({ name: 'prompt_id', type: 'varchar', length: 120 })
   promptId: string;
 

@@ -51,6 +51,7 @@ export class MeetingService {
 
     const meeting = this.meetingRepository.create({
       title: dto.title?.trim() || undefined,
+      agenda: dto.agenda?.trim() || undefined,
       promptId,
       status: MeetingStatus.RECORDING,
       transcriptionMode,

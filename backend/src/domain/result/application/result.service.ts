@@ -263,6 +263,7 @@ export class ResultService {
         noteContent: noteContent || '',
         transcriptText,
         meetingTitle: meeting.title?.trim(),
+        meetingAgenda: meeting.agenda?.trim(),
       });
 
       if (aiContent && aiContent.trim().length > 0) {

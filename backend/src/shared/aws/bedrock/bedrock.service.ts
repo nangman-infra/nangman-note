@@ -41,8 +41,9 @@ export class BedrockService {
     noteContent: string;
     transcriptText: string;
     meetingTitle?: string;
+    meetingAgenda?: string;
   }): Promise<string> {
-    const { promptContent, noteContent, transcriptText, meetingTitle } = params;
+    const { promptContent, noteContent, transcriptText, meetingTitle, meetingAgenda } = params;
 
     const systemPrompt: SystemContentBlock[] = [
       {
@@ -71,6 +72,7 @@ export class BedrockService {
       noteContent,
       transcriptText,
       meetingTitle,
+      meetingAgenda,
     });
 
     const messages: Message[] = [
@@ -123,13 +125,18 @@ export class BedrockService {
     noteContent: string;
     transcriptText: string;
     meetingTitle?: string;
+    meetingAgenda?: string;
   }): string {
-    const { promptContent, noteContent, transcriptText, meetingTitle } = params;
+    const { promptContent, noteContent, transcriptText, meetingTitle, meetingAgenda } = params;
 
     const sections: string[] = [];
 
     if (meetingTitle) {
       sections.push(`## 회의 제목\n${meetingTitle}`);
+
+    if (meetingAgenda) {
+      sections.push(`## 회의 아젠다\n${meetingAgenda}`);
+    }
     }
 
     sections.push(`## 프롬프트 지시\n${promptContent}`);

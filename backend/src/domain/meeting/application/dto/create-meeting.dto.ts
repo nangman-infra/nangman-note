@@ -9,6 +9,11 @@ export class CreateMeetingDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
+  agenda?: string;
+
+  @IsOptional()
+  @IsString()
   promptId?: string;
 
   @IsOptional()

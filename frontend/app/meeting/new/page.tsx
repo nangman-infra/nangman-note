@@ -23,6 +23,7 @@ export default function NewMeetingPage() {
   const { startMeeting, isLoading, error } = useMeeting();
   const { selectedPromptId } = usePromptStore();
   const [title, setTitle] = useState('');
+  const [agenda, setAgenda] = useState('');
   const [transcriptionMode, setTranscriptionMode] = useState(
     MeetingTranscriptionMode.BATCH,
   );
@@ -30,6 +31,7 @@ export default function NewMeetingPage() {
   const handleStart = async () => {
     const meeting = await startMeeting({
       title: title.trim() || undefined,
+      agenda: agenda.trim() || undefined,
       promptId: selectedPromptId,
       transcriptionMode,
     });
@@ -105,6 +107,23 @@ export default function NewMeetingPage() {
                 placeholder="예: 1분기 마케팅 전략 회의"
                 className="input-shell"
               />
+            </div>
+
+            <div>
+              <label htmlFor="meeting-agenda" className="mb-2 block text-sm font-medium">
+                회의 아젠다 (선택)
+              </label>
+              <textarea
+                id="meeting-agenda"
+                value={agenda}
+                onChange={(e) => setAgenda(e.target.value)}
+                placeholder="예: 신규 제품 런칭 전략, 예산 논의, 담당자 배정"
+                rows={3}
+                className="input-shell w-full resize-y text-sm"
+              />
+              <p className="mt-1 text-[11px] text-muted">
+                미입력 시 AI가 회의 내용을 기반으로 자동 생성합니다.
+              </p>
             </div>
 
             <div>

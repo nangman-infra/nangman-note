@@ -12,6 +12,7 @@ export enum MeetingTranscriptionMode {
 export interface Meeting {
   id: string;
   title?: string;
+  agenda?: string;
   promptId: string;
   status: MeetingStatus;
   transcriptionMode: MeetingTranscriptionMode;
@@ -24,6 +25,7 @@ export interface Meeting {
 
 export interface CreateMeetingDto {
   title?: string;
+  agenda?: string;
   promptId?: string; // 선택 사항, 기본값: prompt_default_meeting
   transcriptionMode?: MeetingTranscriptionMode;
 }
