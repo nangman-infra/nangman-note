@@ -3,6 +3,7 @@ import type { NextConfig } from 'next';
 const backendUrl = process.env.BACKEND_URL || 'http://localhost:9999';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   async rewrites() {
     return [
       // REST API 프록시: /api/* → 백엔드
