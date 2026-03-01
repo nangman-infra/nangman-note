@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CalendarDays, FileClock, FolderKanban, Plus, Sparkles, Tags, Trash2 } from 'lucide-react';
+import { CalendarDays, FileClock, FolderKanban, Plus, Settings, Sparkles, Tags, Trash2 } from 'lucide-react';
 
 export type SidebarTimeFilter = 'today' | 'recent' | 'all';
 
@@ -95,6 +95,10 @@ export function Sidebar({
       </section>
 
       <div className="mt-auto space-y-2 pt-4">
+        <Link href="/settings" className="btn-neo w-full justify-start text-muted">
+          <Settings className="h-4 w-4" />
+          설정
+        </Link>
         <Link href="/?view=trash" className="btn-neo w-full justify-start text-muted">
           <Trash2 className="h-4 w-4" />
           휴지통
