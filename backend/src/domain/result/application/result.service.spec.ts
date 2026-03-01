@@ -214,7 +214,7 @@ describe('ResultService', () => {
           isDefault: false,
         }),
       );
-      noteRepository.findOne.mockResolvedValue(null);
+      noteRepository.findOne.mockResolvedValue({ id: 'note-1', meetingId: 'meeting-1', content: '테스트 노트', createdAt: new Date(), updatedAt: new Date() });
       transcriptRepository.find.mockResolvedValue([]);
       bedrockService.generateMeetingResult.mockResolvedValue('재생성 결과');
       resultRepository.save.mockImplementation((entity) =>

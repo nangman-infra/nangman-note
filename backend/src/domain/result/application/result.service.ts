@@ -219,14 +219,18 @@ export class ResultService {
       ...transcripts.map((segment) => Math.floor(segment.endTime)),
     );
 
+    const hasContent = noteContent.length > 0 || transcripts.length > 0;
+
     return {
       promptId,
-      content: await this.generateContentWithAI({
-        meeting,
-        prompt,
-        noteContent,
-        transcripts,
-      }),
+      content: hasContent
+        ? await this.generateContentWithAI({
+            meeting,
+            prompt,
+            noteContent,
+            transcripts,
+          })
+        : this.buildEmptyContentNotice(meeting),
       metadata: {
         title: meeting.title,
         generatedAt: new Date().toISOString(),
@@ -275,6 +279,21 @@ export class ResultService {
       );
       return this.buildFallbackContent(params);
     }
+  }
+
+  private buildEmptyContentNotice(meeting: MeetingEntity): string {
+    const title = meeting.title?.trim() || '제목 없는 회의';
+    const generatedAt = new Date().toLocaleString('ko-KR');
+    return [
+      `# ${title}`,
+      '',
+      '> 📝 이 회의에는 작성된 노트와 수집된 전사 데이터가 없습니다.',
+      '',
+      `- 생성 시각: ${generatedAt}`,
+      '',
+      '회의 내용을 추가하려면 **편집** 버튼을 눌러 직접 작성하거나,',
+      '다음 회의에서 노트를 작성하고 마이크를 활성화해주세요.',
+    ].join('\n');
   }
 
   private buildFallbackContent(params: {
