@@ -12,12 +12,15 @@ import {
   type MeetingActionType,
 } from './MeetingActionDialog';
 import { MeetingCard } from './MeetingCard';
+import type { SidebarTimeFilter } from '@/components/layout/Sidebar';
 
 interface MeetingListProps {
   initialShowTrash?: boolean;
   refreshToken?: number;
   onSelectMeeting?: (meetingId: string | null) => void;
   selectedMeetingId?: string;
+  timeFilter?: SidebarTimeFilter;
+  tagFilter?: string | null;
 }
 
 const filters: Array<{ key: 'all' | MeetingStatus; label: string }> = [
@@ -39,6 +42,8 @@ export function MeetingList({
   refreshToken = 0,
   onSelectMeeting,
   selectedMeetingId,
+  timeFilter = 'all',
+  tagFilter = null,
 }: MeetingListProps) {
   const {
     meetings,
@@ -166,9 +171,33 @@ export function MeetingList({
     if (showTrash) {
       return source;
     }
-    if (activeFilter === 'all') return source;
-    return source.filter((meeting) => meeting.status === activeFilter);
-  }, [activeFilter, meetings, showTrash, trashMeetings]);
+
+    let result = source;
+
+    // 상태 필터 (전체/진행 중/정리 중/완료)
+    if (activeFilter !== 'all') {
+      result = result.filter((m) => m.status === activeFilter);
+    }
+
+    // 사이드바 시간 필터 (오늘/최근 7일/전체)
+    if (timeFilter === 'today') {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      result = result.filter((m) => new Date(m.startedAt) >= todayStart);
+    } else if (timeFilter === 'recent') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      weekAgo.setHours(0, 0, 0, 0);
+      result = result.filter((m) => new Date(m.startedAt) >= weekAgo);
+    }
+
+    // 사이드바 태그(프롬프트) 필터
+    if (tagFilter) {
+      result = result.filter((m) => m.promptId === tagFilter);
+    }
+
+    return result;
+  }, [activeFilter, meetings, showTrash, tagFilter, timeFilter, trashMeetings]);
 
   const storeRecentSearch = (keyword: string) => {
     setRecentSearches((prev) => {

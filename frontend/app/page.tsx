@@ -5,7 +5,7 @@ import { ArrowRight, Mic, NotebookText } from 'lucide-react';
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { Sidebar, type SidebarTimeFilter } from '@/components/layout/Sidebar';
 import { MeetingList } from '@/domains/meeting/components/MeetingList';
 import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { ResultViewer } from '@/domains/result/components/ResultViewer';
@@ -32,6 +32,8 @@ interface HomePageContentProps {
 function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [meetingListRefreshToken, setMeetingListRefreshToken] = useState(0);
+  const [timeFilter, setTimeFilter] = useState<SidebarTimeFilter>('all');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const { prompts } = usePrompt();
 
   const requestMeetingListRefresh = () => {
@@ -40,13 +42,22 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
 
   return (
     <ThreeColumnLayout
-      sidebar={<Sidebar />}
+      sidebar={
+        <Sidebar
+          activeTimeFilter={timeFilter}
+          activeTag={tagFilter}
+          onTimeFilterChange={setTimeFilter}
+          onTagChange={setTagFilter}
+        />
+      }
       list={
         <MeetingList
           initialShowTrash={initialShowTrash}
           refreshToken={meetingListRefreshToken}
           onSelectMeeting={setSelectedMeetingId}
           selectedMeetingId={selectedMeetingId || undefined}
+          timeFilter={timeFilter}
+          tagFilter={tagFilter}
         />
       }
       viewer={
