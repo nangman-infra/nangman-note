@@ -331,7 +331,7 @@ export function ResultViewer({
               프롬프트 변경 후 재생성
             </button>
           ) : (
-            <div className="surface-card flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
+            <div className="surface-card flex flex-col gap-3 p-3">
               {promptOptions.length > 0 ? (
                 <select
                   value={resolvedRegeneratePromptId}
@@ -354,11 +354,11 @@ export function ResultViewer({
                   className="input-shell"
                 />
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowRegenerate(false)}
-                  className="btn-neo px-3 py-2 text-xs"
+                  className="btn-neo whitespace-nowrap px-4 py-2 text-sm"
                 >
                   취소
                 </button>
@@ -366,7 +366,7 @@ export function ResultViewer({
                   type="button"
                   onClick={handleRegenerate}
                   disabled={isRegenerating || !resolvedRegeneratePromptId.trim()}
-                  className="btn-neo border-transparent bg-brand px-3 py-2 text-xs text-white disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn-neo whitespace-nowrap border-transparent bg-brand px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {isRegenerating ? '재생성 중...' : '재생성 실행'}
                 </button>
