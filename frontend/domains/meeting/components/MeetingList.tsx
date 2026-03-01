@@ -1,7 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { History, Search, SlidersHorizontal, Sparkles, Trash2, X } from 'lucide-react';
+import {
+  CheckSquare,
+  History,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Square,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -65,6 +75,9 @@ export function MeetingList({
     deleteMeeting,
     restoreMeeting,
     purgeMeeting,
+    bulkDeleteMeetings,
+    bulkRestoreMeetings,
+    bulkPurgeMeetings,
     applyMeetingStatusUpdate,
   } = useMeetings();
   const { pushToast } = useFeedback();
@@ -77,10 +90,15 @@ export function MeetingList({
     type: MeetingActionType;
     meetingId: string;
     title: string;
+    bulkCount?: number;
   } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimerRef = useRef<number | null>(null);
+
+  // ── 다중 선택 상태 ──
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useMeetingStatus({
     onStatusChange: (message) => {
@@ -162,6 +180,19 @@ export function MeetingList({
     };
   }, []);
 
+  // 선택 모드 해제 시 선택 초기화
+  useEffect(() => {
+    if (!selectionMode) {
+      setSelectedIds(new Set());
+    }
+  }, [selectionMode]);
+
+  // 뷰 전환 시 선택 모드 해제
+  useEffect(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, [showTrash]);
+
   const searchCandidates = useMemo(() => {
     if (showTrash) {
       return recentSearches;
@@ -194,12 +225,10 @@ export function MeetingList({
 
     let result = source;
 
-    // 상태 필터 (전체/진행 중/정리 중/완료)
     if (activeFilter !== 'all') {
       result = result.filter((m) => m.status === activeFilter);
     }
 
-    // 사이드바 시간 필터 (오늘/최근 7일/전체)
     if (timeFilter === 'today') {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -211,7 +240,6 @@ export function MeetingList({
       result = result.filter((m) => new Date(m.startedAt) >= weekAgo);
     }
 
-    // 사이드바 태그(프롬프트) 필터
     if (tagFilter) {
       result = result.filter((m) => m.promptId === tagFilter);
     }
@@ -219,6 +247,65 @@ export function MeetingList({
     return result;
   }, [activeFilter, meetings, showTrash, tagFilter, timeFilter, trashMeetings]);
 
+  // ── 다중 선택 핸들러 ──
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(filteredMeetings.map((m) => m.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const isAllSelected = filteredMeetings.length > 0 && selectedIds.size === filteredMeetings.length;
+
+  const toggleSelectionMode = () => {
+    setSelectionMode((prev) => !prev);
+  };
+
+  // ── 일괄 작업 핸들러 ──
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    setPendingAction({
+      type: 'bulk-delete',
+      meetingId: '',
+      title: '',
+      bulkCount: selectedIds.size,
+    });
+  };
+
+  const handleBulkRestore = () => {
+    if (selectedIds.size === 0) return;
+    setPendingAction({
+      type: 'bulk-restore',
+      meetingId: '',
+      title: '',
+      bulkCount: selectedIds.size,
+    });
+  };
+
+  const handleBulkPurge = () => {
+    if (selectedIds.size === 0) return;
+    setPendingAction({
+      type: 'bulk-purge',
+      meetingId: '',
+      title: '',
+      bulkCount: selectedIds.size,
+    });
+  };
+
+  // ── 검색 ──
   const storeRecentSearch = (keyword: string) => {
     setRecentSearches((prev) => {
       const normalized = normalizeKeyword(keyword);
@@ -281,6 +368,7 @@ export function MeetingList({
     pushToast({ title: '최근 검색어를 비웠습니다', variant: 'info' });
   };
 
+  // ── 단건 작업 핸들러 ──
   const handleDeleteMeeting = (meetingId: string) => {
     const meeting = meetings.find((item) => item.id === meetingId);
     setPendingAction({
@@ -325,6 +413,79 @@ export function MeetingList({
     if (!pendingAction) return;
     setIsActionProcessing(true);
 
+    // ── bulk 작업 ──
+    if (pendingAction.type === 'bulk-delete') {
+      const ids = [...selectedIds];
+      const result = await bulkDeleteMeetings(ids);
+      setIsActionProcessing(false);
+      setPendingAction(null);
+
+      if (!result) {
+        pushToast({ title: '일괄 삭제에 실패했습니다', variant: 'error' });
+        return;
+      }
+
+      if (selectedMeetingId && result.succeeded.includes(selectedMeetingId)) {
+        onSelectMeeting?.(null);
+      }
+
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      pushToast({
+        title: `${result.succeeded.length}개의 회의를 휴지통으로 이동했습니다`,
+        description: result.failed.length > 0 ? `${result.failed.length}개 실패` : undefined,
+        variant: result.failed.length > 0 ? 'error' : 'success',
+      });
+      return;
+    }
+
+    if (pendingAction.type === 'bulk-restore') {
+      const ids = [...selectedIds];
+      const result = await bulkRestoreMeetings(ids);
+      setIsActionProcessing(false);
+      setPendingAction(null);
+
+      if (!result) {
+        pushToast({ title: '일괄 복구에 실패했습니다', variant: 'error' });
+        return;
+      }
+
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      pushToast({
+        title: `${result.succeeded.length}개의 회의를 복구했습니다`,
+        description: result.failed.length > 0 ? `${result.failed.length}개 실패` : undefined,
+        variant: result.failed.length > 0 ? 'error' : 'success',
+      });
+      return;
+    }
+
+    if (pendingAction.type === 'bulk-purge') {
+      const ids = [...selectedIds];
+      const result = await bulkPurgeMeetings(ids);
+      setIsActionProcessing(false);
+      setPendingAction(null);
+
+      if (!result) {
+        pushToast({ title: '일괄 영구 삭제에 실패했습니다', variant: 'error' });
+        return;
+      }
+
+      if (selectedMeetingId && result.succeeded.includes(selectedMeetingId)) {
+        onSelectMeeting?.(null);
+      }
+
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      pushToast({
+        title: `${result.succeeded.length}개의 회의를 영구 삭제했습니다`,
+        description: result.failed.length > 0 ? `${result.failed.length}개 실패` : undefined,
+        variant: result.failed.length > 0 ? 'error' : 'info',
+      });
+      return;
+    }
+
+    // ── 단건 작업 ──
     if (pendingAction.type === 'move-to-trash') {
       const deleted = await deleteMeeting(pendingAction.meetingId);
       if (!deleted) {
@@ -520,8 +681,82 @@ export function MeetingList({
             <Trash2 className="h-3 w-3" />
             {showTrash ? '닫기' : '휴지통'}
           </button>
+
+          {/* 선택 모드 토글 버튼 */}
+          {filteredMeetings.length > 0 ? (
+            <button
+              type="button"
+              onClick={toggleSelectionMode}
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                selectionMode
+                  ? 'bg-brand text-white'
+                  : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
+              }`}
+            >
+              <CheckSquare className="h-3 w-3" />
+              {selectionMode ? '선택 취소' : '선택'}
+            </button>
+          ) : null}
         </div>
       </header>
+
+      {/* ── 선택 모드 툴바 ── */}
+      {selectionMode ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line-soft)] bg-brand/5 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={isAllSelected ? deselectAll : selectAll}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand/10"
+            >
+              {isAllSelected ? (
+                <CheckSquare className="h-3.5 w-3.5" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
+              {isAllSelected ? '전체 해제' : '전체 선택'}
+            </button>
+            <span className="text-xs font-semibold text-muted">
+              {selectedIds.size}개 선택
+            </span>
+          </div>
+
+          <div className="ml-auto flex items-center gap-1.5">
+            {showTrash ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBulkRestore}
+                  disabled={selectedIds.size === 0}
+                  className="btn-neo whitespace-nowrap px-2.5 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  복구
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkPurge}
+                  disabled={selectedIds.size === 0}
+                  className="btn-neo whitespace-nowrap border-transparent bg-rose-600 px-2.5 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  삭제
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={selectedIds.size === 0}
+                className="btn-neo whitespace-nowrap border-transparent bg-rose-600 px-2.5 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="h-3 w-3" />
+                삭제
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <div className="scroll-muted flex-1 space-y-2 overflow-y-auto px-4 py-4">
         {isLoading ? (
@@ -548,6 +783,9 @@ export function MeetingList({
                 onRestore={showTrash ? () => void handleRestoreMeeting(meeting.id) : undefined}
                 onPurge={showTrash ? () => handlePurgeMeeting(meeting.id) : undefined}
                 isActive={meeting.id === selectedMeetingId}
+                selectionMode={selectionMode}
+                isSelected={selectedIds.has(meeting.id)}
+                onToggleSelect={() => toggleSelect(meeting.id)}
               />
             </div>
           ))
@@ -558,6 +796,7 @@ export function MeetingList({
         open={Boolean(pendingAction)}
         actionType={pendingAction?.type ?? 'move-to-trash'}
         meetingTitle={pendingAction?.title ?? '제목 없는 회의'}
+        bulkCount={pendingAction?.bulkCount}
         isLoading={isActionProcessing}
         onConfirm={handleConfirmAction}
         onCancel={closeActionDialog}

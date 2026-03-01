@@ -80,4 +80,31 @@ export const meetingApi = {
   purge: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/v1/meetings/${id}/permanent`);
   },
+
+  // 일괄 삭제 (soft delete)
+  bulkDelete: async (ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> => {
+    const response = await apiClient.post<{ data: { succeeded: string[]; failed: string[] } }>(
+      '/api/v1/meetings/bulk/delete',
+      { ids },
+    );
+    return response.data.data;
+  },
+
+  // 일괄 복구
+  bulkRestore: async (ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> => {
+    const response = await apiClient.post<{ data: { succeeded: string[]; failed: string[] } }>(
+      '/api/v1/meetings/bulk/restore',
+      { ids },
+    );
+    return response.data.data;
+  },
+
+  // 일괄 영구 삭제
+  bulkPurge: async (ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> => {
+    const response = await apiClient.post<{ data: { succeeded: string[]; failed: string[] } }>(
+      '/api/v1/meetings/bulk/purge',
+      { ids },
+    );
+    return response.data.data;
+  },
 };

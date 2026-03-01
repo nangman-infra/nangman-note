@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { BulkMeetingIdsDto } from '../application/dto/bulk-meeting-ids.dto';
 import { CreateMeetingDto } from '../application/dto/create-meeting.dto';
 import { CompleteMeetingDto } from '../application/dto/complete-meeting.dto';
 import { ListMeetingsQueryDto } from '../application/dto/list-meetings-query.dto';
@@ -39,6 +40,21 @@ export class MeetingController {
   @Get('search')
   async search(@Query() query: SearchMeetingsQueryDto) {
     return this.meetingService.search(query);
+  }
+
+  @Post('bulk/delete')
+  async bulkRemove(@Body() dto: BulkMeetingIdsDto) {
+    return this.meetingService.bulkRemove(dto.ids);
+  }
+
+  @Post('bulk/restore')
+  async bulkRestore(@Body() dto: BulkMeetingIdsDto) {
+    return this.meetingService.bulkRestore(dto.ids);
+  }
+
+  @Post('bulk/purge')
+  async bulkPurge(@Body() dto: BulkMeetingIdsDto) {
+    return this.meetingService.bulkPurge(dto.ids);
   }
 
   @Get(':id')
@@ -73,4 +89,5 @@ export class MeetingController {
   async purge(@Param('id') id: string): Promise<void> {
     await this.meetingService.purge(id);
   }
+
 }

@@ -308,6 +308,75 @@ export class MeetingService {
     await this.meetingRepository.remove(meeting);
   }
 
+  async bulkRemove(ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> {
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const meeting = await this.meetingRepository.findOne({ where: { id } });
+        if (!meeting) {
+          failed.push(id);
+          continue;
+        }
+        await this.meetingRepository.softRemove(meeting);
+        succeeded.push(id);
+      } catch {
+        failed.push(id);
+      }
+    }
+
+    return { succeeded, failed };
+  }
+
+  async bulkRestore(ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> {
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const meeting = await this.meetingRepository.findOne({
+          where: { id },
+          withDeleted: true,
+        });
+        if (!meeting || !meeting.deletedAt) {
+          failed.push(id);
+          continue;
+        }
+        await this.meetingRepository.restore(id);
+        succeeded.push(id);
+      } catch {
+        failed.push(id);
+      }
+    }
+
+    return { succeeded, failed };
+  }
+
+  async bulkPurge(ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> {
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+
+    for (const id of ids) {
+      try {
+        const meeting = await this.meetingRepository.findOne({
+          where: { id },
+          withDeleted: true,
+        });
+        if (!meeting || !meeting.deletedAt) {
+          failed.push(id);
+          continue;
+        }
+        await this.meetingRepository.remove(meeting);
+        succeeded.push(id);
+      } catch {
+        failed.push(id);
+      }
+    }
+
+    return { succeeded, failed };
+  }
+
   private matchesSearchScope(
     meeting: MeetingEntity,
     scope: SearchScope,

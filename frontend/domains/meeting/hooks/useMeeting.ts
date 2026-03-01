@@ -38,6 +38,9 @@ export function useMeetings() {
     deleteMeeting,
     restoreMeeting,
     purgeMeeting,
+    bulkDeleteMeetings,
+    bulkRestoreMeetings,
+    bulkPurgeMeetings,
     applyMeetingStatusUpdate,
   } = useMeetingStore();
 
@@ -52,6 +55,9 @@ export function useMeetings() {
     deleteMeeting,
     restoreMeeting,
     purgeMeeting,
+    bulkDeleteMeetings,
+    bulkRestoreMeetings,
+    bulkPurgeMeetings,
     applyMeetingStatusUpdate,
   };
 }

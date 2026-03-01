@@ -7,6 +7,11 @@ import {
   type SearchResult,
 } from '../types/meeting.types';
 
+interface BulkResult {
+  succeeded: string[];
+  failed: string[];
+}
+
 interface MeetingState {
   currentMeeting: Meeting | null;
   isRecording: boolean;
@@ -24,6 +29,9 @@ interface MeetingState {
   deleteMeeting: (id: string) => Promise<boolean>;
   restoreMeeting: (id: string) => Promise<boolean>;
   purgeMeeting: (id: string) => Promise<boolean>;
+  bulkDeleteMeetings: (ids: string[]) => Promise<BulkResult | null>;
+  bulkRestoreMeetings: (ids: string[]) => Promise<BulkResult | null>;
+  bulkPurgeMeetings: (ids: string[]) => Promise<BulkResult | null>;
   setCurrentMeeting: (meeting: Meeting | null) => void;
   applyMeetingStatusUpdate: (update: {
     meetingId: string;
@@ -217,6 +225,63 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         isLoading: false,
       });
       return false;
+    }
+  },
+
+  bulkDeleteMeetings: async (ids) => {
+    try {
+      set({ isLoading: true, error: null });
+      const result = await meetingApi.bulkDelete(ids);
+      const succeededSet = new Set(result.succeeded);
+      set((state) => ({
+        meetings: state.meetings.filter((m) => !succeededSet.has(m.id)),
+        isLoading: false,
+      }));
+      return result;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to bulk delete meetings',
+        isLoading: false,
+      });
+      return null;
+    }
+  },
+
+  bulkRestoreMeetings: async (ids) => {
+    try {
+      set({ isLoading: true, error: null });
+      const result = await meetingApi.bulkRestore(ids);
+      const succeededSet = new Set(result.succeeded);
+      set((state) => ({
+        trashMeetings: state.trashMeetings.filter((m) => !succeededSet.has(m.id)),
+        isLoading: false,
+      }));
+      return result;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to bulk restore meetings',
+        isLoading: false,
+      });
+      return null;
+    }
+  },
+
+  bulkPurgeMeetings: async (ids) => {
+    try {
+      set({ isLoading: true, error: null });
+      const result = await meetingApi.bulkPurge(ids);
+      const succeededSet = new Set(result.succeeded);
+      set((state) => ({
+        trashMeetings: state.trashMeetings.filter((m) => !succeededSet.has(m.id)),
+        isLoading: false,
+      }));
+      return result;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to bulk purge meetings',
+        isLoading: false,
+      });
+      return null;
     }
   },
 

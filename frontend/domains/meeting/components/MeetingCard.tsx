@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Clock3, Hourglass, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Clock3, Hourglass, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import type { Meeting } from '../types/meeting.types';
 import { formatDate, formatDuration } from '@/lib/utils/date';
 
@@ -13,6 +13,9 @@ interface MeetingCardProps {
   onPurge?: () => void;
   mode?: 'active' | 'trash';
   isActive?: boolean;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 const statusConfig = {
@@ -42,6 +45,9 @@ export const MeetingCard = memo(
     onPurge,
     mode = 'active',
     isActive,
+    selectionMode = false,
+    isSelected = false,
+    onToggleSelect,
   }: MeetingCardProps) => {
     const duration = meeting.endedAt
       ? (new Date(meeting.endedAt).getTime() - new Date(meeting.startedAt).getTime()) / 1000
@@ -50,20 +56,45 @@ export const MeetingCard = memo(
     const config = statusConfig[meeting.status];
     const StatusIcon = config.icon;
 
+    const handleCardClick = () => {
+      if (selectionMode) {
+        onToggleSelect?.();
+        return;
+      }
+      onClick?.();
+    };
+
     return (
       <article
         className={`surface-card w-full p-4 transition ${
-          isActive
-            ? 'border-[var(--line-strong)] bg-white shadow-[0_16px_30px_rgba(17,94,89,0.12)]'
-            : 'hover:-translate-y-0.5 hover:border-[var(--line-strong)]'
-        }`}
+          isSelected
+            ? 'border-brand bg-brand/5 shadow-[0_8px_20px_rgba(17,94,89,0.10)]'
+            : isActive
+              ? 'border-[var(--line-strong)] bg-white shadow-[0_16px_30px_rgba(17,94,89,0.12)]'
+              : 'hover:-translate-y-0.5 hover:border-[var(--line-strong)]'
+        } ${selectionMode ? 'cursor-pointer' : ''}`}
+        onClick={selectionMode ? handleCardClick : undefined}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
+          {selectionMode ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${
+                isSelected
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-[var(--line-strong)] bg-white hover:border-brand'
+              }`}
+              aria-label={isSelected ? '선택 해제' : '선택'}
+            >
+              {isSelected ? <Check className="h-3 w-3" /> : null}
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={onClick}
+            onClick={selectionMode ? undefined : onClick}
             className="min-w-0 flex-1 text-left"
-            disabled={mode === 'trash'}
+            disabled={mode === 'trash' || selectionMode}
           >
             <h3 className="line-clamp-2 text-sm font-semibold leading-snug">
               {meeting.title || '제목 없는 회의'}
@@ -71,10 +102,10 @@ export const MeetingCard = memo(
           </button>
 
           <div className="flex items-center gap-1.5">
-            {mode === 'active' && onDelete ? (
+            {mode === 'active' && onDelete && !selectionMode ? (
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 className="rounded-full p-1.5 text-muted transition hover:bg-rose-50 hover:text-rose-700"
                 aria-label="회의 삭제"
               >
@@ -90,8 +121,8 @@ export const MeetingCard = memo(
 
         <button
           type="button"
-          onClick={onClick}
-          disabled={mode === 'trash'}
+          onClick={selectionMode ? undefined : onClick}
+          disabled={mode === 'trash' || selectionMode}
           className="w-full text-left"
         >
           <div className="space-y-1 text-xs text-muted">
@@ -100,23 +131,23 @@ export const MeetingCard = memo(
           </div>
         </button>
 
-        {mode === 'trash' ? (
-          <div className="mt-3 flex items-center gap-2">
+        {mode === 'trash' && !selectionMode ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={onRestore}
-              className="btn-neo flex-1 px-3 py-1.5 text-xs"
+              className="btn-neo justify-center px-2 py-1.5 text-xs"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              복구
+              <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">복구</span>
             </button>
             <button
               type="button"
               onClick={onPurge}
-              className="btn-neo border-transparent bg-rose-600 px-3 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white"
+              className="btn-neo justify-center border-transparent bg-rose-600 px-2 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-              영구삭제
+              <Trash2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">영구삭제</span>
             </button>
           </div>
         ) : null}

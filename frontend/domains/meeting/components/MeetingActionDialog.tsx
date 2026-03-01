@@ -1,14 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { AlertTriangle, RotateCcw, Trash2, X } from 'lucide-react';
 
-export type MeetingActionType = 'move-to-trash' | 'purge';
+export type MeetingActionType = 'move-to-trash' | 'purge' | 'bulk-delete' | 'bulk-purge' | 'bulk-restore';
 
 interface MeetingActionDialogProps {
   open: boolean;
   actionType: MeetingActionType;
   meetingTitle: string;
+  /** bulk 작업 시 선택된 항목 수 */
+  bulkCount?: number;
   isLoading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -18,6 +20,7 @@ export function MeetingActionDialog({
   open,
   actionType,
   meetingTitle,
+  bulkCount,
   isLoading = false,
   onConfirm,
   onCancel,
@@ -55,12 +58,41 @@ export function MeetingActionDialog({
 
   if (!open) return null;
 
-  const isPurge = actionType === 'purge';
-  const heading = isPurge ? '회의를 영구 삭제할까요?' : '회의를 휴지통으로 이동할까요?';
-  const description = isPurge
-    ? '영구 삭제 후에는 복구할 수 없습니다.'
-    : '휴지통에서 복구하거나 영구 삭제할 수 있습니다.';
-  const confirmLabel = isPurge ? '영구 삭제' : '휴지통 이동';
+  const isBulk = actionType.startsWith('bulk-');
+  const countLabel = isBulk && bulkCount ? `${bulkCount}개의 회의를` : '';
+
+  let heading: string;
+  let description: string;
+  let confirmLabel: string;
+
+  switch (actionType) {
+    case 'bulk-delete':
+      heading = `${countLabel} 휴지통으로 이동할까요?`;
+      description = '선택한 회의들이 휴지통으로 이동됩니다. 휴지통에서 복구하거나 영구 삭제할 수 있습니다.';
+      confirmLabel = '일괄 삭제';
+      break;
+    case 'bulk-purge':
+      heading = `${countLabel} 영구 삭제할까요?`;
+      description = '선택한 회의들이 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.';
+      confirmLabel = '일괄 영구 삭제';
+      break;
+    case 'bulk-restore':
+      heading = `${countLabel} 복구할까요?`;
+      description = '선택한 회의들이 복구되어 회의 목록으로 돌아갑니다.';
+      confirmLabel = '일괄 복구';
+      break;
+    case 'purge':
+      heading = '회의를 영구 삭제할까요?';
+      description = '영구 삭제 후에는 복구할 수 없습니다.';
+      confirmLabel = '영구 삭제';
+      break;
+    default:
+      heading = '회의를 휴지통으로 이동할까요?';
+      description = '휴지통에서 복구하거나 영구 삭제할 수 있습니다.';
+      confirmLabel = '휴지통 이동';
+  }
+
+  const isRestore = actionType === 'bulk-restore';
 
   return (
     <dialog
@@ -88,8 +120,12 @@ export function MeetingActionDialog({
 
         <h2 className="text-lg font-semibold">{heading}</h2>
         <p className="mt-2 text-sm text-muted">
-          <span className="font-semibold text-foreground">&quot;{meetingTitle || '제목 없는 회의'}&quot;</span>
-          <br />
+          {isBulk ? null : (
+            <>
+              <span className="font-semibold text-foreground">&quot;{meetingTitle || '제목 없는 회의'}&quot;</span>
+              <br />
+            </>
+          )}
           {description}
         </p>
 
@@ -106,9 +142,17 @@ export function MeetingActionDialog({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className="btn-neo border-transparent bg-rose-600 px-4 py-2 text-sm text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className={`btn-neo border-transparent px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+              isRestore
+                ? 'bg-brand hover:bg-brand/90 hover:text-white'
+                : 'bg-rose-600 hover:bg-rose-700 hover:text-white'
+            }`}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            {isRestore ? (
+              <RotateCcw className="h-3.5 w-3.5" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
             {isLoading ? '처리 중...' : confirmLabel}
           </button>
         </div>
