@@ -434,8 +434,8 @@ export function MeetingList({
           </p>
         </form>
 
-        <div className="scroll-muted flex items-center gap-2 overflow-x-auto pb-1">
-          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--line-soft)] px-2 py-1 text-xs text-muted">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--line-soft)] px-2 py-1 text-xs text-muted">
             <SlidersHorizontal className="h-3 w-3" />
             필터
           </span>
@@ -445,7 +445,7 @@ export function MeetingList({
               type="button"
               onClick={() => setActiveFilter(filter.key)}
               disabled={showTrash}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                 activeFilter === filter.key && !showTrash
                   ? 'bg-brand text-white'
                   : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
@@ -462,14 +462,14 @@ export function MeetingList({
               setIsSuggestionOpen(false);
               onSelectMeeting?.(null);
             }}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition ${
               showTrash
                 ? 'bg-rose-600 text-white'
                 : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
             }`}
           >
             <Trash2 className="h-3 w-3" />
-            {showTrash ? '휴지통 닫기' : '휴지통 보기'}
+            {showTrash ? '닫기' : '휴지통'}
           </button>
         </div>
       </header>
