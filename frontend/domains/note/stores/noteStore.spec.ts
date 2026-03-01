@@ -21,7 +21,7 @@ describe('useNoteStore', () => {
   });
 
   it('saves empty note content successfully', async () => {
-    vi.mocked(noteApi.save).mockResolvedValue(undefined);
+    vi.mocked(noteApi.save).mockResolvedValue({ id: 'note-1', meetingId: 'meeting-1', content: '', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-03-01T00:00:00.000Z' });
     useNoteStore.getState().setContent('');
 
     const success = await useNoteStore.getState().saveNote('meeting-1');
