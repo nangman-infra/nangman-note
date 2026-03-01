@@ -45,7 +45,20 @@ Required/used variables:
 
 - `PORT`
 - `NODE_ENV` (`development` | `test` | `production`)
+- `DB_ENGINE` (`sqljs` | `postgres`)
+- `DB_MIGRATIONS_RUN` (`true` | `false`)
 - `DB_PATH`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_SSL` (`true` | `false`)
+- `DB_SSL_REJECT_UNAUTHORIZED` (`true` | `false`)
+- `DB_POOL_MAX` (default: `10`)
+- `DB_CONNECTION_TIMEOUT_MS` (default: `5000`)
+- `DB_IDLE_TIMEOUT_MS` (default: `30000`)
+- `DB_STATEMENT_TIMEOUT_MS` (default: `15000`)
 - `ENCRYPTION_KEY`
 - `AWS_REGION`
 - `AWS_PROFILE`
@@ -60,6 +73,16 @@ Required/used variables:
 - `AWS_BEDROCK_TEMPERATURE` (`0` ~ `1`, default recommended: `0`)
 - `LOG_LEVEL`
 - `CORS_ORIGIN` (comma-separated)
+
+Recommended mode:
+
+- Development: `DB_ENGINE=sqljs` (file-based local DB)
+- Production: `DB_ENGINE=postgres` (RDS/Aurora) + `DB_MIGRATIONS_RUN=true`
+
+Operational BP (PostgreSQL):
+
+- Keep `DB_SSL=true` and `DB_SSL_REJECT_UNAUTHORIZED=true` in production.
+- Tune connection pool/timeouts via DB_* timeout variables before scaling app instances.
 
 ## Run
 
@@ -77,7 +100,19 @@ pnpm test:e2e
 pnpm build
 ```
 
+Migrations (PostgreSQL):
+
+```bash
+# DB_ENGINE=postgres 환경에서 실행
+pnpm migration:show
+pnpm migration:run
+pnpm migration:revert
+```
+
 ## API
+
+- `GET /` (hello)
+- `GET /health` (DB connectivity check)
 
 ### Meeting
 
@@ -88,6 +123,9 @@ pnpm build
 - `PATCH /api/v1/meetings/:id`
 - `POST /api/v1/meetings/:id/complete`
 - `DELETE /api/v1/meetings/:id`
+- `GET /api/v1/meetings/trash`
+- `POST /api/v1/meetings/:id/restore`
+- `DELETE /api/v1/meetings/:id/permanent`
 
 ### Prompt
 

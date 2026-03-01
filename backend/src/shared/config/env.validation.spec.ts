@@ -1,6 +1,53 @@
 import { validateEnv } from './env.validation';
 
 describe('validateEnv', () => {
+  it('defaults DB_ENGINE to sqljs in development', () => {
+    const env = validateEnv({
+      NODE_ENV: 'development',
+      PORT: '9999',
+      ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+    });
+
+    expect(env.DB_ENGINE).toBe('sqljs');
+    expect(env.DB_MIGRATIONS_RUN).toBe(false);
+    expect(env.DB_POOL_MAX).toBe(0);
+  });
+
+  it('defaults DB_ENGINE to postgres in production', () => {
+    const env = validateEnv({
+      NODE_ENV: 'production',
+      PORT: '9999',
+      ENCRYPTION_KEY:
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      DB_HOST: 'db.example.local',
+      DB_PORT: '5432',
+      DB_NAME: 'nangman_note',
+      DB_USER: 'app_user',
+      DB_PASSWORD: 'secure-password',
+      DB_SSL: 'true',
+    });
+
+    expect(env.DB_ENGINE).toBe('postgres');
+    expect(env.DB_MIGRATIONS_RUN).toBe(true);
+    expect(env.DB_SSL_REJECT_UNAUTHORIZED).toBe(true);
+    expect(env.DB_POOL_MAX).toBe(10);
+    expect(env.DB_CONNECTION_TIMEOUT_MS).toBe(5000);
+    expect(env.DB_IDLE_TIMEOUT_MS).toBe(30000);
+    expect(env.DB_STATEMENT_TIMEOUT_MS).toBe(15000);
+  });
+
+  it('throws when production DB_ENGINE is not postgres', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        PORT: '9999',
+        DB_ENGINE: 'sqljs',
+        ENCRYPTION_KEY:
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      }),
+    ).toThrow('In production, DB_ENGINE must be postgres.');
+  });
+
   it('defaults bedrock temperature to 0 when not provided', () => {
     const env = validateEnv({
       NODE_ENV: 'development',
@@ -53,6 +100,12 @@ describe('validateEnv', () => {
       validateEnv({
         NODE_ENV: 'production',
         PORT: '9999',
+        DB_HOST: 'db.example.local',
+        DB_PORT: '5432',
+        DB_NAME: 'nangman_note',
+        DB_USER: 'app_user',
+        DB_PASSWORD: 'secure-password',
+        DB_SSL: 'true',
         ENCRYPTION_KEY: 'replace-with-64-char-hex-key',
       }),
     ).toThrow(

@@ -44,10 +44,10 @@ export class MeetingEntity {
   })
   transcriptionMode: MeetingTranscriptionMode;
 
-  @Column({ name: 'started_at', type: 'datetime' })
+  @Column({ name: 'started_at' })
   startedAt: Date;
 
-  @Column({ name: 'ended_at', type: 'datetime', nullable: true })
+  @Column({ name: 'ended_at', nullable: true })
   endedAt?: Date;
 
   @CreateDateColumn({ name: 'created_at' })
@@ -56,7 +56,7 @@ export class MeetingEntity {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @DeleteDateColumn({ name: 'deleted_at', type: 'datetime', nullable: true })
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt?: Date | null;
 
   @ManyToOne(() => PromptEntity, (prompt) => prompt.meetings, {
