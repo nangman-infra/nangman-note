@@ -31,7 +31,12 @@ interface HomePageContentProps {
 
 function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const [meetingListRefreshToken, setMeetingListRefreshToken] = useState(0);
   const { prompts } = usePrompt();
+
+  const requestMeetingListRefresh = () => {
+    setMeetingListRefreshToken((prev) => prev + 1);
+  };
 
   return (
     <ThreeColumnLayout
@@ -39,6 +44,7 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
       list={
         <MeetingList
           initialShowTrash={initialShowTrash}
+          refreshToken={meetingListRefreshToken}
           onSelectMeeting={setSelectedMeetingId}
           selectedMeetingId={selectedMeetingId || undefined}
         />
@@ -56,14 +62,18 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
             }))}
           />
         ) : (
-          <EmptyViewer />
+          <EmptyViewer onRefreshList={requestMeetingListRefresh} />
         )
       }
     />
   );
 }
 
-function EmptyViewer() {
+interface EmptyViewerProps {
+  onRefreshList: () => void;
+}
+
+function EmptyViewer({ onRefreshList }: EmptyViewerProps) {
   return (
     <div className="flex h-full items-center justify-center p-6">
       <div className="surface-card motion-float w-full max-w-xl p-7">
@@ -96,8 +106,8 @@ function EmptyViewer() {
             <Mic className="h-4 w-4" />
             새 회의 시작
           </Link>
-          <button type="button" className="btn-neo" onClick={() => window.location.reload()}>
-            최근 회의 새로고침
+          <button type="button" className="btn-neo" onClick={onRefreshList}>
+            목록 새로고침
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

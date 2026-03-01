@@ -7,10 +7,15 @@ import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMeetings } from '../hooks/useMeeting';
 import { MeetingStatus } from '../types/meeting.types';
+import {
+  MeetingActionDialog,
+  type MeetingActionType,
+} from './MeetingActionDialog';
 import { MeetingCard } from './MeetingCard';
 
 interface MeetingListProps {
   initialShowTrash?: boolean;
+  refreshToken?: number;
   onSelectMeeting?: (meetingId: string | null) => void;
   selectedMeetingId?: string;
 }
@@ -23,6 +28,7 @@ const filters: Array<{ key: 'all' | MeetingStatus; label: string }> = [
 ];
 
 const MAX_RECENT_SEARCHES = 8;
+const POLL_INTERVAL_MS = 8000;
 
 function normalizeKeyword(keyword: string) {
   return keyword.trim();
@@ -30,6 +36,7 @@ function normalizeKeyword(keyword: string) {
 
 export function MeetingList({
   initialShowTrash = false,
+  refreshToken = 0,
   onSelectMeeting,
   selectedMeetingId,
 }: MeetingListProps) {
@@ -51,6 +58,12 @@ export function MeetingList({
   const [showTrash, setShowTrash] = useState(initialShowTrash);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useLocalStorage<string[]>('transnote_recent_meeting_searches', []);
+  const [pendingAction, setPendingAction] = useState<{
+    type: MeetingActionType;
+    meetingId: string;
+    title: string;
+  } | null>(null);
+  const [isActionProcessing, setIsActionProcessing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimerRef = useRef<number | null>(null);
 
@@ -60,7 +73,25 @@ export function MeetingList({
       return;
     }
     void fetchMeetings();
-  }, [fetchMeetings, fetchTrashMeetings, showTrash]);
+  }, [fetchMeetings, fetchTrashMeetings, refreshToken, showTrash]);
+
+  useEffect(() => {
+    if (!showTrash && searchQuery.trim().length > 0) {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      if (showTrash) {
+        void fetchTrashMeetings({ silent: true });
+        return;
+      }
+      void fetchMeetings({ silent: true });
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [fetchMeetings, fetchTrashMeetings, searchQuery, showTrash]);
 
   useEffect(() => {
     setShowTrash(initialShowTrash);
@@ -201,29 +232,12 @@ export function MeetingList({
     pushToast({ title: '최근 검색어를 비웠습니다', variant: 'info' });
   };
 
-  const handleDeleteMeeting = async (meetingId: string) => {
+  const handleDeleteMeeting = (meetingId: string) => {
     const meeting = meetings.find((item) => item.id === meetingId);
-    const confirmed = window.confirm(
-      `\"${meeting?.title || '제목 없는 회의'}\"를 휴지통으로 이동할까요?`,
-    );
-    if (!confirmed) return;
-
-    const deleted = await deleteMeeting(meetingId);
-    if (!deleted) {
-      pushToast({
-        title: '회의 삭제에 실패했습니다',
-        description: '잠시 후 다시 시도해주세요.',
-        variant: 'error',
-      });
-      return;
-    }
-
-    if (selectedMeetingId === meetingId) {
-      onSelectMeeting?.(null);
-    }
-    pushToast({
-      title: '회의를 휴지통으로 이동했습니다',
-      variant: 'success',
+    setPendingAction({
+      type: 'move-to-trash',
+      meetingId,
+      title: meeting?.title || '제목 없는 회의',
     });
   };
 
@@ -244,15 +258,51 @@ export function MeetingList({
     });
   };
 
-  const handlePurgeMeeting = async (meetingId: string) => {
+  const handlePurgeMeeting = (meetingId: string) => {
     const meeting = trashMeetings.find((item) => item.id === meetingId);
-    const confirmed = window.confirm(
-      `\"${meeting?.title || '제목 없는 회의'}\"를 영구 삭제할까요?\n이 작업은 되돌릴 수 없습니다.`,
-    );
-    if (!confirmed) return;
+    setPendingAction({
+      type: 'purge',
+      meetingId,
+      title: meeting?.title || '제목 없는 회의',
+    });
+  };
 
-    const purged = await purgeMeeting(meetingId);
+  const closeActionDialog = () => {
+    if (isActionProcessing) return;
+    setPendingAction(null);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!pendingAction) return;
+    setIsActionProcessing(true);
+
+    if (pendingAction.type === 'move-to-trash') {
+      const deleted = await deleteMeeting(pendingAction.meetingId);
+      if (!deleted) {
+        setIsActionProcessing(false);
+        pushToast({
+          title: '회의 삭제에 실패했습니다',
+          description: '잠시 후 다시 시도해주세요.',
+          variant: 'error',
+        });
+        return;
+      }
+
+      if (selectedMeetingId === pendingAction.meetingId) {
+        onSelectMeeting?.(null);
+      }
+      setPendingAction(null);
+      setIsActionProcessing(false);
+      pushToast({
+        title: '회의를 휴지통으로 이동했습니다',
+        variant: 'success',
+      });
+      return;
+    }
+
+    const purged = await purgeMeeting(pendingAction.meetingId);
     if (!purged) {
+      setIsActionProcessing(false);
       pushToast({
         title: '영구 삭제에 실패했습니다',
         description: '잠시 후 다시 시도해주세요.',
@@ -261,9 +311,11 @@ export function MeetingList({
       return;
     }
 
-    if (selectedMeetingId === meetingId) {
+    if (selectedMeetingId === pendingAction.meetingId) {
       onSelectMeeting?.(null);
     }
+    setPendingAction(null);
+    setIsActionProcessing(false);
     pushToast({
       title: '회의를 영구 삭제했습니다',
       variant: 'info',
@@ -443,15 +495,24 @@ export function MeetingList({
                 meeting={meeting}
                 mode={showTrash ? 'trash' : 'active'}
                 onClick={showTrash ? undefined : () => onSelectMeeting?.(meeting.id)}
-                onDelete={showTrash ? undefined : () => void handleDeleteMeeting(meeting.id)}
+                onDelete={showTrash ? undefined : () => handleDeleteMeeting(meeting.id)}
                 onRestore={showTrash ? () => void handleRestoreMeeting(meeting.id) : undefined}
-                onPurge={showTrash ? () => void handlePurgeMeeting(meeting.id) : undefined}
+                onPurge={showTrash ? () => handlePurgeMeeting(meeting.id) : undefined}
                 isActive={meeting.id === selectedMeetingId}
               />
             </div>
           ))
         )}
       </div>
+
+      <MeetingActionDialog
+        open={Boolean(pendingAction)}
+        actionType={pendingAction?.type ?? 'move-to-trash'}
+        meetingTitle={pendingAction?.title ?? '제목 없는 회의'}
+        isLoading={isActionProcessing}
+        onConfirm={handleConfirmAction}
+        onCancel={closeActionDialog}
+      />
     </div>
   );
 }

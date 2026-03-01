@@ -18,8 +18,8 @@ interface MeetingState {
   startMeeting: (dto: CreateMeetingDto) => Promise<Meeting | null>;
   endMeeting: (options?: { skipTranscription?: boolean }) => Promise<boolean>;
   updatePrompt: (promptId: string) => Promise<Meeting | null>;
-  fetchMeetings: () => Promise<void>;
-  fetchTrashMeetings: () => Promise<void>;
+  fetchMeetings: (options?: { silent?: boolean }) => Promise<void>;
+  fetchTrashMeetings: (options?: { silent?: boolean }) => Promise<void>;
   searchMeetings: (query: string, scope?: string) => Promise<void>;
   deleteMeeting: (id: string) => Promise<boolean>;
   restoreMeeting: (id: string) => Promise<boolean>;
@@ -104,29 +104,47 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     }
   },
 
-  fetchMeetings: async () => {
+  fetchMeetings: async (options) => {
+    const shouldShowLoading = !options?.silent;
     try {
-      set({ isLoading: true, error: null });
+      if (shouldShowLoading) {
+        set({ isLoading: true, error: null });
+      }
       const meetings = await meetingApi.list();
-      set({ meetings, isLoading: false });
+      set((state) => ({
+        meetings,
+        error: null,
+        isLoading: shouldShowLoading ? false : state.isLoading,
+      }));
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to fetch meetings',
-        isLoading: false,
-      });
+      if (shouldShowLoading) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to fetch meetings',
+          isLoading: false,
+        });
+      }
     }
   },
 
-  fetchTrashMeetings: async () => {
+  fetchTrashMeetings: async (options) => {
+    const shouldShowLoading = !options?.silent;
     try {
-      set({ isLoading: true, error: null });
+      if (shouldShowLoading) {
+        set({ isLoading: true, error: null });
+      }
       const trashMeetings = await meetingApi.listTrash();
-      set({ trashMeetings, isLoading: false });
+      set((state) => ({
+        trashMeetings,
+        error: null,
+        isLoading: shouldShowLoading ? false : state.isLoading,
+      }));
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to fetch trash meetings',
-        isLoading: false,
-      });
+      if (shouldShowLoading) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to fetch trash meetings',
+          isLoading: false,
+        });
+      }
     }
   },
 
