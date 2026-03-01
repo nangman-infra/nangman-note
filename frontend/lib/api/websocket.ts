@@ -17,7 +17,6 @@ export function createSocket(
   const socket = io(env.WS_URL || undefined, {
     path,
     query,
-    transports: ['websocket'],
     withCredentials: true,
   });
 

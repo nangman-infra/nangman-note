@@ -27,6 +27,8 @@ export default function NewMeetingPage() {
   const [transcriptionMode, setTranscriptionMode] = useState(
     MeetingTranscriptionMode.BATCH,
   );
+  const [languageCode, setLanguageCode] = useState('');
+  const [translateTargetLanguage, setTranslateTargetLanguage] = useState('');
 
   const handleStart = async () => {
     const meeting = await startMeeting({
@@ -34,6 +36,8 @@ export default function NewMeetingPage() {
       agenda: agenda.trim() || undefined,
       promptId: selectedPromptId,
       transcriptionMode,
+      languageCode: languageCode || undefined,
+      translateTargetLanguage: translateTargetLanguage || undefined,
     });
 
     if (!meeting) {
@@ -183,9 +187,9 @@ export default function NewMeetingPage() {
                       선택됨
                     </span>
                   ) : null}
-                  <p className="text-sm font-semibold">Realtime (확장 준비)</p>
+                  <p className="text-sm font-semibold">Realtime (실시간 전사)</p>
                   <p className="mt-1 pr-2 text-xs text-muted">
-                    웹소켓 기반 실시간 수집 경로를 활성화합니다. 안정 운영은 Batch 모드를 권장합니다.
+                    AWS Transcribe Streaming으로 실시간 전사합니다. 회의 중 텍스트가 즉시 표시됩니다.
                   </p>
                 </label>
               </div>
@@ -198,6 +202,61 @@ export default function NewMeetingPage() {
                 </span>
               </p>
             </div>
+
+            {/* 실시간 모드일 때만 언어/번역 옵션 표시 */}
+            {transcriptionMode === MeetingTranscriptionMode.REALTIME && (
+              <div className="space-y-4 rounded-[18px] border border-[var(--line-soft)] bg-[var(--bg-card)] p-4">
+                <p className="text-xs font-semibold tracking-wide text-muted">실시간 전사 옵션</p>
+
+                <div>
+                  <label htmlFor="language-code" className="mb-1.5 block text-sm font-medium">
+                    전사 언어
+                  </label>
+                  <select
+                    id="language-code"
+                    value={languageCode}
+                    onChange={(e) => setLanguageCode(e.target.value)}
+                    className="input-shell w-full text-sm"
+                  >
+                    <option value="">자동 감지 (권장)</option>
+                    <option value="ko-KR">한국어 (ko-KR)</option>
+                    <option value="en-US">영어 (en-US)</option>
+                    <option value="ja-JP">일본어 (ja-JP)</option>
+                    <option value="zh-CN">중국어 (zh-CN)</option>
+                    <option value="de-DE">독일어 (de-DE)</option>
+                    <option value="fr-FR">프랑스어 (fr-FR)</option>
+                    <option value="es-ES">스페인어 (es-ES)</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-muted">
+                    자동 감지를 선택하면 여러 언어를 자동으로 인식합니다.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="translate-target" className="mb-1.5 block text-sm font-medium">
+                    번역 대상 언어
+                  </label>
+                  <select
+                    id="translate-target"
+                    value={translateTargetLanguage}
+                    onChange={(e) => setTranslateTargetLanguage(e.target.value)}
+                    className="input-shell w-full text-sm"
+                  >
+                    <option value="">번역 안 함</option>
+                    <option value="ko">한국어</option>
+                    <option value="en">영어</option>
+                    <option value="ja">일본어</option>
+                    <option value="zh">중국어</option>
+                    <option value="de">독일어</option>
+                    <option value="fr">프랑스어</option>
+                    <option value="es">스페인어</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-muted">
+                    전사 언어와 다른 언어를 선택하면 실시간 번역이 표시됩니다.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <PromptSelector />
 

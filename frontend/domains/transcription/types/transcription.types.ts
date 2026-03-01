@@ -5,7 +5,20 @@ export interface TranscriptSegment {
   endTime: number; // 초
   text: string;
   confidence: number; // 0-1
+  translatedText?: string;
+  detectedLanguage?: string;
   createdAt: string;
+}
+
+/** 실시간 전사 WebSocket 이벤트 페이로드 */
+export interface RealtimeTranscriptPayload {
+  type: 'partial' | 'final';
+  resultId: string;
+  text: string;
+  translatedText?: string;
+  startTime: number;
+  endTime: number;
+  detectedLanguage?: string;
 }
 
 export enum TranscriptionJobStatus {

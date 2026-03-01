@@ -28,6 +28,14 @@ export class TranscriptSegmentEntity {
   @Column({ type: 'float', default: 0.9 })
   confidence: number;
 
+  /** 번역된 텍스트 (null이면 번역 안 함) */
+  @Column({ name: 'translated_text', type: 'text', nullable: true })
+  translatedText?: string;
+
+  /** Transcribe가 감지한 언어 코드 (e.g. 'ko-KR') */
+  @Column({ name: 'detected_language', type: 'varchar', length: 20, nullable: true })
+  detectedLanguage?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

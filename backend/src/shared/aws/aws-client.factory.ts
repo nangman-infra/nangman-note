@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { S3Client } from '@aws-sdk/client-s3';
 import { TranscribeClient } from '@aws-sdk/client-transcribe';
+import { TranscribeStreamingClient } from '@aws-sdk/client-transcribe-streaming';
+import { TranslateClient } from '@aws-sdk/client-translate';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { AppEnv } from '../config/env.validation';
 
@@ -29,6 +31,20 @@ export class AwsClientFactory {
 
   createTranscribeClient(): TranscribeClient {
     return new TranscribeClient({
+      region: this.region,
+      credentials: this.credentials,
+    });
+  }
+
+  createTranscribeStreamingClient(): TranscribeStreamingClient {
+    return new TranscribeStreamingClient({
+      region: this.region,
+      credentials: this.credentials,
+    });
+  }
+
+  createTranslateClient(): TranslateClient {
+    return new TranslateClient({
       region: this.region,
       credentials: this.credentials,
     });

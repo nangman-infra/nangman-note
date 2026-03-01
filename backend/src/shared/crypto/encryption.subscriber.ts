@@ -21,7 +21,7 @@ interface EncryptionFieldMap {
 }
 
 const ENCRYPTION_TARGETS: EncryptionFieldMap[] = [
-  { entityClass: TranscriptSegmentEntity, fields: ['text'] },
+  { entityClass: TranscriptSegmentEntity, fields: ['text', 'translatedText'] },
   { entityClass: NoteEntity, fields: ['content'] },
   { entityClass: ResultEntity, fields: ['content'] },
 ];

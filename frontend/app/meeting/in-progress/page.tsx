@@ -14,6 +14,8 @@ import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types'
 import { MeetingStatus } from '@/domains/meeting/types/meeting.types';
 import { NoteEditor } from '@/domains/note/components/NoteEditor';
 import { useTranscription } from '@/domains/transcription/hooks/useTranscription';
+import { useAudioStreaming } from '@/domains/transcription/hooks/useAudioStreaming';
+import { TranscriptPanel } from '@/domains/transcription/components/TranscriptPanel';
 import { useNoteStore } from '@/domains/note/stores/noteStore';
 import { useAudioCapture, type AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
 import { useMediaRecorder } from '@/domains/transcription/hooks/useMediaRecorder';
@@ -64,6 +66,14 @@ export default function InProgressMeetingPage() {
     reset: resetUpload,
   } = useAudioUpload();
 
+  // 실시간 오디오 스트리밍
+  const {
+    state: audioStreamingState,
+    error: audioStreamingError,
+    startStreaming,
+    stopStreaming,
+  } = useAudioStreaming();
+
   const meetingId = currentMeeting?.id || meetingIdFromQuery;
 
   useEffect(() => {
@@ -74,10 +84,14 @@ export default function InProgressMeetingPage() {
     currentMeeting?.transcriptionMode ?? MeetingTranscriptionMode.BATCH;
   const isRealtimeMode =
     transcriptionMode === MeetingTranscriptionMode.REALTIME;
-  const { isConnected, error: transcriptionError } = useTranscription(
-    meetingId,
-    isRealtimeMode,
-  );
+  const {
+    segments,
+    partial,
+    isConnected,
+    hasActiveSession,
+    error: transcriptionError,
+    socketRef: transcriptionSocketRef,
+  } = useTranscription(meetingId, isRealtimeMode);
 
   // 탭 닫기 방지: 녹음 중일 때
   const isActiveRecording = recorderState === 'recording';
@@ -169,11 +183,30 @@ export default function InProgressMeetingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingId]);
 
-  // 마이크 스트림 획득 후 녹음 시작
+  // 마이크 스트림 획득 후 녹음 시작 (배치) 또는 스트리밍 시작 (실시간)
   useEffect(() => {
-    if (!stream || !meetingId || recorderState !== 'idle') return;
-    startRecording(stream, meetingId);
-  }, [stream, meetingId, recorderState, startRecording]);
+    if (!stream || !meetingId) return;
+
+    if (isRealtimeMode) {
+      // 실시간 모드: AudioWorklet PCM 스트리밍
+      if (audioStreamingState === 'idle' && transcriptionSocketRef.current?.connected) {
+        void startStreaming(stream, transcriptionSocketRef.current);
+      }
+    } else {
+      // 배치 모드: MediaRecorder 녹음
+      if (recorderState === 'idle') {
+        startRecording(stream, meetingId);
+      }
+    }
+  }, [stream, meetingId, isRealtimeMode, recorderState, audioStreamingState, startRecording, startStreaming, transcriptionSocketRef]);
+
+  // 실시간 모드: 소켓 연결 후 오디오 스트리밍 시작
+  // isConnected가 변경될 때 트리거됨 (ref만으로는 useEffect가 재실행 안 됨)
+  useEffect(() => {
+    if (!isRealtimeMode || !stream || audioStreamingState !== 'idle') return;
+    if (!isConnected || !transcriptionSocketRef.current?.connected) return;
+    void startStreaming(stream, transcriptionSocketRef.current);
+  }, [isRealtimeMode, stream, audioStreamingState, isConnected, startStreaming, transcriptionSocketRef]);
 
   // 마이크 디바이스 변경 핸들러
   const handleDeviceChange = useCallback(
@@ -199,9 +232,11 @@ export default function InProgressMeetingPage() {
       ? { label: '노트 전용', className: 'bg-amber-100 text-amber-800' }
     : !isRealtimeMode
       ? { label: '배치 전사 모드', className: 'bg-slate-100 text-slate-700' }
-      : isConnected
-        ? { label: '실시간 수집 연결됨', className: 'bg-emerald-100 text-emerald-800' }
-        : { label: '실시간 수집 연결중', className: 'bg-amber-100 text-amber-800' };
+      : isConnected && hasActiveSession
+        ? { label: '실시간 전사 중', className: 'bg-emerald-100 text-emerald-800' }
+        : isConnected
+          ? { label: '실시간 연결됨', className: 'bg-blue-100 text-blue-800' }
+          : { label: '실시간 연결중', className: 'bg-amber-100 text-amber-800' };
 
   // 녹음 상태 배지
   const recordingBadge = (p: AudioCapturePermission) => {
@@ -490,49 +525,16 @@ export default function InProgressMeetingPage() {
           </section>
 
           <aside className="glass-surface min-h-0 overflow-hidden">
-            <div className="border-b border-[var(--line-soft)] px-4 py-3">
-              <p className="text-xs font-semibold tracking-wide text-muted">TRANSCRIPTION</p>
-                <h2 className="mt-1 text-sm font-semibold">
-                  {permission === 'denied'
-                    ? '노트 전용 모드'
-                    : isRealtimeMode
-                      ? '실시간 수집 모니터'
-                      : '배치 전사 대기'}
-                </h2>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-                <span className="rounded-full bg-white px-2 py-1">
-                  {isRealtimeMode
-                    ? '실시간 텍스트: 준비중'
-                    : '실시간 텍스트: 비활성'}
-                </span>
-                <span className="rounded-full bg-white px-2 py-1">Meeting ID: {currentMeeting.id.slice(0, 8)}...</span>
-              </div>
-            </div>
-
-            <div className="flex h-[calc(100%-84px)] flex-col">
-              <div className="px-4 py-3 text-xs text-muted">
-                {permission === 'denied' ? (
-                  <>
-                    <MicOff className="mr-1 inline-block h-3.5 w-3.5" />
-                    마이크 접근이 차단되어 전사가 비활성화되었습니다. 노트 작성에 집중해주세요.
-                  </>
-                ) : (
-                  <>
-                    <Mic className="mr-1 inline-block h-3.5 w-3.5" />
-                    {isRealtimeMode
-                      ? '실시간 모드는 확장 준비를 위한 수집 경로를 유지합니다. 최종 회의록은 노트와 배치/후처리 결과를 기준으로 생성됩니다.'
-                      : '현재 회의는 배치 전사 모드입니다. 회의 종료 후 수집된 오디오가 AWS 배치 전사로 처리됩니다.'}
-                  </>
-                )}
-              </div>
-              <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted">
-                {permission === 'denied'
-                  ? '마이크 비활성 — 노트 전용 모드'
-                  : isRealtimeMode
-                    ? '실시간 텍스트 표시는 정식 STT 연동 이후 제공됩니다. 현재는 수집 경로만 활성화됩니다.'
-                    : '실시간 전사가 비활성화되어 있습니다. 회의 종료 후 배치 전사를 실행합니다.'}
-              </div>
-            </div>
+            <TranscriptPanel
+              segments={segments}
+              partial={partial}
+              isConnected={isConnected}
+              hasActiveSession={hasActiveSession}
+              isRealtimeMode={isRealtimeMode}
+              micPermission={permission}
+              meetingId={currentMeeting.id}
+              error={transcriptionError || audioStreamingError}
+            />
           </aside>
         </div>
       </div>

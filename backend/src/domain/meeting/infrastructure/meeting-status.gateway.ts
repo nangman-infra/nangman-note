@@ -22,7 +22,6 @@ import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status
     origin: createWsCorsOriginHandler(),
     credentials: true,
   },
-  transports: ['websocket'],
 })
 export class MeetingStatusGateway
   implements OnGatewayConnection, OnGatewayDisconnect

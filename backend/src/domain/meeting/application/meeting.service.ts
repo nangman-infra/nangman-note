@@ -55,6 +55,8 @@ export class MeetingService {
       promptId,
       status: MeetingStatus.RECORDING,
       transcriptionMode,
+      languageCode: dto.languageCode?.trim() || undefined,
+      translateTargetLanguage: dto.translateTargetLanguage?.trim() || undefined,
       startedAt: new Date(),
     });
 

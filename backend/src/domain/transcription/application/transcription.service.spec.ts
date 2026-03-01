@@ -9,6 +9,8 @@ import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobProvider } from '../domain/transcription-job-provider.enum';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
 import type { BatchTranscriptionProvider } from './ports/batch-transcription-provider.port';
+import type { StreamingTranscriptionProvider } from './ports/streaming-transcription-provider.port';
+import type { TranslateService } from '../../../shared/aws/translate/translate.service';
 import { TranscriptionService } from './transcription.service';
 
 describe('TranscriptionService', () => {
@@ -21,34 +23,38 @@ describe('TranscriptionService', () => {
   >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
   let batchTranscriptionProvider: jest.Mocked<BatchTranscriptionProvider>;
+  let streamingProvider: jest.Mocked<StreamingTranscriptionProvider>;
+  let translateService: jest.Mocked<Pick<TranslateService, 'translateText' | 'isSameLanguage'>>;
 
   const buildMeeting = (
     overrides: Partial<MeetingEntity> = {},
-  ): MeetingEntity => ({
-    id: 'meeting-1',
-    promptId: 'prompt_default_meeting',
-    status: MeetingStatus.RECORDING,
-    transcriptionMode: MeetingTranscriptionMode.BATCH,
-    startedAt: new Date('2026-03-01T00:00:00.000Z'),
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:00:00.000Z'),
-    ...overrides,
-  });
+  ): MeetingEntity =>
+    ({
+      id: 'meeting-1',
+      promptId: 'prompt_default_meeting',
+      status: MeetingStatus.RECORDING,
+      transcriptionMode: MeetingTranscriptionMode.BATCH,
+      startedAt: new Date('2026-03-01T00:00:00.000Z'),
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      ...overrides,
+    }) as MeetingEntity;
 
   const buildJob = (
     overrides: Partial<TranscriptionJobEntity> = {},
-  ): TranscriptionJobEntity => ({
-    id: 'job-1',
-    meetingId: 'meeting-1',
-    provider: TranscriptionJobProvider.AWS_TRANSCRIBE,
-    providerJobId: 'aws-job-1',
-    status: TranscriptionJobStatus.QUEUED,
-    mediaUri: 's3://bucket/audio.wav',
-    languageCode: 'ko-KR',
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:00:00.000Z'),
-    ...overrides,
-  });
+  ): TranscriptionJobEntity =>
+    ({
+      id: 'job-1',
+      meetingId: 'meeting-1',
+      provider: TranscriptionJobProvider.AWS_TRANSCRIBE,
+      providerJobId: 'aws-job-1',
+      status: TranscriptionJobStatus.QUEUED,
+      mediaUri: 's3://bucket/audio.wav',
+      languageCode: 'ko-KR',
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      ...overrides,
+    }) as TranscriptionJobEntity;
 
   beforeEach(() => {
     transcriptRepository = {
@@ -66,12 +72,24 @@ describe('TranscriptionService', () => {
       submitBatchJob: jest.fn(),
       getJobStatus: jest.fn(),
     };
+    streamingProvider = {
+      startSession: jest.fn(),
+      feedAudio: jest.fn(),
+      stopSession: jest.fn(),
+      hasActiveSession: jest.fn().mockReturnValue(false),
+    };
+    translateService = {
+      translateText: jest.fn(),
+      isSameLanguage: jest.fn().mockReturnValue(false),
+    };
 
     service = new TranscriptionService(
       transcriptRepository as unknown as Repository<TranscriptSegmentEntity>,
       transcriptionJobRepository as unknown as Repository<TranscriptionJobEntity>,
       meetingService as unknown as MeetingService,
       batchTranscriptionProvider,
+      streamingProvider,
+      translateService as unknown as TranslateService,
     );
   });
 
@@ -149,7 +167,7 @@ describe('TranscriptionService', () => {
         (entity) => entity as TranscriptionJobEntity,
       );
       transcriptionJobRepository.save.mockImplementation((entity) =>
-        Promise.resolve(entity),
+        Promise.resolve(entity as TranscriptionJobEntity),
       );
 
       const result = await service.queueBatchJob('meeting-1', {
@@ -178,7 +196,7 @@ describe('TranscriptionService', () => {
         (entity) => entity as TranscriptionJobEntity,
       );
       transcriptionJobRepository.save.mockImplementation((entity) =>
-        Promise.resolve(entity),
+        Promise.resolve(entity as TranscriptionJobEntity),
       );
 
       await service.queueBatchJob('meeting-1', {
@@ -220,7 +238,7 @@ describe('TranscriptionService', () => {
         (entity) => entity as TranscriptionJobEntity,
       );
       transcriptionJobRepository.save.mockImplementation((entity) =>
-        Promise.resolve(entity),
+        Promise.resolve(entity as TranscriptionJobEntity),
       );
 
       await expect(

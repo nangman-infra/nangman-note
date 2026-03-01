@@ -106,9 +106,11 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
             const isSelected = selectedPromptId === prompt.id;
             return (
               <div key={prompt.id} className="relative">
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleChange(prompt.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleChange(prompt.id); } }}
                   className={`surface-card block w-full cursor-pointer p-3 text-left transition ${
                     isSelected ? 'border-[var(--line-strong)] bg-brand/5' : 'hover:border-[var(--line-strong)]'
                   }`}
@@ -163,7 +165,7 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
                     </div>
                   </div>
                   <p className="mt-2 line-clamp-2 text-xs text-muted">{prompt.content}</p>
-                </button>
+                </div>
               </div>
             );
           })}
