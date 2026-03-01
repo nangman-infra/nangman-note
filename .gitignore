@@ -2,6 +2,9 @@
 # TransNote 루트 .gitignore
 # ========================================
 
+# Infrastructure (ECS task definitions - local only)
+infra/
+
 # Dependencies
 node_modules/
 
