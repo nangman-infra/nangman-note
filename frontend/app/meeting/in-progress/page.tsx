@@ -264,6 +264,7 @@ export default function InProgressMeetingPage() {
     if (shouldRunBatchTranscription && audioBlob && meetingId) {
       setShowProcessing(true);
 
+      setMeetingIdFromQuery('');
       pushToast({
         title: '회의를 종료했습니다',
         description: '오디오 업로드 및 전사를 시작합니다.',
@@ -290,18 +291,20 @@ export default function InProgressMeetingPage() {
             description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
             variant: 'error',
           });
+          setMeetingIdFromQuery('');
           setCurrentMeeting(null);
           router.replace('/');
         }
       } else {
         await endMeeting({ skipTranscription: true });
         setShowProcessing(false);
-        pushToast({
-          title: '오디오 업로드에 실패했습니다',
-          description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
-          variant: 'info',
-        });
-        setCurrentMeeting(null);
+          pushToast({
+            title: '오디오 업로드에 실패했습니다',
+            description: '전사 없이 노트 기반 결과 생성으로 전환했습니다.',
+            variant: 'info',
+          });
+          setMeetingIdFromQuery('');
+          setCurrentMeeting(null);
         router.replace('/');
       }
     } else {
@@ -313,6 +316,7 @@ export default function InProgressMeetingPage() {
         description: '노트 기반으로 결과를 생성합니다.',
         variant: 'success',
       });
+      setMeetingIdFromQuery('');
       setCurrentMeeting(null);
       router.replace('/');
     }
@@ -327,6 +331,7 @@ export default function InProgressMeetingPage() {
       description: '결과 화면에서 확인하세요.',
       variant: 'success',
     });
+    setMeetingIdFromQuery('');
     setCurrentMeeting(null);
     router.replace('/');
   };
