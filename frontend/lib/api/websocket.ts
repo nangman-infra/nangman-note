@@ -14,9 +14,12 @@ export function createSocket(
   path: string,
   query?: Record<string, string>,
 ): Socket {
+  // 백엔드에 직접 연결할 때는 WebSocket transport 사용 (binary 데이터 무손실)
+  // polling 모드에서는 binary가 base64 인코딩되어 오디오 품질이 저하됨
   const socket = io(env.WS_URL || undefined, {
     path,
     query,
+    transports: env.WS_URL ? ['websocket'] : ['polling', 'websocket'],
     withCredentials: true,
   });
 

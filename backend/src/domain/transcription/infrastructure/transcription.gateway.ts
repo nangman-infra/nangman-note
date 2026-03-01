@@ -38,6 +38,8 @@ export class TranscriptionGateway
 
   /** meetingId → Set<socket.id> (같은 회의에 여러 클라이언트가 연결될 수 있음) */
   private readonly meetingClients = new Map<string, Set<string>>();
+  /** 세션 시작 중 중복 호출 방지 락 */
+  private readonly startingSession = new Set<string>();
 
   constructor(
     private readonly transcriptionService: TranscriptionService,
@@ -134,8 +136,12 @@ export class TranscriptionGateway
         return { ok: true };
       }
 
-      // 첫 오디오 청크가 도착하면 Transcribe 세션 시작
-      if (!this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
+      // 첫 오디오 청크가 도착하면 Transcribe 세션 시작 (중복 방지)
+      if (
+        !this.transcriptionService.hasActiveRealtimeSession(meetingId) &&
+        !this.startingSession.has(meetingId)
+      ) {
+        this.startingSession.add(meetingId);
         try {
           await this.transcriptionService.startRealtimeSession(
             meetingId,
@@ -158,6 +164,8 @@ export class TranscriptionGateway
             },
           );
 
+          this.startingSession.delete(meetingId);
+
           this.logger.log(
             `Realtime session started on first audio for meeting ${meetingId}`,
           );
@@ -168,6 +176,7 @@ export class TranscriptionGateway
             hasActiveSession: true,
           });
         } catch (error) {
+          this.startingSession.delete(meetingId);
           this.logger.warn(
             `Failed to start realtime session for meeting ${meetingId}: ${error instanceof Error ? error.message : error}`,
           );

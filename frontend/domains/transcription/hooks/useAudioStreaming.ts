@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 
-const TARGET_SAMPLE_RATE = 16_000; // Transcribe expects 16kHz PCM
+// PCM processor는 AudioContext의 네이티브 sample rate(48kHz)를 그대로 사용합니다.
+// 다운샘플링 없이 Transcribe에 실제 rate를 전달합니다.
 
 export type AudioStreamingState = 'idle' | 'streaming' | 'stopping' | 'stopped' | 'error';
 
@@ -65,12 +66,15 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
 
       try {
         // AudioContext를 기본 sample rate로 생성 (마이크와 동일 — 보통 48kHz)
-        // 다운샘플링은 AudioWorklet processor에서 처리
         const audioContext = new AudioContext();
         audioContextRef.current = audioContext;
         socketRef.current = socket;
 
-        const nativeSampleRate = audioContext.sampleRate;
+        // Chrome autoplay 정책: 사용자 제스처 없이 생성된 AudioContext는
+        // suspended 상태일 수 있음 → resume() 필수
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
 
         // AudioWorklet 모듈 로드 (public 디렉토리)
         await audioContext.audioWorklet.addModule(
@@ -87,13 +91,6 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         );
         workletNodeRef.current = workletNode;
 
-        // WorkletProcessor에게 네이티브 sample rate와 타겟 sample rate를 전달
-        workletNode.port.postMessage({
-          type: 'init',
-          nativeSampleRate,
-          targetSampleRate: TARGET_SAMPLE_RATE,
-        });
-
         // worklet에서 PCM ArrayBuffer를 받아 socket으로 전송
         workletNode.port.onmessage = (event: MessageEvent) => {
           const pcmBuffer: ArrayBuffer = event.data;
@@ -103,7 +100,13 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         };
 
         source.connect(workletNode);
-        workletNode.connect(audioContext.destination);
+        // 마이크 오디오를 스피커로 직접 출력하면 피드백 에코가 발생하므로
+        // GainNode(gain=0)을 통해 무음으로 destination에 연결.
+        // destination 연결이 없으면 Chrome이 process() 호출을 중단할 수 있음.
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0;
+        workletNode.connect(silentGain);
+        silentGain.connect(audioContext.destination);
 
         setState('streaming');
       } catch (err) {

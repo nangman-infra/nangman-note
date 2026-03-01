@@ -15,8 +15,9 @@ import type {
   StreamingTranscriptEvent,
 } from '../application/ports/streaming-transcription-provider.port';
 
-const DEFAULT_SAMPLE_RATE = 16_000;
-const MAX_BUFFERED_AUDIO_CHUNKS = 120; // 약 12초(100ms 청크 기준)
+const DEFAULT_SAMPLE_RATE = 48_000;
+// 버퍼 무제한 — 48kHz PCM은 Transcribe HTTP/2보다 빠르지만
+// 침묵 구간에서 따라잡으므로 드랍하지 않음 (96KB/s 수준)
 const DEFAULT_LANGUAGE_OPTIONS = [
   'ko-KR',
   'en-US',
@@ -35,8 +36,6 @@ interface ActiveSession {
   closed: boolean;
   /** abort signal */
   abortController: AbortController;
-  droppedChunkCount: number;
-  lastBackpressureLogAt: number;
 }
 
 /**
@@ -47,20 +46,9 @@ class AudioChunkQueue {
   private queue: Buffer[] = [];
   private resolve: ((value: IteratorResult<Buffer>) => void) | null = null;
   private done = false;
-  private readonly maxChunks: number;
 
-  constructor(maxChunks: number) {
-    this.maxChunks = maxChunks;
-  }
-
-  push(chunk: Buffer): number {
-    if (this.done) return 0;
-
-    let dropped = 0;
-    if (this.queue.length >= this.maxChunks) {
-      this.queue.shift();
-      dropped = 1;
-    }
+  push(chunk: Buffer): void {
+    if (this.done) return;
 
     if (this.resolve) {
       const r = this.resolve;
@@ -69,7 +57,6 @@ class AudioChunkQueue {
     } else {
       this.queue.push(chunk);
     }
-    return dropped;
   }
 
   end(): void {
@@ -132,7 +119,7 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
       await this.stopSession(meetingId);
     }
 
-    const audioQueue = new AudioChunkQueue(MAX_BUFFERED_AUDIO_CHUNKS);
+    const audioQueue = new AudioChunkQueue();
     const abortController = new AbortController();
 
     const session: ActiveSession = {
@@ -140,8 +127,6 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
       audioQueue,
       closed: false,
       abortController,
-      droppedChunkCount: 0,
-      lastBackpressureLogAt: 0,
     };
     this.sessions.set(meetingId, session);
 
@@ -185,17 +170,7 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
   feedAudio(meetingId: string, chunk: Buffer): void {
     const session = this.sessions.get(meetingId);
     if (!session || session.closed) return;
-    const dropped = session.audioQueue.push(chunk);
-    if (dropped > 0) {
-      session.droppedChunkCount += dropped;
-      const now = Date.now();
-      if (now - session.lastBackpressureLogAt >= 5000) {
-        session.lastBackpressureLogAt = now;
-        this.logger.warn(
-          `Backpressure detected for meeting ${meetingId}: dropped=${session.droppedChunkCount}`,
-        );
-      }
-    }
+    session.audioQueue.push(chunk);
   }
 
   stopSession(meetingId: string): Promise<void> {
@@ -240,13 +215,21 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
   ): void {
     void (async () => {
       try {
+        this.logger.debug(`Sending StartStreamTranscription command for meeting ${meetingId}...`);
         const response = await this.client.send(command);
+        this.logger.debug(`StartStreamTranscription response received for meeting ${meetingId}, SessionId=${response.SessionId}`);
 
         if (!response.TranscriptResultStream) {
           throw new Error('No TranscriptResultStream in response');
         }
 
+        this.logger.debug(`Entering TranscriptResultStream loop for meeting ${meetingId}...`);
+        let eventCount = 0;
         for await (const event of response.TranscriptResultStream) {
+          eventCount++;
+          if (eventCount <= 3) {
+            this.logger.debug(`TranscriptResultStream event #${eventCount} for meeting ${meetingId}: ${JSON.stringify(Object.keys(event))}`);
+          }
           // 세션이 이미 종료되었으면 루프 탈출
           if (!this.sessions.has(meetingId)) break;
 

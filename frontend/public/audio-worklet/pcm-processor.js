@@ -1,107 +1,104 @@
 /**
- * PCM Audio Worklet Processor
- * 브라우저 마이크에서 Float32 오디오를 받아 다운샘플링 후
- * Int16 PCM (16-bit LE, mono)으로 변환합니다.
+ * PCM Audio Worklet Processor (AWS Transcribe Streaming 호환)
  *
- * 이 파일은 AudioWorklet 컨텍스트에서 실행됩니다 (별도 스레드).
+ * AWS 공식 레퍼런스 구현 기반:
+ * https://github.com/aws-samples/sample-dual-audio-transcribe
+ *
+ * - 다운샘플링 없이 AudioContext의 네이티브 sample rate(보통 48kHz)로 전송
+ * - DataView.setInt16 으로 명시적 little-endian PCM 인코딩
+ * - outputs에 입력 복사 → destination 연결 유지 (process() 호출 보장)
+ * - publishInterval 간격으로 버퍼를 모아 한번에 전송
  */
 
 class PcmProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this._stopped = false;
-    this._nativeSampleRate = 48000; // 기본값, init 메시지로 갱신
-    this._targetSampleRate = 16000;
-    this._resampleRatio = 3; // 48000 / 16000
-
-    // 다운샘플링용 버퍼
-    this._inputBuffer = [];
-    this._resampleCursor = 0;
-    // AWS 권장 청크(50~200ms) 중 100ms로 고정
-    this._outputBufferSize = 1600; // 16kHz * 0.1s
-    this._outputBuffer = [];
+    // publishInterval: sampleRate * 0.1 = 100ms 분량
+    // AWS 레퍼런스는 sampleRate * 5 (5초)이지만, 실시간 전사는 더 짧은 간격이 필요
+    this._publishInterval = Math.round(sampleRate * 0.1);
+    this._recordingBuffer = [new Float32Array(0)];
+    this._recordedFrames = 0;
+    this._framesSinceLastPublish = 0;
 
     this.port.onmessage = (event) => {
       if (event.data === 'stop') {
         this._stopped = true;
-        if (this._outputBuffer.length > 0) {
-          this._flush();
+        // 남은 버퍼 플러시
+        if (this._recordedFrames > 0) {
+          this._publish();
         }
-        return;
-      }
-
-      if (event.data && event.data.type === 'init') {
-        this._nativeSampleRate = event.data.nativeSampleRate || 48000;
-        this._targetSampleRate = event.data.targetSampleRate || 16000;
-        this._resampleRatio = this._nativeSampleRate / this._targetSampleRate;
-        this._outputBufferSize = Math.max(
-          320,
-          Math.round(this._targetSampleRate * 0.1),
-        );
       }
     };
   }
 
-  process(inputs) {
+  process(inputs, outputs) {
     if (this._stopped) return false;
 
-    const input = inputs[0];
-    if (!input || input.length === 0) return true;
+    if (!inputs.length || !inputs[0].length) return true;
 
-    // mono channel (channel 0)
-    const channelData = input[0];
+    const channelData = inputs[0][0]; // mono: input 0, channel 0
     if (!channelData) return true;
 
-    // 다운샘플링: fractional ratio 지원 linear interpolation
-    const ratio = this._resampleRatio;
-    if (!Number.isFinite(ratio) || ratio <= 0) return true;
+    const numSamples = channelData.length;
 
-    for (let i = 0; i < channelData.length; i++) {
-      this._inputBuffer.push(channelData[i]);
+    // outputs에 입력 복사 → destination 연결이 살아있어야 process()가 계속 호출됨
+    if (outputs.length && outputs[0].length && outputs[0][0]) {
+      outputs[0][0].set(channelData);
     }
 
-    while (this._resampleCursor + 1 < this._inputBuffer.length) {
-      const leftIndex = Math.floor(this._resampleCursor);
-      const rightIndex = leftIndex + 1;
-      const frac = this._resampleCursor - leftIndex;
-      const left = this._inputBuffer[leftIndex];
-      const right = this._inputBuffer[rightIndex];
-      const sample = left + (right - left) * frac;
-      this._outputBuffer.push(sample);
-      this._resampleCursor += ratio;
+    // 녹음 버퍼에 추가
+    const newBuffer = new Float32Array(this._recordedFrames + numSamples);
+    newBuffer.set(this._recordingBuffer[0], 0);
+    newBuffer.set(channelData, this._recordedFrames);
+    this._recordingBuffer[0] = newBuffer;
+    this._recordedFrames += numSamples;
+    this._framesSinceLastPublish += numSamples;
 
-      if (this._outputBuffer.length >= this._outputBufferSize) {
-        this._flush();
-      }
-    }
-
-    const consumed = Math.floor(this._resampleCursor);
-    if (consumed > 0) {
-      this._inputBuffer = this._inputBuffer.slice(consumed);
-      this._resampleCursor -= consumed;
+    // publishInterval 이상 쌓이면 전송
+    if (this._framesSinceLastPublish >= this._publishInterval) {
+      this._publish();
     }
 
     return true;
   }
 
-  _flush() {
-    if (this._outputBuffer.length === 0) return;
+  _publish() {
+    if (this._recordedFrames === 0) return;
 
-    const pcmData = this._float32ToInt16(this._outputBuffer);
-    this.port.postMessage(pcmData.buffer, [pcmData.buffer]);
-    this._outputBuffer = [];
+    // AWS 레퍼런스 pcmEncodeArray 패턴:
+    // DataView를 사용해 명시적으로 little-endian Int16 PCM 생성
+    const audioData = this._pcmEncode(this._recordingBuffer);
+
+    this.port.postMessage(audioData, [audioData]);
+
+    // 버퍼 리셋
+    this._recordingBuffer = [new Float32Array(0)];
+    this._recordedFrames = 0;
+    this._framesSinceLastPublish = 0;
   }
 
   /**
-   * Float32 [-1.0, 1.0] → Int16 [-32768, 32767]
+   * Float32Array[] → ArrayBuffer (PCM signed 16-bit little-endian)
+   * AWS 레퍼런스 pcmEncodeArray 함수와 동일 로직
    */
-  _float32ToInt16(float32Array) {
-    const int16Array = new Int16Array(float32Array.length);
-    for (let i = 0; i < float32Array.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  _pcmEncode(input) {
+    const numChannels = input.length; // 1 (mono)
+    const numSamples = input[0].length;
+    const bufferLength = numChannels * numSamples * 2; // 2 bytes per sample
+    const buffer = new ArrayBuffer(bufferLength);
+    const view = new DataView(buffer);
+
+    let index = 0;
+    for (let i = 0; i < numSamples; i++) {
+      for (let channel = 0; channel < numChannels; channel++) {
+        const s = Math.max(-1, Math.min(1, input[channel][i]));
+        view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7fff, true); // true = little-endian
+        index += 2;
+      }
     }
-    return int16Array;
+
+    return buffer;
   }
 }
 
