@@ -225,15 +225,14 @@ export class TranscriptionService {
   /**
    * Transcribe 결과 이벤트 처리:
    * - partial: 바로 프론트에 전달 (번역 X, DB 저장 X)
-   * - final: 즉시 프론트에 전달 + DB 저장 (번역은 회의 종료 후 일괄 처리)
+   * - final: 원문 즉시 전달 + DB 저장 + 번역 fire-and-forget 후행
    *
-   * 실시간 번역은 Translate API 호출 빈도로 인해 Node.js 이벤트 루프를 과부하시켜
-   * 전사 자체의 실시간성을 저하시킴. 따라서 번역은 회의 종료 후 일괄 처리로 변경.
+   * 전사 원문은 즉시 emit하고, 번역은 비동기로 후행하므로 전사 실시간성을 저하시키지 않음.
    */
   private handleTranscriptEvent(
     meetingId: string,
     event: StreamingTranscriptEvent,
-    _translateTarget: string | null,
+    translateTarget: string | null,
     onPayload: (payload: RealtimeTranscriptPayload) => void,
   ): void {
     if (event.type === 'partial') {
@@ -248,18 +247,35 @@ export class TranscriptionService {
       return;
     }
 
-    // final 원문은 즉시 전달 (번역 없이)
+    const needsTranslation = this.shouldTranslate(
+      translateTarget,
+      event.detectedLanguage,
+    );
+
+    // final 원문은 즉시 전달 (번역 완료를 기다리지 않음)
     this.emitPayload(onPayload, {
       type: 'final',
       resultId: event.resultId,
       text: event.text,
+      translationPending: needsTranslation,
       startTime: event.startTime,
       endTime: event.endTime,
       detectedLanguage: event.detectedLanguage,
     });
 
-    // DB 저장만 (번역은 회의 종료 후 일괄 처리)
-    void this.saveFinalSegment(meetingId, event);
+    // DB 저장
+    const savedSegmentIdPromise = this.saveFinalSegment(meetingId, event);
+
+    // 번역이 필요한 경우 fire-and-forget으로 후행 처리
+    if (needsTranslation && translateTarget) {
+      void this.translateAndPatchSegment(
+        meetingId,
+        event,
+        translateTarget,
+        onPayload,
+        savedSegmentIdPromise,
+      );
+    }
   }
 
   private shouldTranslate(
