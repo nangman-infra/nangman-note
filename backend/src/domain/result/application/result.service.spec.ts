@@ -47,9 +47,7 @@ describe('ResultService', () => {
       ...overrides,
     }) as unknown as MeetingEntity;
 
-  const buildPrompt = (
-    overrides: Partial<PromptEntity> = {},
-  ): PromptEntity =>
+  const buildPrompt = (overrides: Partial<PromptEntity> = {}): PromptEntity =>
     ({
       id: 'prompt_default_meeting',
       name: '기본 프롬프트',
@@ -62,9 +60,7 @@ describe('ResultService', () => {
       ...overrides,
     }) as unknown as PromptEntity;
 
-  const buildResult = (
-    overrides: Partial<ResultEntity> = {},
-  ): ResultEntity =>
+  const buildResult = (overrides: Partial<ResultEntity> = {}): ResultEntity =>
     ({
       id: 'result-1',
       meetingId: 'meeting-1',
@@ -208,7 +204,9 @@ describe('ResultService', () => {
       meetingService.findById.mockResolvedValue(buildMeeting());
       meetingService.updatePrompt.mockResolvedValue(buildMeeting());
       resultRepository.findOne.mockResolvedValue(existing);
-      promptService.ensureExists.mockResolvedValue(undefined as unknown as void);
+      promptService.ensureExists.mockResolvedValue(
+        undefined as unknown as void,
+      );
       promptService.findById.mockResolvedValue(
         buildPrompt({
           id: updatedPromptId,

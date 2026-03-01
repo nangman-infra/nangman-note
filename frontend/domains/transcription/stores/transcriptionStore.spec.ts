@@ -55,4 +55,18 @@ describe('useTranscriptionStore', () => {
       translationStatus: 'done',
     });
   });
+
+  it('squashes excessive repeats in realtime text payload', () => {
+    useTranscriptionStore.getState().handlePayload({
+      type: 'final',
+      resultId: 'result-1',
+      text: 'OK OK OK OK 좋아요좋아요좋아요',
+      startTime: 0,
+      endTime: 1,
+    });
+
+    const state = useTranscriptionStore.getState();
+    expect(state.segments).toHaveLength(1);
+    expect(state.segments[0]?.text).toBe('OK OK 좋아요좋아요');
+  });
 });

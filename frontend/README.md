@@ -15,17 +15,21 @@ cp .env.production.example .env.production.local
 
 Required keys for both profiles:
 
-- `NEXT_PUBLIC_API_URL` (http/https URL)
-- `NEXT_PUBLIC_WS_URL` (ws/wss URL)
 - `NEXT_PUBLIC_APP_NAME`
 - `NEXT_PUBLIC_APP_VERSION`
 - `NEXT_PUBLIC_ENABLE_OFFLINE` (`true` or `false`)
 - `NEXT_PUBLIC_AUTO_SAVE_DELAY` (number: 500~10000)
 
+Optional keys:
+
+- `NEXT_PUBLIC_API_URL` (default: empty string = same-origin `/api/*` proxy)
+- `NEXT_PUBLIC_WS_URL` (default: empty string = same-origin `/ws/*` proxy)
+- `BACKEND_URL` (server runtime proxy target, default: `http://localhost:9999`)
+
 Validation policy:
 
-- Development (`NODE_ENV=development`): API/WS URL have localhost defaults.
-- Production (`NODE_ENV=production`): API/WS URL use production defaults and print warning if not explicitly set.
+- Development (`NODE_ENV=development`): API/WS URL can be omitted to use same-origin proxy.
+- Production (`NODE_ENV=production`): API/WS URL can be omitted if frontend proxy(`BACKEND_URL`) is configured.
 
 ## Getting Started
 

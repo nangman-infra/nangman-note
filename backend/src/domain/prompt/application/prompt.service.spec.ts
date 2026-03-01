@@ -13,18 +13,16 @@ describe('PromptService', () => {
     >
   >;
 
-  const buildPrompt = (
-    overrides: Partial<PromptEntity> = {},
-  ): PromptEntity =>
+  const buildPrompt = (overrides: Partial<PromptEntity> = {}): PromptEntity =>
     ({
-    id: 'prompt_user_123',
-    name: '사용자 프롬프트',
-    content: '내용',
-    isDefault: false,
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:00:00.000Z'),
-    ...overrides,
-  }) as unknown as PromptEntity;
+      id: 'prompt_user_123',
+      name: '사용자 프롬프트',
+      content: '내용',
+      isDefault: false,
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      ...overrides,
+    }) as unknown as PromptEntity;
 
   beforeEach(() => {
     promptRepository = {

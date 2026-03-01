@@ -67,7 +67,9 @@ describe('NoteService', () => {
     it('updates existing note content', async () => {
       const existing = buildNote({ content: 'before' });
       noteRepository.findOne.mockResolvedValue(existing);
-      noteRepository.save.mockImplementation((note) => Promise.resolve(note as NoteEntity));
+      noteRepository.save.mockImplementation((note) =>
+        Promise.resolve(note as NoteEntity),
+      );
 
       const result = await service.upsert('meeting-1', { content: 'after' });
 

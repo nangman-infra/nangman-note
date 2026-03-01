@@ -215,20 +215,28 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
   ): void {
     void (async () => {
       try {
-        this.logger.debug(`Sending StartStreamTranscription command for meeting ${meetingId}...`);
+        this.logger.debug(
+          `Sending StartStreamTranscription command for meeting ${meetingId}...`,
+        );
         const response = await this.client.send(command);
-        this.logger.debug(`StartStreamTranscription response received for meeting ${meetingId}, SessionId=${response.SessionId}`);
+        this.logger.debug(
+          `StartStreamTranscription response received for meeting ${meetingId}, SessionId=${response.SessionId}`,
+        );
 
         if (!response.TranscriptResultStream) {
           throw new Error('No TranscriptResultStream in response');
         }
 
-        this.logger.debug(`Entering TranscriptResultStream loop for meeting ${meetingId}...`);
+        this.logger.debug(
+          `Entering TranscriptResultStream loop for meeting ${meetingId}...`,
+        );
         let eventCount = 0;
         for await (const event of response.TranscriptResultStream) {
           eventCount++;
           if (eventCount <= 3) {
-            this.logger.debug(`TranscriptResultStream event #${eventCount} for meeting ${meetingId}: ${JSON.stringify(Object.keys(event))}`);
+            this.logger.debug(
+              `TranscriptResultStream event #${eventCount} for meeting ${meetingId}: ${JSON.stringify(Object.keys(event))}`,
+            );
           }
           // 세션이 이미 종료되었으면 루프 탈출
           if (!this.sessions.has(meetingId)) break;

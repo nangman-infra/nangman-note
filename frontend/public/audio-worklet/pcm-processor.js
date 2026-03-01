@@ -17,7 +17,7 @@ class PcmProcessor extends AudioWorkletProcessor {
     // publishInterval: sampleRate * 0.1 = 100ms 분량
     // AWS 레퍼런스는 sampleRate * 5 (5초)이지만, 실시간 전사는 더 짧은 간격이 필요
     this._publishInterval = Math.round(sampleRate * 0.1);
-    this._recordingBuffer = [new Float32Array(0)];
+    this._chunks = [];
     this._recordedFrames = 0;
     this._framesSinceLastPublish = 0;
 
@@ -47,11 +47,10 @@ class PcmProcessor extends AudioWorkletProcessor {
       outputs[0][0].set(channelData);
     }
 
-    // 녹음 버퍼에 추가
-    const newBuffer = new Float32Array(this._recordedFrames + numSamples);
-    newBuffer.set(this._recordingBuffer[0], 0);
-    newBuffer.set(channelData, this._recordedFrames);
-    this._recordingBuffer[0] = newBuffer;
+    // AudioWorklet 입력 버퍼는 재사용되므로 매 tick 복사본을 보관
+    const copiedChunk = new Float32Array(numSamples);
+    copiedChunk.set(channelData);
+    this._chunks.push(copiedChunk);
     this._recordedFrames += numSamples;
     this._framesSinceLastPublish += numSamples;
 
@@ -68,12 +67,19 @@ class PcmProcessor extends AudioWorkletProcessor {
 
     // AWS 레퍼런스 pcmEncodeArray 패턴:
     // DataView를 사용해 명시적으로 little-endian Int16 PCM 생성
-    const audioData = this._pcmEncode(this._recordingBuffer);
+    const merged = new Float32Array(this._recordedFrames);
+    let offset = 0;
+    for (const chunk of this._chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const audioData = this._pcmEncode([merged]);
 
     this.port.postMessage(audioData, [audioData]);
 
     // 버퍼 리셋
-    this._recordingBuffer = [new Float32Array(0)];
+    this._chunks = [];
     this._recordedFrames = 0;
     this._framesSinceLastPublish = 0;
   }

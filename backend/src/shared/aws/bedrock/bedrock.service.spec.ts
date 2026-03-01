@@ -38,7 +38,9 @@ describe('BedrockService', () => {
       CORS_ORIGIN: 'http://localhost:3000',
     } as unknown as AppEnv;
     const configService = {
-      get: jest.fn((key: string) => (configMap as unknown as Record<string, unknown>)[key]),
+      get: jest.fn(
+        (key: string) => (configMap as unknown as Record<string, unknown>)[key],
+      ),
     } as unknown as ConfigService<AppEnv, true>;
 
     const service = new BedrockService(configService, awsClientFactory);

@@ -89,5 +89,4 @@ export class MeetingController {
   async purge(@Param('id') id: string): Promise<void> {
     await this.meetingService.purge(id);
   }
-
 }

@@ -308,7 +308,9 @@ export class MeetingService {
     await this.meetingRepository.remove(meeting);
   }
 
-  async bulkRemove(ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> {
+  async bulkRemove(
+    ids: string[],
+  ): Promise<{ succeeded: string[]; failed: string[] }> {
     const succeeded: string[] = [];
     const failed: string[] = [];
 
@@ -329,7 +331,9 @@ export class MeetingService {
     return { succeeded, failed };
   }
 
-  async bulkRestore(ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> {
+  async bulkRestore(
+    ids: string[],
+  ): Promise<{ succeeded: string[]; failed: string[] }> {
     const succeeded: string[] = [];
     const failed: string[] = [];
 
@@ -353,7 +357,9 @@ export class MeetingService {
     return { succeeded, failed };
   }
 
-  async bulkPurge(ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> {
+  async bulkPurge(
+    ids: string[],
+  ): Promise<{ succeeded: string[]; failed: string[] }> {
     const succeeded: string[] = [];
     const failed: string[] = [];
 

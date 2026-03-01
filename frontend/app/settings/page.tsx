@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit3, Languages, Mic, Plus, Save, Settings2, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit3, Languages, Mic, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
 import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';

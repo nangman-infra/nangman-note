@@ -34,7 +34,13 @@ export default function InProgressMeetingPage() {
   const [isEnding, setIsEnding] = useState(false);
   const [showProcessing, setShowProcessing] = useState(false);
   const [isRecoveringMeeting, setIsRecoveringMeeting] = useState(false);
+  const [isLeavingPage, setIsLeavingPage] = useState(false);
   const [meetingIdFromQuery, setMeetingIdFromQuery] = useState('');
+
+  const navigateHome = useCallback(() => {
+    setIsLeavingPage(true);
+    router.replace('/');
+  }, [router]);
 
   // 오디오 캡처 (마이크 권한 + 디바이스 선택)
   const {
@@ -111,9 +117,9 @@ export default function InProgressMeetingPage() {
   useEffect(() => {
     if (currentMeeting && currentMeeting.status !== MeetingStatus.RECORDING && !showProcessing) {
       setCurrentMeeting(null);
-      router.replace('/');
+      navigateHome();
     }
-  }, [currentMeeting, showProcessing, setCurrentMeeting, router]);
+  }, [currentMeeting, showProcessing, setCurrentMeeting, navigateHome]);
 
   // 새로고침/재접속 복구: URL의 meetingId로 회의 상태 복원
   useEffect(() => {
@@ -131,7 +137,7 @@ export default function InProgressMeetingPage() {
             description: '회의 결과 화면에서 회의록을 확인해주세요.',
             variant: 'info',
           });
-          router.replace('/');
+          navigateHome();
           return;
         }
         setCurrentMeeting(meeting);
@@ -142,7 +148,7 @@ export default function InProgressMeetingPage() {
           description: '회의가 이미 종료되었거나 접근할 수 없습니다.',
           variant: 'info',
         });
-        router.replace('/');
+        navigateHome();
       } finally {
         if (!disposed) {
           setIsRecoveringMeeting(false);
@@ -157,8 +163,8 @@ export default function InProgressMeetingPage() {
   }, [
     currentMeeting,
     meetingIdFromQuery,
+    navigateHome,
     pushToast,
-    router,
     setCurrentMeeting,
   ]);
 
@@ -334,7 +340,7 @@ export default function InProgressMeetingPage() {
           });
           setMeetingIdFromQuery('');
           setCurrentMeeting(null);
-          router.replace('/');
+          navigateHome();
         }
       } else {
         await endMeeting({ skipTranscription: true });
@@ -346,7 +352,7 @@ export default function InProgressMeetingPage() {
         });
         setMeetingIdFromQuery('');
         setCurrentMeeting(null);
-        router.replace('/');
+        navigateHome();
       }
     } else {
       // 실시간 모드 또는 오디오 없음: 전사 없이 종료
@@ -359,7 +365,7 @@ export default function InProgressMeetingPage() {
       });
       setMeetingIdFromQuery('');
       setCurrentMeeting(null);
-      router.replace('/');
+      navigateHome();
     }
   };
 
@@ -374,7 +380,7 @@ export default function InProgressMeetingPage() {
     });
     setMeetingIdFromQuery('');
     setCurrentMeeting(null);
-    router.replace('/');
+    navigateHome();
   };
 
   const handleGoHome = useCallback(() => {
@@ -388,11 +394,15 @@ export default function InProgressMeetingPage() {
       return;
     }
 
-    router.replace('/');
-  }, [currentMeeting?.status, pushToast, router, showProcessing]);
+    navigateHome();
+  }, [currentMeeting?.status, pushToast, navigateHome, showProcessing]);
 
   // 회의 없음 상태
   if (!currentMeeting) {
+    if (isLeavingPage) {
+      return null;
+    }
+
     if (isRecoveringMeeting) {
       return (
         <div className="app-shell flex min-h-dvh items-center justify-center p-6">

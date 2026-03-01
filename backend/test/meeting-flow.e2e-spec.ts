@@ -44,7 +44,7 @@ describe('Meeting Flow (e2e)', () => {
     expect((completeRes.body as { status: string }).status).toBe('processing');
   });
 
-  it('transitions realtime meeting to completed on complete', async () => {
+  it('transitions realtime meeting to processing on complete', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/meetings')
       .send({
@@ -60,10 +60,10 @@ describe('Meeting Flow (e2e)', () => {
       .send({})
       .expect(201);
 
-    expect((completeRes.body as { status: string }).status).toBe('completed');
+    expect((completeRes.body as { status: string }).status).toBe('processing');
   });
 
-  it('transitions batch meeting to completed when skipTranscription=true', async () => {
+  it('transitions batch meeting to processing when skipTranscription=true', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/meetings')
       .send({
@@ -81,6 +81,6 @@ describe('Meeting Flow (e2e)', () => {
       })
       .expect(201);
 
-    expect((completeRes.body as { status: string }).status).toBe('completed');
+    expect((completeRes.body as { status: string }).status).toBe('processing');
   });
 });

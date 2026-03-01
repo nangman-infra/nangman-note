@@ -17,7 +17,7 @@ interface UseAudioStreamingReturn {
 
 /**
  * AudioWorklet 기반 실시간 PCM 오디오 스트리밍 훅.
- * 마이크 스트림에서 PCM 16-bit LE mono 16kHz를 추출하여
+ * 마이크 스트림에서 PCM 16-bit LE mono(브라우저 네이티브 sample rate)를 추출하여
  * WebSocket으로 binary 전송합니다.
  */
 export function useAudioStreaming(): UseAudioStreamingReturn {

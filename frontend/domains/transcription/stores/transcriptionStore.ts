@@ -31,6 +31,26 @@ function squashExcessiveTokenRepeats(text: string): string {
   return compact.join(' ').trim();
 }
 
+function squashExcessivePatternRepeats(text: string): string {
+  let next = text.trim();
+  if (!next) return next;
+
+  // "ok ok ok ok" 형태 반복 축약
+  next = next.replace(/(\S+)(?:\s+\1){2,}/gu, '$1 $1');
+
+  // "좋아요좋아요좋아요" 형태(공백 없는 반복)도 완화
+  if (next.length <= 200) {
+    next = next.replace(/(.{1,8}?)(?:\1){2,}/gu, '$1$1');
+  }
+
+  return next.trim();
+}
+
+function sanitizeTranscriptText(text: string): string {
+  const collapsedPattern = squashExcessivePatternRepeats(text);
+  return squashExcessiveTokenRepeats(collapsedPattern);
+}
+
 /** 확정된 전사 세그먼트 */
 export interface FinalSegment {
   resultId: string;
@@ -97,7 +117,7 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
     }
 
     if (payload.type === 'partial') {
-      const cleanedPartial = squashExcessiveTokenRepeats(payload.text);
+      const cleanedPartial = sanitizeTranscriptText(payload.text);
       set((state) => {
         if (
           state.partial &&
@@ -120,7 +140,7 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
         };
       });
     } else {
-      const cleanedFinal = squashExcessiveTokenRepeats(payload.text);
+      const cleanedFinal = sanitizeTranscriptText(payload.text);
       const normalizedFinal = normalizeTextForCompare(cleanedFinal);
 
       // final: partial을 클리어하고 segments에 추가
@@ -146,6 +166,19 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
             if (isSameText && isNearTimestamp) {
               return state.segments;
             }
+          }
+
+          const hasRecentDuplicate = state.segments
+            .slice(-3)
+            .some((segment) => {
+              const isSameText =
+                normalizeTextForCompare(segment.text) === normalizedFinal;
+              const isNearTimestamp =
+                Math.abs(segment.endTime - payload.endTime) < 2.5;
+              return isSameText && isNearTimestamp;
+            });
+          if (hasRecentDuplicate) {
+            return state.segments;
           }
 
           return [

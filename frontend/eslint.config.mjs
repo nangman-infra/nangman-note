@@ -48,6 +48,12 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["proxy.ts"],
+    rules: {
+      "no-restricted-properties": "off",
+    },
+  },
+  {
     files: [
       "**/*.spec.ts",
       "**/*.spec.tsx",
