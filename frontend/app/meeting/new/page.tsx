@@ -47,6 +47,8 @@ export default function NewMeetingPage() {
   const selectedPrompt = prompts.find((p) => p.id === selectedPromptId);
 
   const handleStart = async () => {
+    if (isLoading) return;
+
     const meeting = await startMeeting({
       title: title.trim() || undefined,
       agenda: agenda.trim() || undefined,
@@ -129,7 +131,12 @@ export default function NewMeetingPage() {
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="예: 1분기 마케팅 전략 회의"
                   className="input-shell"
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleStart(); }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    if (e.nativeEvent.isComposing) return;
+                    e.preventDefault();
+                    void handleStart();
+                  }}
                 />
                 <p className="mt-1 text-[11px] text-muted">
                   미입력 시 AI가 회의 내용을 기반으로 자동 생성합니다.

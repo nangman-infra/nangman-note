@@ -7,7 +7,7 @@ const CHUNK_INTERVAL_MS = 10_000; // 10초 간격 청크
 
 const PREFERRED_MIME_TYPE = 'audio/webm;codecs=opus';
 
-export type RecorderState = 'idle' | 'recording' | 'stopping' | 'stopped';
+export type RecorderState = 'idle' | 'recording' | 'stopping';
 
 interface UseMediaRecorderReturn {
   state: RecorderState;
@@ -35,9 +35,12 @@ export function useMediaRecorder(): UseMediaRecorderReturn {
       }
 
       setError(null);
-      setChunkCount(0);
+      const isSameMeeting = meetingIdRef.current === meetingId;
+      if (!isSameMeeting) {
+        setChunkCount(0);
+        chunkIndexRef.current = 0;
+      }
       meetingIdRef.current = meetingId;
-      chunkIndexRef.current = 0;
 
       const mimeType = MediaRecorder.isTypeSupported(PREFERRED_MIME_TYPE)
         ? PREFERRED_MIME_TYPE
@@ -67,7 +70,7 @@ export function useMediaRecorder(): UseMediaRecorderReturn {
 
       recorder.onerror = () => {
         setError('마이크 녹음 중 오류가 발생했습니다.');
-        setState('stopped');
+        setState('idle');
       };
 
       recorder.onstop = async () => {
@@ -76,7 +79,7 @@ export function useMediaRecorder(): UseMediaRecorderReturn {
         await new Promise((r) => setTimeout(r, 200));
 
         const blob = await assembleBlob(meetingIdRef.current);
-        setState('stopped');
+        setState('idle');
 
         if (resolveStopRef.current) {
           resolveStopRef.current(blob);
@@ -94,6 +97,7 @@ export function useMediaRecorder(): UseMediaRecorderReturn {
   const stopRecording = useCallback(async (): Promise<Blob | null> => {
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === 'inactive') {
+      setState('idle');
       return assembleBlob(meetingIdRef.current);
     }
 

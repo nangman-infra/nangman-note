@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Columns3, FileText } from 'lucide-react';
+import { Columns3, FileText, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 interface ThreeColumnLayoutProps {
@@ -12,7 +12,7 @@ interface ThreeColumnLayoutProps {
 
 export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutProps) {
   const isCompact = useMediaQuery('(max-width: 1024px)');
-  const [activeColumn, setActiveColumn] = useState<'list' | 'viewer'>('list');
+  const [activeColumn, setActiveColumn] = useState<'sidebar' | 'list' | 'viewer'>('list');
 
   if (isCompact) {
     return (
@@ -22,9 +22,19 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
           <div className="inline-flex rounded-xl border border-[var(--line-soft)] bg-white/70 p-1">
             <button
               type="button"
+              onClick={() => setActiveColumn('sidebar')}
+              className={`btn-neo px-3 py-1 text-xs ${
+                activeColumn === 'sidebar' ? 'border-transparent bg-brand text-white' : 'border-transparent'
+              }`}
+            >
+              <PanelLeft className="h-3.5 w-3.5" />
+              메뉴
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveColumn('list')}
               className={`btn-neo px-3 py-1 text-xs ${
-                activeColumn === 'list' ? 'bg-brand text-white border-transparent' : 'border-transparent'
+                activeColumn === 'list' ? 'border-transparent bg-brand text-white' : 'border-transparent'
               }`}
             >
               <Columns3 className="h-3.5 w-3.5" />
@@ -34,7 +44,7 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
               type="button"
               onClick={() => setActiveColumn('viewer')}
               className={`btn-neo px-3 py-1 text-xs ${
-                activeColumn === 'viewer' ? 'bg-brand text-white border-transparent' : 'border-transparent'
+                activeColumn === 'viewer' ? 'border-transparent bg-brand text-white' : 'border-transparent'
               }`}
             >
               <FileText className="h-3.5 w-3.5" />
@@ -44,7 +54,11 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
         </header>
 
         <div className="glass-surface h-[calc(100dvh-5.5rem)] overflow-hidden">
-          {activeColumn === 'list' ? list : viewer}
+          {activeColumn === 'sidebar'
+            ? sidebar
+            : activeColumn === 'list'
+              ? list
+              : viewer}
         </div>
       </div>
     );

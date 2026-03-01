@@ -58,27 +58,30 @@ export function ResultViewer({
     [],
   );
   const [noteContent, setNoteContent] = useState<string>('');
-  const [tabDataLoaded, setTabDataLoaded] = useState(false);
 
   // 탭 데이터 로드
   useEffect(() => {
-    if (tabDataLoaded || !meetingId) return;
+    if (!meetingId) return;
 
+    let disposed = false;
     const loadTabData = async () => {
       try {
         const [segments, note] = await Promise.all([
           resultTabDataApi.listTranscripts(meetingId).catch(() => []),
           resultTabDataApi.getNoteContent(meetingId).catch(() => ''),
         ]);
+        if (disposed) return;
         setTranscripts(segments);
         setNoteContent(note ?? '');
-        setTabDataLoaded(true);
       } catch {
         // 에러 무시 — 탭에서 빈 상태로 표시
       }
     };
     void loadTabData();
-  }, [meetingId, tabDataLoaded]);
+    return () => {
+      disposed = true;
+    };
+  }, [meetingId, result?.id, result?.updatedAt, isPending]);
 
   useEffect(() => {
     if (!error) return;

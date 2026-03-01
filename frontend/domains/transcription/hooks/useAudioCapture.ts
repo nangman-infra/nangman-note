@@ -14,7 +14,7 @@ interface UseAudioCaptureReturn {
   devices: AudioDevice[];
   selectedDeviceId: string | null;
   stream: MediaStream | null;
-  requestPermission: () => Promise<boolean>;
+  requestPermission: (nextDeviceId?: string) => Promise<boolean>;
   selectDevice: (deviceId: string) => void;
   stopCapture: () => void;
 }
@@ -57,7 +57,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
   }, []);
 
   const requestPermission = useCallback(
-    async (): Promise<boolean> => {
+    async (nextDeviceId?: string): Promise<boolean> => {
       if (!isMediaDevicesSupported()) {
         setPermission('unsupported');
         return false;
@@ -65,10 +65,11 @@ export function useAudioCapture(): UseAudioCaptureReturn {
 
       // 이전 스트림이 남아있으면 정리
       stopCapture();
+      const effectiveDeviceId = nextDeviceId ?? selectedDeviceId;
 
       const audioConstraints: MediaTrackConstraints = {
         // 장치 선택
-        ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {}),
+        ...(effectiveDeviceId ? { deviceId: { exact: effectiveDeviceId } } : {}),
         // 전사 품질 개선을 위한 기본 DSP 옵션
         channelCount: { ideal: 1 },
         sampleRate: { ideal: 48_000 },
@@ -98,6 +99,8 @@ export function useAudioCapture(): UseAudioCaptureReturn {
           if (activeDeviceId) {
             setSelectedDeviceId(activeDeviceId);
           }
+        } else if (effectiveDeviceId) {
+          setSelectedDeviceId(effectiveDeviceId);
         }
 
         return true;

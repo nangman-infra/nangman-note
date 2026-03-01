@@ -240,12 +240,12 @@ export function MeetingList({
       result = result.filter((m) => new Date(m.startedAt) >= weekAgo);
     }
 
-    if (tagFilter) {
+    if (tagFilter && searchQuery.trim().length === 0) {
       result = result.filter((m) => m.promptId === tagFilter);
     }
 
     return result;
-  }, [activeFilter, meetings, showTrash, tagFilter, timeFilter, trashMeetings]);
+  }, [activeFilter, meetings, searchQuery, showTrash, tagFilter, timeFilter, trashMeetings]);
 
   // ── 다중 선택 핸들러 ──
   const toggleSelect = (id: string) => {

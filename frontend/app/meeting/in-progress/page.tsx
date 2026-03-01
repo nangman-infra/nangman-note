@@ -273,16 +273,15 @@ export default function InProgressMeetingPage() {
     async (deviceId: string) => {
       selectDevice(deviceId);
       // 디바이스 변경 후 재연결: 녹음 중이면 중지 후 재시작
-      if (recorderState === 'recording') {
+      if (recorderState === 'recording' || recorderState === 'stopping') {
         await stopRecording();
-        await cleanupChunks();
       }
-      const granted = await requestPermission();
+      const granted = await requestPermission(deviceId);
       if (granted) {
         // stream이 변경되면 위 useEffect에서 자동 재시작
       }
     },
-    [selectDevice, recorderState, stopRecording, cleanupChunks, requestPermission],
+    [selectDevice, recorderState, stopRecording, requestPermission],
   );
 
   // 연결 상태 배지
