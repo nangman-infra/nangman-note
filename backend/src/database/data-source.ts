@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { MeetingEntity } from '../domain/meeting/domain/meeting.entity';
+import { MeetingSearchDocumentEntity } from '../domain/meeting/domain/meeting-search-document.entity';
 import { NoteEntity } from '../domain/note/domain/note.entity';
 import { PromptEntity } from '../domain/prompt/domain/prompt.entity';
 import { ResultEntity } from '../domain/result/domain/result.entity';
@@ -34,6 +35,7 @@ export default new DataSource({
   entities: [
     PromptEntity,
     MeetingEntity,
+    MeetingSearchDocumentEntity,
     NoteEntity,
     ResultEntity,
     TranscriptSegmentEntity,

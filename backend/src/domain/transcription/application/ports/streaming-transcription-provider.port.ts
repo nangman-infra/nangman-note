@@ -42,11 +42,13 @@ export interface StreamingTranscriptionProvider {
   /** 세션 시작 */
   startSession(options: StreamingSessionOptions): Promise<void>;
   /** 오디오 청크 전달 (PCM 16-bit LE binary) */
-  feedAudio(meetingId: string, chunk: Buffer): void;
+  feedAudio(meetingId: string, chunk: Buffer): boolean;
   /** 세션 종료 */
   stopSession(meetingId: string): Promise<void>;
   /** 세션 활성 여부 확인 */
   hasActiveSession(meetingId: string): boolean;
+  /** 활성 세션 개수 */
+  getActiveSessionCount(): number;
 }
 
 export const STREAMING_TRANSCRIPTION_PROVIDER = Symbol(

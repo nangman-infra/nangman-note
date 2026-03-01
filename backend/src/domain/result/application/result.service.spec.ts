@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
+import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
@@ -26,6 +27,9 @@ describe('ResultService', () => {
   >;
   let promptService: jest.Mocked<
     Pick<PromptService, 'ensureExists' | 'findById'>
+  >;
+  let meetingSearchDocumentService: jest.Mocked<
+    Pick<MeetingSearchDocumentService, 'refreshByMeetingId'>
   >;
   let bedrockService: jest.Mocked<
     Pick<BedrockService, 'generateMeetingResult'>
@@ -98,6 +102,9 @@ describe('ResultService', () => {
       ensureExists: jest.fn(),
       findById: jest.fn(),
     };
+    meetingSearchDocumentService = {
+      refreshByMeetingId: jest.fn(),
+    };
     bedrockService = {
       generateMeetingResult: jest.fn(),
     };
@@ -107,6 +114,7 @@ describe('ResultService', () => {
       noteRepository as unknown as Repository<NoteEntity>,
       transcriptRepository as unknown as Repository<TranscriptSegmentEntity>,
       meetingService as unknown as MeetingService,
+      meetingSearchDocumentService as unknown as MeetingSearchDocumentService,
       promptService as unknown as PromptService,
       bedrockService as unknown as BedrockService,
     );
@@ -166,6 +174,9 @@ describe('ResultService', () => {
       expect(createArg.metadata?.totalDuration).toBe(600);
       expect(createArg.metadata?.transcriptWordCount).toBe(2);
       expect(createArg.metadata?.noteLength).toBe(5);
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith('meeting-1');
       expect(result.content).toBe('# AI 결과');
     });
   });
@@ -194,6 +205,9 @@ describe('ResultService', () => {
       expect(updated.content).toBe('업데이트된 결과 문서');
       expect(updated.metadata.noteLength).toBe('업데이트된 결과 문서'.length);
       expect(updated.metadata.totalDuration).toBe(120);
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith('meeting-1');
     });
   });
 
@@ -238,6 +252,9 @@ describe('ResultService', () => {
       });
       expect(regenerated.promptId).toBe(updatedPromptId);
       expect(regenerated.content).toBe('재생성 결과');
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith('meeting-1');
     });
   });
 

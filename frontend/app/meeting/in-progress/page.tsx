@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Mic, MicOff, Radio, Square, Timer } from 'lucide-react';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
@@ -36,6 +36,7 @@ export default function InProgressMeetingPage() {
   const [isRecoveringMeeting, setIsRecoveringMeeting] = useState(false);
   const [isLeavingPage, setIsLeavingPage] = useState(false);
   const [meetingIdFromQuery, setMeetingIdFromQuery] = useState('');
+  const fallbackHandledRef = useRef(false);
 
   const navigateHome = useCallback(() => {
     setIsLeavingPage(true);
@@ -90,6 +91,30 @@ export default function InProgressMeetingPage() {
     currentMeeting?.transcriptionMode ?? MeetingTranscriptionMode.BATCH;
   const isRealtimeMode =
     transcriptionMode === MeetingTranscriptionMode.REALTIME;
+  const handleRealtimeFallbackToBatch = useCallback(
+    (payload?: { reason?: string }) => {
+      if (fallbackHandledRef.current) return;
+      fallbackHandledRef.current = true;
+
+      stopStreaming();
+      if (currentMeeting) {
+        setCurrentMeeting({
+          ...currentMeeting,
+          transcriptionMode: MeetingTranscriptionMode.BATCH,
+        });
+      }
+
+      pushToast({
+        title: '실시간 전사가 배치 모드로 전환되었습니다',
+        description:
+          payload?.reason === 'realtime-capacity-exceeded'
+            ? '동시 사용량이 높아 배치 전사로 자동 전환했습니다.'
+            : '전사 안정성을 위해 배치 모드로 전환했습니다.',
+        variant: 'info',
+      });
+    },
+    [currentMeeting, pushToast, setCurrentMeeting, stopStreaming],
+  );
   const {
     segments,
     partial,
@@ -98,7 +123,13 @@ export default function InProgressMeetingPage() {
     error: transcriptionError,
     stopSession: stopTranscriptionSession,
     socketRef: transcriptionSocketRef,
-  } = useTranscription(meetingId, isRealtimeMode);
+  } = useTranscription(meetingId, isRealtimeMode, {
+    onFallbackToBatch: handleRealtimeFallbackToBatch,
+  });
+
+  useEffect(() => {
+    fallbackHandledRef.current = false;
+  }, [meetingId]);
 
   // 탭 닫기 방지: 녹음 중일 때
   const isActiveRecording = recorderState === 'recording';
@@ -197,7 +228,9 @@ export default function InProgressMeetingPage() {
     if (isRealtimeMode) {
       // 실시간 모드: AudioWorklet PCM 스트리밍
       if (audioStreamingState === 'idle' && transcriptionSocketRef.current?.connected) {
-        void startStreaming(stream, transcriptionSocketRef.current);
+        void startStreaming(stream, transcriptionSocketRef.current, {
+          onFallbackToBatch: handleRealtimeFallbackToBatch,
+        });
       }
     } else {
       // 배치 모드: MediaRecorder 녹음
@@ -205,15 +238,35 @@ export default function InProgressMeetingPage() {
         startRecording(stream, meetingId);
       }
     }
-  }, [stream, meetingId, isRealtimeMode, recorderState, audioStreamingState, startRecording, startStreaming, transcriptionSocketRef]);
+  }, [
+    stream,
+    meetingId,
+    isRealtimeMode,
+    recorderState,
+    audioStreamingState,
+    startRecording,
+    startStreaming,
+    transcriptionSocketRef,
+    handleRealtimeFallbackToBatch,
+  ]);
 
   // 실시간 모드: 소켓 연결 후 오디오 스트리밍 시작
   // isConnected가 변경될 때 트리거됨 (ref만으로는 useEffect가 재실행 안 됨)
   useEffect(() => {
     if (!isRealtimeMode || !stream || audioStreamingState !== 'idle') return;
     if (!isConnected || !transcriptionSocketRef.current?.connected) return;
-    void startStreaming(stream, transcriptionSocketRef.current);
-  }, [isRealtimeMode, stream, audioStreamingState, isConnected, startStreaming, transcriptionSocketRef]);
+    void startStreaming(stream, transcriptionSocketRef.current, {
+      onFallbackToBatch: handleRealtimeFallbackToBatch,
+    });
+  }, [
+    isRealtimeMode,
+    stream,
+    audioStreamingState,
+    isConnected,
+    startStreaming,
+    transcriptionSocketRef,
+    handleRealtimeFallbackToBatch,
+  ]);
 
   // 마이크 디바이스 변경 핸들러
   const handleDeviceChange = useCallback(

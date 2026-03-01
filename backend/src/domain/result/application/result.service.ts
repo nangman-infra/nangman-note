@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from 'fs';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFFont, PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Repository } from 'typeorm';
+import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
@@ -36,6 +37,7 @@ export class ResultService {
     @InjectRepository(TranscriptSegmentEntity)
     private readonly transcriptRepository: Repository<TranscriptSegmentEntity>,
     private readonly meetingService: MeetingService,
+    private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
     private readonly promptService: PromptService,
     private readonly bedrockService: BedrockService,
   ) {}
@@ -88,7 +90,9 @@ export class ResultService {
       noteLength: dto.content.length,
     };
 
-    return this.resultRepository.save(existing);
+    const saved = await this.resultRepository.save(existing);
+    await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+    return saved;
   }
 
   async regenerate(
@@ -107,7 +111,9 @@ export class ResultService {
     existing.content = generated.content;
     existing.metadata = generated.metadata;
 
-    return this.resultRepository.save(existing);
+    const saved = await this.resultRepository.save(existing);
+    await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+    return saved;
   }
 
   async exportResult(
@@ -171,7 +177,7 @@ export class ResultService {
     const payload = await this.generateResultPayload(meetingId);
 
     try {
-      return await this.resultRepository.save(
+      const saved = await this.resultRepository.save(
         this.resultRepository.create({
           meetingId,
           promptId: payload.promptId,
@@ -179,6 +185,8 @@ export class ResultService {
           metadata: payload.metadata,
         }),
       );
+      await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+      return saved;
     } catch (error) {
       // UNIQUE constraint 실패 시 이미 생성된 결과를 반환
       if (
@@ -191,7 +199,10 @@ export class ResultService {
         const fallback = await this.resultRepository.findOne({
           where: { meetingId },
         });
-        if (fallback) return fallback;
+        if (fallback) {
+          await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+          return fallback;
+        }
       }
       throw error;
     }

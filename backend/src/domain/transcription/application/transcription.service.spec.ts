@@ -27,7 +27,9 @@ describe('TranscriptionService', () => {
   let transcriptionJobRepository: jest.Mocked<
     Pick<Repository<TranscriptionJobEntity>, 'find' | 'create' | 'save'>
   >;
-  let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
+  let meetingService: jest.Mocked<
+    Pick<MeetingService, 'findById' | 'updatePrompt'>
+  >;
   let batchTranscriptionProvider: jest.Mocked<BatchTranscriptionProvider>;
   let streamingProvider: jest.Mocked<StreamingTranscriptionProvider>;
   let translateService: jest.Mocked<
@@ -78,6 +80,7 @@ describe('TranscriptionService', () => {
     };
     meetingService = {
       findById: jest.fn(),
+      updatePrompt: jest.fn(),
     };
     batchTranscriptionProvider = {
       submitBatchJob: jest.fn(),
@@ -85,9 +88,10 @@ describe('TranscriptionService', () => {
     };
     streamingProvider = {
       startSession: jest.fn(),
-      feedAudio: jest.fn(),
+      feedAudio: jest.fn().mockReturnValue(true),
       stopSession: jest.fn(),
       hasActiveSession: jest.fn().mockReturnValue(false),
+      getActiveSessionCount: jest.fn().mockReturnValue(0),
     };
     translateService = {
       translateText: jest.fn(),
@@ -135,6 +139,53 @@ describe('TranscriptionService', () => {
           new Uint8Array([1, 2, 3]),
         ),
       ).resolves.toBe(true);
+
+      expect(streamingProvider.feedAudio.mock.calls).toHaveLength(1);
+    });
+  });
+
+  describe('feedRealtimeAudio', () => {
+    it('returns false when provider rejects chunk because of backpressure', () => {
+      streamingProvider.feedAudio.mockReturnValue(false);
+
+      const ok = service.feedRealtimeAudio('meeting-1', Buffer.from([1, 2, 3]));
+
+      expect(ok).toBe(false);
+    });
+  });
+
+  describe('realtime session counters', () => {
+    it('returns active session count from provider', () => {
+      streamingProvider.getActiveSessionCount.mockReturnValue(7);
+
+      expect(service.getActiveRealtimeSessionCount()).toBe(7);
+    });
+  });
+
+  describe('switchMeetingToBatchFallback', () => {
+    it('switches realtime meeting to batch mode', async () => {
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({ transcriptionMode: MeetingTranscriptionMode.REALTIME }),
+      );
+      meetingService.updatePrompt.mockResolvedValue(buildMeeting());
+
+      const switched = await service.switchMeetingToBatchFallback('meeting-1');
+
+      expect(switched).toBe(true);
+      expect(meetingService.updatePrompt).toHaveBeenCalledWith('meeting-1', {
+        transcriptionMode: MeetingTranscriptionMode.BATCH,
+      });
+    });
+
+    it('returns false when meeting is already batch mode', async () => {
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({ transcriptionMode: MeetingTranscriptionMode.BATCH }),
+      );
+
+      const switched = await service.switchMeetingToBatchFallback('meeting-1');
+
+      expect(switched).toBe(false);
+      expect(meetingService.updatePrompt).not.toHaveBeenCalled();
     });
   });
 

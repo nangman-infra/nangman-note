@@ -4,10 +4,16 @@ import { useTranscriptionStore } from '../stores/transcriptionStore';
 import { createSocket } from '@/lib/api/websocket';
 import type { RealtimeTranscriptPayload } from '../types/transcription.types';
 
+interface UseTranscriptionOptions {
+  onFallbackToBatch?: (payload?: { reason?: string }) => void;
+}
+
 export function useTranscription(
   meetingId: string,
   isRealtimeEnabled: boolean = false,
+  options?: UseTranscriptionOptions,
 ) {
+  const fallbackHandler = options?.onFallbackToBatch;
   const {
     segments,
     partial,
@@ -24,6 +30,11 @@ export function useTranscription(
   } = useTranscriptionStore();
 
   const socketRef = useRef<Socket | null>(null);
+  const fallbackCallbackRef = useRef(options?.onFallbackToBatch);
+
+  useEffect(() => {
+    fallbackCallbackRef.current = fallbackHandler;
+  }, [fallbackHandler]);
 
   const stopSession = useCallback(async (): Promise<boolean> => {
     const socket = socketRef.current;
@@ -103,6 +114,15 @@ export function useTranscription(
     socket.on('transcript:error', (err: { message?: string }) => {
       setError(err.message || 'Transcription stream error');
     });
+
+    socket.on(
+      'transcript:fallback',
+      (payload: { mode?: 'batch'; reason?: string }) => {
+        if (payload.mode === 'batch') {
+          fallbackCallbackRef.current?.({ reason: payload.reason });
+        }
+      },
+    );
 
     socket.on('transcript:session-ended', () => {
       setHasActiveSession(false);

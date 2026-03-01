@@ -1,4 +1,5 @@
 import { Repository } from 'typeorm';
+import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { NoteEntity } from '../domain/note.entity';
 import { NoteService } from './note.service';
@@ -9,6 +10,9 @@ describe('NoteService', () => {
     Pick<Repository<NoteEntity>, 'findOne' | 'create' | 'save'>
   >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
+  let meetingSearchDocumentService: jest.Mocked<
+    Pick<MeetingSearchDocumentService, 'refreshByMeetingId'>
+  >;
 
   const buildNote = (overrides: Partial<NoteEntity> = {}): NoteEntity =>
     ({
@@ -29,10 +33,14 @@ describe('NoteService', () => {
     meetingService = {
       findById: jest.fn(),
     };
+    meetingSearchDocumentService = {
+      refreshByMeetingId: jest.fn(),
+    };
 
     service = new NoteService(
       noteRepository as unknown as Repository<NoteEntity>,
       meetingService as unknown as MeetingService,
+      meetingSearchDocumentService as unknown as MeetingSearchDocumentService,
     );
   });
 
@@ -75,6 +83,9 @@ describe('NoteService', () => {
 
       expect(existing.content).toBe('after');
       expect(noteRepository.save).toHaveBeenCalledWith(existing);
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith('meeting-1');
       expect(result.content).toBe('after');
     });
 
@@ -91,6 +102,9 @@ describe('NoteService', () => {
         content: '새 노트',
       });
       expect(noteRepository.save).toHaveBeenCalledWith(created);
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith('meeting-1');
       expect(result).toEqual(created);
     });
   });

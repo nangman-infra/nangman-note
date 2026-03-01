@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { NoteEntity } from '../domain/note.entity';
 import { UpsertNoteDto } from './dto/upsert-note.dto';
@@ -11,6 +12,7 @@ export class NoteService {
     @InjectRepository(NoteEntity)
     private readonly noteRepository: Repository<NoteEntity>,
     private readonly meetingService: MeetingService,
+    private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
   ) {}
 
   async findByMeetingId(meetingId: string): Promise<NoteEntity> {
@@ -43,14 +45,18 @@ export class NoteService {
 
     if (existing) {
       existing.content = dto.content;
-      return this.noteRepository.save(existing);
+      const saved = await this.noteRepository.save(existing);
+      await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+      return saved;
     }
 
-    return this.noteRepository.save(
+    const saved = await this.noteRepository.save(
       this.noteRepository.create({
         meetingId,
         content: dto.content,
       }),
     );
+    await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+    return saved;
   }
 }

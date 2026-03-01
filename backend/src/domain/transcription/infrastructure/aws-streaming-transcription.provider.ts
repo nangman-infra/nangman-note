@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   TranscribeStreamingClient,
   StartStreamTranscriptionCommand,
@@ -8,6 +9,7 @@ import {
   PartialResultsStability,
   type StartStreamTranscriptionCommandInput,
 } from '@aws-sdk/client-transcribe-streaming';
+import { AppEnv } from '../../../shared/config/env.validation';
 import { AwsClientFactory } from '../../../shared/aws/aws-client.factory';
 import type {
   StreamingTranscriptionProvider,
@@ -16,8 +18,7 @@ import type {
 } from '../application/ports/streaming-transcription-provider.port';
 
 const DEFAULT_SAMPLE_RATE = 48_000;
-// 버퍼 무제한 — 48kHz PCM은 Transcribe HTTP/2보다 빠르지만
-// 침묵 구간에서 따라잡으므로 드랍하지 않음 (96KB/s 수준)
+const DEFAULT_MAX_BUFFERED_AUDIO_BYTES = 4 * 1024 * 1024; // 4MB
 const DEFAULT_LANGUAGE_OPTIONS = [
   'ko-KR',
   'en-US',
@@ -44,19 +45,32 @@ interface ActiveSession {
  */
 class AudioChunkQueue {
   private queue: Buffer[] = [];
+  private bufferedBytes = 0;
   private resolve: ((value: IteratorResult<Buffer>) => void) | null = null;
   private done = false;
+  constructor(private readonly maxBufferedBytes: number) {}
 
-  push(chunk: Buffer): void {
-    if (this.done) return;
+  push(chunk: Buffer): boolean {
+    if (this.done) return false;
+
+    if (chunk.length <= 0 || chunk.length > this.maxBufferedBytes) {
+      return false;
+    }
 
     if (this.resolve) {
       const r = this.resolve;
       this.resolve = null;
       r({ value: chunk, done: false });
-    } else {
-      this.queue.push(chunk);
+      return true;
     }
+
+    if (this.bufferedBytes + chunk.length > this.maxBufferedBytes) {
+      return false;
+    }
+
+    this.queue.push(chunk);
+    this.bufferedBytes += chunk.length;
+    return true;
   }
 
   end(): void {
@@ -72,8 +86,10 @@ class AudioChunkQueue {
     return {
       next: (): Promise<IteratorResult<Buffer>> => {
         if (this.queue.length > 0) {
+          const value = this.queue.shift()!;
+          this.bufferedBytes = Math.max(0, this.bufferedBytes - value.length);
           return Promise.resolve({
-            value: this.queue.shift()!,
+            value,
             done: false,
           });
         }
@@ -96,9 +112,19 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
   private readonly logger = new Logger(AwsStreamingTranscriptionProvider.name);
   private readonly sessions = new Map<string, ActiveSession>();
   private readonly client: TranscribeStreamingClient;
+  private readonly maxBufferedAudioBytes: number;
 
-  constructor(private readonly awsClientFactory: AwsClientFactory) {
+  constructor(
+    private readonly awsClientFactory: AwsClientFactory,
+    private readonly configService: ConfigService<AppEnv, true>,
+  ) {
     this.client = this.awsClientFactory.createTranscribeStreamingClient();
+    this.maxBufferedAudioBytes = Math.max(
+      64 * 1024,
+      this.configService.get('REALTIME_MAX_BUFFERED_AUDIO_BYTES', {
+        infer: true,
+      }) || DEFAULT_MAX_BUFFERED_AUDIO_BYTES,
+    );
   }
 
   async startSession(options: StreamingSessionOptions): Promise<void> {
@@ -119,7 +145,7 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
       await this.stopSession(meetingId);
     }
 
-    const audioQueue = new AudioChunkQueue();
+    const audioQueue = new AudioChunkQueue(this.maxBufferedAudioBytes);
     const abortController = new AbortController();
 
     const session: ActiveSession = {
@@ -167,10 +193,10 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
     this.runResultLoop(meetingId, command, onTranscript, onError, onClose);
   }
 
-  feedAudio(meetingId: string, chunk: Buffer): void {
+  feedAudio(meetingId: string, chunk: Buffer): boolean {
     const session = this.sessions.get(meetingId);
-    if (!session || session.closed) return;
-    session.audioQueue.push(chunk);
+    if (!session || session.closed) return false;
+    return session.audioQueue.push(chunk);
   }
 
   stopSession(meetingId: string): Promise<void> {
@@ -189,6 +215,10 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
   hasActiveSession(meetingId: string): boolean {
     const session = this.sessions.get(meetingId);
     return !!session && !session.closed;
+  }
+
+  getActiveSessionCount(): number {
+    return this.sessions.size;
   }
 
   /**

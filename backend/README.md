@@ -71,6 +71,10 @@ Required/used variables:
 - `AWS_BEDROCK_MODEL_ID`
 - `AWS_BEDROCK_MAX_TOKENS`
 - `AWS_BEDROCK_TEMPERATURE` (`0` ~ `1`, default recommended: `0`)
+- `REALTIME_MAX_CONCURRENT_SESSIONS` (default: `8`)
+- `REALTIME_MAX_BUFFERED_AUDIO_BYTES` (default: `4194304`)
+- `REALTIME_MAX_AUDIO_CHUNK_BYTES` (default: `65536`)
+- `REALTIME_BACKPRESSURE_RETRY_MS` (default: `200`)
 - `LOG_LEVEL`
 - `CORS_ORIGIN` (comma-separated)
 
@@ -154,8 +158,8 @@ pnpm migration:revert
 - `GET /api/v1/meetings/:meetingId/transcripts/jobs`
 - `POST /api/v1/meetings/:meetingId/transcripts/jobs`
 - WebSocket: `ws://host/ws/transcribe?meetingId=<uuid>`
-  - client event: `audio`
-  - server event: `error` (유효성/권한/처리 오류)
+  - client event: `audio` (ack 기반 backpressure 응답 포함)
+  - server event: `transcript:partial`, `transcript:final`, `transcript:translation`, `transcript:fallback`, `transcript:error`
 
 ## Response Convention
 

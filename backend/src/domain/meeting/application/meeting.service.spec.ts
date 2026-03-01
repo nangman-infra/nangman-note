@@ -3,9 +3,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Repository } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
+import { MeetingSearchDocumentService } from './meeting-search-document.service';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
+import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
 import { MeetingService } from './meeting.service';
 
 describe('MeetingService', () => {
@@ -15,6 +17,12 @@ describe('MeetingService', () => {
   >;
   let promptService: jest.Mocked<Pick<PromptService, 'ensureExists'>>;
   let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
+  let meetingSearchDocumentService: jest.Mocked<
+    Pick<
+      MeetingSearchDocumentService,
+      'refreshByMeetingId' | 'ensureCoverage' | 'search'
+    >
+  >;
 
   const buildMeeting = (
     overrides: Partial<MeetingEntity> = {},
@@ -42,11 +50,17 @@ describe('MeetingService', () => {
     eventEmitter = {
       emit: jest.fn(),
     };
+    meetingSearchDocumentService = {
+      refreshByMeetingId: jest.fn(),
+      ensureCoverage: jest.fn(),
+      search: jest.fn(),
+    };
 
     service = new MeetingService(
       meetingRepository as unknown as Repository<MeetingEntity>,
       promptService as unknown as PromptService,
       eventEmitter as unknown as EventEmitter2,
+      meetingSearchDocumentService as unknown as MeetingSearchDocumentService,
     );
   });
 
@@ -153,6 +167,9 @@ describe('MeetingService', () => {
           status: MeetingStatus.RECORDING,
         }),
       );
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith(created.id);
       expect(result).toEqual(created);
     });
 
@@ -179,6 +196,49 @@ describe('MeetingService', () => {
           title: 'trimmed title',
           promptId: 'prompt_user_custom',
           transcriptionMode: MeetingTranscriptionMode.REALTIME,
+        }),
+      );
+    });
+  });
+
+  describe('search', () => {
+    it('returns mapped search results from projection rows', async () => {
+      meetingSearchDocumentService.ensureCoverage.mockResolvedValue(0);
+      meetingSearchDocumentService.search.mockResolvedValue({
+        rows: [
+          {
+            meetingId: 'meeting-1',
+            title: '주간 운영 회의',
+            noteContent: '이번 주 운영 이슈를 정리합니다.',
+            resultContent: '',
+            transcriptContent: '',
+            status: MeetingStatus.COMPLETED,
+            transcriptionMode: MeetingTranscriptionMode.BATCH,
+            startedAt: new Date('2026-03-01T00:00:00.000Z'),
+          },
+        ],
+        total: 1,
+      });
+
+      const query: SearchMeetingsQueryDto = {
+        q: '운영',
+        scope: 'all',
+      };
+      const response = await service.search(query);
+
+      expect(meetingSearchDocumentService.ensureCoverage).toHaveBeenCalled();
+      expect(meetingSearchDocumentService.search).toHaveBeenCalledWith({
+        loweredKeyword: '운영',
+        scope: 'all',
+        page: 1,
+        limit: 50,
+      });
+      expect(response.pagination.total).toBe(1);
+      expect(response.results[0]).toEqual(
+        expect.objectContaining({
+          meetingId: 'meeting-1',
+          status: MeetingStatus.COMPLETED,
+          transcriptionMode: MeetingTranscriptionMode.BATCH,
         }),
       );
     });

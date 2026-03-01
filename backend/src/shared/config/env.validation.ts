@@ -27,6 +27,10 @@ export interface AppEnv {
   AWS_BEDROCK_MODEL_ID: string;
   AWS_BEDROCK_MAX_TOKENS: number;
   AWS_BEDROCK_TEMPERATURE: number;
+  REALTIME_MAX_CONCURRENT_SESSIONS: number;
+  REALTIME_MAX_BUFFERED_AUDIO_BYTES: number;
+  REALTIME_MAX_AUDIO_CHUNK_BYTES: number;
+  REALTIME_BACKPRESSURE_RETRY_MS: number;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -283,6 +287,26 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
         min: 0,
         max: 1,
       },
+    ),
+    REALTIME_MAX_CONCURRENT_SESSIONS: readNumber(
+      config,
+      'REALTIME_MAX_CONCURRENT_SESSIONS',
+      8,
+    ),
+    REALTIME_MAX_BUFFERED_AUDIO_BYTES: readNumber(
+      config,
+      'REALTIME_MAX_BUFFERED_AUDIO_BYTES',
+      4 * 1024 * 1024,
+    ),
+    REALTIME_MAX_AUDIO_CHUNK_BYTES: readNumber(
+      config,
+      'REALTIME_MAX_AUDIO_CHUNK_BYTES',
+      64 * 1024,
+    ),
+    REALTIME_BACKPRESSURE_RETRY_MS: readNumber(
+      config,
+      'REALTIME_BACKPRESSURE_RETRY_MS',
+      200,
     ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: readString(

@@ -1,12 +1,17 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
+import {
+  MeetingSearchDocumentService,
+  type MeetingSearchDocumentRow,
+} from './meeting-search-document.service';
 import {
   MeetingStatusChangedEvent,
   type MeetingStatusPhase,
@@ -36,11 +41,14 @@ export interface MeetingSearchResult {
 
 @Injectable()
 export class MeetingService {
+  private readonly logger = new Logger(MeetingService.name);
+
   constructor(
     @InjectRepository(MeetingEntity)
     private readonly meetingRepository: Repository<MeetingEntity>,
     private readonly promptService: PromptService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
   ) {}
 
   async create(dto: CreateMeetingDto): Promise<MeetingEntity> {
@@ -60,7 +68,9 @@ export class MeetingService {
       startedAt: new Date(),
     });
 
-    return this.meetingRepository.save(meeting);
+    const saved = await this.meetingRepository.save(meeting);
+    await this.meetingSearchDocumentService.refreshByMeetingId(saved.id);
+    return saved;
   }
 
   async list(query: ListMeetingsQueryDto): Promise<{
@@ -122,7 +132,6 @@ export class MeetingService {
     const scope = query.scope ?? 'all';
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
-    const skip = (page - 1) * limit;
 
     if (keyword.length === 0) {
       throw new BadRequestException('Search query must not be empty');
@@ -133,63 +142,45 @@ export class MeetingService {
     }
 
     const loweredKeyword = keyword.toLowerCase();
-    const likeKeyword = `%${loweredKeyword}%`;
+    try {
+      await this.meetingSearchDocumentService.ensureCoverage();
 
-    let total = 0;
-    let pagedMeetings: MeetingEntity[] = [];
-
-    if (scope === 'title') {
-      const titleQuery = this.meetingRepository
-        .createQueryBuilder('meeting')
-        .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
-          keyword: likeKeyword,
-        });
-
-      total = await titleQuery.clone().getCount();
-      if (total > 0) {
-        pagedMeetings = await titleQuery
-          .clone()
-          .orderBy('meeting.started_at', 'DESC')
-          .offset(skip)
-          .limit(limit)
-          .getMany();
-      }
-    } else {
-      // 암호화된 컬럼(result/note/transcript)은 DB LIKE 검색이 불가능하므로
-      // 복호화된 엔티티 로드 후 애플리케이션 레벨에서 필터링합니다.
-      const meetings = await this.meetingRepository.find({
-        relations: {
-          note: true,
-          result: true,
-          transcripts: true,
-        },
-        order: { startedAt: 'DESC' },
+      const { rows, total } = await this.meetingSearchDocumentService.search({
+        loweredKeyword,
+        scope,
+        page,
+        limit,
       });
 
-      const filtered = meetings.filter((meeting) =>
-        this.matchesSearchScope(meeting, scope, loweredKeyword),
+      const results = rows.map((row) =>
+        this.toSearchResultFromDocument({
+          row,
+          scope,
+          keyword,
+          loweredKeyword,
+        }),
       );
-      total = filtered.length;
-      pagedMeetings = filtered.slice(skip, skip + limit);
-    }
 
-    const results = pagedMeetings.map((meeting) =>
-      this.toSearchResult({
-        meeting,
+      return {
+        results,
+        pagination: {
+          page,
+          limit,
+          total,
+        },
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Search projection unavailable, falling back to legacy search: ${error instanceof Error ? error.message : error}`,
+      );
+      return this.searchLegacy({
         scope,
         keyword,
         loweredKeyword,
-      }),
-    );
-
-    return {
-      results,
-      pagination: {
         page,
         limit,
-        total,
-      },
-    };
+      });
+    }
   }
 
   async findById(id: string): Promise<MeetingEntity> {
@@ -383,6 +374,73 @@ export class MeetingService {
     return { succeeded, failed };
   }
 
+  private async searchLegacy(params: {
+    scope: SearchScope;
+    keyword: string;
+    loweredKeyword: string;
+    page: number;
+    limit: number;
+  }): Promise<{
+    results: MeetingSearchResult[];
+    pagination: { page: number; limit: number; total: number };
+  }> {
+    const { scope, keyword, loweredKeyword, page, limit } = params;
+    const skip = (page - 1) * limit;
+    const likeKeyword = `%${loweredKeyword}%`;
+
+    let total = 0;
+    let pagedMeetings: MeetingEntity[] = [];
+
+    if (scope === 'title') {
+      const titleQuery = this.meetingRepository
+        .createQueryBuilder('meeting')
+        .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
+          keyword: likeKeyword,
+        });
+
+      total = await titleQuery.clone().getCount();
+      if (total > 0) {
+        pagedMeetings = await titleQuery
+          .clone()
+          .orderBy('meeting.started_at', 'DESC')
+          .offset(skip)
+          .limit(limit)
+          .getMany();
+      }
+    } else {
+      const meetings = await this.meetingRepository.find({
+        relations: {
+          note: true,
+          result: true,
+          transcripts: true,
+        },
+        order: { startedAt: 'DESC' },
+      });
+
+      const filtered = meetings.filter((meeting) =>
+        this.matchesSearchScope(meeting, scope, loweredKeyword),
+      );
+      total = filtered.length;
+      pagedMeetings = filtered.slice(skip, skip + limit);
+    }
+
+    return {
+      results: pagedMeetings.map((meeting) =>
+        this.toSearchResultFromMeeting({
+          meeting,
+          scope,
+          keyword,
+          loweredKeyword,
+        }),
+      ),
+      pagination: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
   private matchesSearchScope(
     meeting: MeetingEntity,
     scope: SearchScope,
@@ -415,7 +473,7 @@ export class MeetingService {
     }
   }
 
-  private toSearchResult(params: {
+  private toSearchResultFromMeeting(params: {
     meeting: MeetingEntity;
     scope: SearchScope;
     keyword: string;
@@ -426,7 +484,7 @@ export class MeetingService {
     const title = meeting.title?.trim() ?? '';
     const resultContent = meeting.result?.content?.trim() ?? '';
     const noteContent = meeting.note?.content?.trim() ?? '';
-    const transcriptContent = this.pickTranscriptContent(
+    const transcriptContent = this.pickTranscriptContentFromMeeting(
       meeting,
       loweredKeyword,
     );
@@ -474,7 +532,82 @@ export class MeetingService {
     };
   }
 
-  private pickTranscriptContent(
+  private toSearchResultFromDocument(params: {
+    row: MeetingSearchDocumentRow;
+    scope: SearchScope;
+    keyword: string;
+    loweredKeyword: string;
+  }): MeetingSearchResult {
+    const { row, scope, keyword, loweredKeyword } = params;
+
+    const title = row.title?.trim() ?? '';
+    const resultContent = row.resultContent?.trim() ?? '';
+    const noteContent = row.noteContent?.trim() ?? '';
+    const transcriptContent = this.pickTranscriptContentFromDocument(
+      row.transcriptContent ?? '',
+      loweredKeyword,
+    );
+
+    const candidateOrder: Array<{
+      matchedIn: SearchMatchedIn;
+      content: string;
+    }> =
+      scope === 'all'
+        ? [
+            { matchedIn: 'title', content: title },
+            { matchedIn: 'result', content: resultContent },
+            { matchedIn: 'note', content: noteContent },
+            { matchedIn: 'transcript', content: transcriptContent },
+          ]
+        : [
+            {
+              matchedIn: scope as SearchMatchedIn,
+              content:
+                scope === 'title'
+                  ? title
+                  : scope === 'result'
+                    ? resultContent
+                    : scope === 'note'
+                      ? noteContent
+                      : transcriptContent,
+            },
+          ];
+
+    const matched =
+      candidateOrder.find((candidate) =>
+        candidate.content.toLowerCase().includes(loweredKeyword),
+      ) ??
+      candidateOrder.find((candidate) => candidate.content.length > 0) ??
+      ({ matchedIn: 'title', content: title || keyword } as const);
+
+    return {
+      meetingId: row.meetingId,
+      title: row.title,
+      status: row.status as MeetingStatus,
+      transcriptionMode: row.transcriptionMode as MeetingTranscriptionMode,
+      matchedIn: matched.matchedIn,
+      snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
+      startedAt: new Date(row.startedAt),
+    };
+  }
+
+  private pickTranscriptContentFromDocument(
+    transcriptContent: string,
+    loweredKeyword: string,
+  ): string {
+    const texts = transcriptContent
+      .split('\n')
+      .map((text) => text.trim())
+      .filter((text) => text.length > 0);
+
+    const matched = texts.find((text) =>
+      text.toLowerCase().includes(loweredKeyword),
+    );
+
+    return matched ?? texts[0] ?? '';
+  }
+
+  private pickTranscriptContentFromMeeting(
     meeting: MeetingEntity,
     loweredKeyword: string,
   ): string {

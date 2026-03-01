@@ -114,8 +114,8 @@ export class TranscriptionService {
   /**
    * 오디오 청크를 실시간 전사 세션에 전달
    */
-  feedRealtimeAudio(meetingId: string, chunk: Buffer): void {
-    this.streamingProvider.feedAudio(meetingId, chunk);
+  feedRealtimeAudio(meetingId: string, chunk: Buffer): boolean {
+    return this.streamingProvider.feedAudio(meetingId, chunk);
   }
 
   /**
@@ -131,6 +131,26 @@ export class TranscriptionService {
    */
   hasActiveRealtimeSession(meetingId: string): boolean {
     return this.streamingProvider.hasActiveSession(meetingId);
+  }
+
+  getActiveRealtimeSessionCount(): number {
+    return this.streamingProvider.getActiveSessionCount();
+  }
+
+  async switchMeetingToBatchFallback(meetingId: string): Promise<boolean> {
+    const meeting = await this.meetingService.findById(meetingId);
+
+    if (meeting.transcriptionMode !== MeetingTranscriptionMode.REALTIME) {
+      return false;
+    }
+
+    await this.meetingService.updatePrompt(meetingId, {
+      transcriptionMode: MeetingTranscriptionMode.BATCH,
+    });
+    this.logger.warn(
+      `Meeting ${meetingId} switched from realtime to batch due to capacity constraints`,
+    );
+    return true;
   }
 
   /** 레거시: acceptRealtimeAudioChunk (이전 플레이스홀더 호환) */
