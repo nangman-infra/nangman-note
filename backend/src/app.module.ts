@@ -10,6 +10,7 @@ import { PromptModule } from './domain/prompt/prompt.module';
 import { ResultModule } from './domain/result/result.module';
 import { TranscriptionModule } from './domain/transcription/transcription.module';
 import { AwsModule } from './shared/aws/aws.module';
+import { CryptoModule } from './shared/crypto/crypto.module';
 import { AppEnv, validateEnv } from './shared/config/env.validation';
 import { buildTypeOrmModuleOptions } from './shared/config/typeorm-options.factory';
 
@@ -65,6 +66,7 @@ import { buildTypeOrmModuleOptions } from './shared/config/typeorm-options.facto
       },
     }),
     AwsModule,
+    CryptoModule,
     PromptModule,
     MeetingModule,
     NoteModule,
