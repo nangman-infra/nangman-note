@@ -96,6 +96,10 @@ export function useTranscription(
       handlePayload(payload);
     });
 
+    socket.on('transcript:translation', (payload: RealtimeTranscriptPayload) => {
+      handlePayload(payload);
+    });
+
     socket.on('transcript:error', (err: { message?: string }) => {
       setError(err.message || 'Transcription stream error');
     });

@@ -18,7 +18,7 @@ export class TranslateService {
 
   constructor(private readonly awsClientFactory: AwsClientFactory) {
     // AWS SDK v3 Translate 타입 해석 이슈로 no-unsafe-assignment 오탐 방지
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     this.client = this.awsClientFactory.createTranslateClient();
   }
 
@@ -43,7 +43,7 @@ export class TranslateService {
 
     try {
       // AWS SDK v3 Translate 타입 해석 이슈로 no-unsafe-assignment/no-unsafe-call 오탐 방지
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+
       const command = new TranslateTextCommand({
         Text: text,
         SourceLanguageCode: sourceLanguage,
@@ -51,7 +51,7 @@ export class TranslateService {
       });
 
       // AWS SDK v3 Translate 타입 해석 이슈로 no-unsafe-assignment/no-unsafe-call/no-unsafe-member-access 오탐 방지
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+
       const response = (await this.client.send(command)) as {
         TranslatedText?: string;
         SourceLanguageCode?: string;

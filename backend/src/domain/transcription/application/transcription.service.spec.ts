@@ -11,12 +11,18 @@ import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum'
 import type { BatchTranscriptionProvider } from './ports/batch-transcription-provider.port';
 import type { StreamingTranscriptionProvider } from './ports/streaming-transcription-provider.port';
 import type { TranslateService } from '../../../shared/aws/translate/translate.service';
-import { TranscriptionService } from './transcription.service';
+import {
+  type RealtimeTranscriptPayload,
+  TranscriptionService,
+} from './transcription.service';
 
 describe('TranscriptionService', () => {
   let service: TranscriptionService;
   let transcriptRepository: jest.Mocked<
-    Pick<Repository<TranscriptSegmentEntity>, 'find'>
+    Pick<
+      Repository<TranscriptSegmentEntity>,
+      'find' | 'create' | 'save' | 'update'
+    >
   >;
   let transcriptionJobRepository: jest.Mocked<
     Pick<Repository<TranscriptionJobEntity>, 'find' | 'create' | 'save'>
@@ -61,6 +67,9 @@ describe('TranscriptionService', () => {
   beforeEach(() => {
     transcriptRepository = {
       find: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      update: jest.fn(),
     };
     transcriptionJobRepository = {
       find: jest.fn(),
@@ -138,6 +147,105 @@ describe('TranscriptionService', () => {
       await expect(
         service.ensureRealtimeEnabled('meeting-1'),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('realtime translation flow', () => {
+    it('emits final immediately and sends translation update later', async () => {
+      const payloads: RealtimeTranscriptPayload[] = [];
+
+      let onTranscriptHandler:
+        | ((event: {
+            type: 'partial' | 'final';
+            resultId: string;
+            text: string;
+            startTime: number;
+            endTime: number;
+            detectedLanguage?: string;
+          }) => void)
+        | undefined;
+
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({
+          transcriptionMode: MeetingTranscriptionMode.REALTIME,
+          translateTargetLanguage: 'en',
+        }),
+      );
+
+      streamingProvider.startSession.mockImplementation((options) => {
+        onTranscriptHandler = options.onTranscript;
+        return Promise.resolve();
+      });
+
+      const deferredTranslate = new Promise<{
+        translatedText: string;
+        sourceLanguageCode: string;
+        targetLanguageCode: string;
+      }>((resolve) => {
+        setTimeout(() => {
+          resolve({
+            translatedText: 'hello team',
+            sourceLanguageCode: 'ko',
+            targetLanguageCode: 'en',
+          });
+        }, 0);
+      });
+
+      translateService.isSameLanguage.mockReturnValue(false);
+      translateService.translateText.mockReturnValue(deferredTranslate);
+
+      transcriptRepository.create.mockImplementation(
+        (entity) => entity as TranscriptSegmentEntity,
+      );
+      transcriptRepository.save.mockResolvedValue({
+        id: 'segment-1',
+      } as TranscriptSegmentEntity);
+      transcriptRepository.update.mockResolvedValue({
+        generatedMaps: [],
+        raw: [],
+        affected: 1,
+      });
+
+      await service.startRealtimeSession(
+        'meeting-1',
+        (payload) => payloads.push(payload),
+        jest.fn(),
+        jest.fn(),
+      );
+
+      expect(onTranscriptHandler).toBeDefined();
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'result-1',
+        text: '안녕하세요 팀',
+        startTime: 0,
+        endTime: 1.5,
+        detectedLanguage: 'ko-KR',
+      });
+
+      // final은 번역 완료를 기다리지 않고 즉시 전달
+      expect(payloads[0]).toMatchObject({
+        type: 'final',
+        resultId: 'result-1',
+        text: '안녕하세요 팀',
+        translationPending: true,
+      });
+
+      await deferredTranslate;
+      await Promise.resolve();
+
+      expect(payloads).toContainEqual(
+        expect.objectContaining({
+          type: 'translation',
+          resultId: 'result-1',
+          translatedText: 'hello team',
+        }),
+      );
+
+      expect(transcriptRepository.update).toHaveBeenCalledWith(
+        { id: 'segment-1' },
+        { translatedText: 'hello team' },
+      );
     });
   });
 

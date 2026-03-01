@@ -234,7 +234,11 @@ export class TranscriptionGateway
     payload: RealtimeTranscriptPayload,
   ): void {
     const eventName =
-      payload.type === 'partial' ? 'transcript:partial' : 'transcript:final';
+      payload.type === 'partial'
+        ? 'transcript:partial'
+        : payload.type === 'final'
+          ? 'transcript:final'
+          : 'transcript:translation';
     this.server.to(meetingId).emit(eventName, payload);
   }
 

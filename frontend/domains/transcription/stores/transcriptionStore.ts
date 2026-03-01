@@ -36,6 +36,7 @@ export interface FinalSegment {
   resultId: string;
   text: string;
   translatedText?: string;
+  translationStatus?: 'pending' | 'done' | 'failed';
   startTime: number;
   endTime: number;
   detectedLanguage?: string;
@@ -78,6 +79,23 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
   error: null,
 
   handlePayload: (payload: RealtimeTranscriptPayload) => {
+    if (payload.type === 'translation') {
+      set((state) => ({
+        ...state,
+        segments: state.segments.map((segment) => {
+          if (segment.resultId !== payload.resultId) {
+            return segment;
+          }
+          return {
+            ...segment,
+            translatedText: payload.translatedText ?? segment.translatedText,
+            translationStatus: payload.failed ? 'failed' : 'done',
+          };
+        }),
+      }));
+      return;
+    }
+
     if (payload.type === 'partial') {
       const cleanedPartial = squashExcessiveTokenRepeats(payload.text);
       set((state) => {
@@ -136,6 +154,11 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
               resultId: payload.resultId,
               text: cleanedFinal,
               translatedText: payload.translatedText,
+              translationStatus: payload.translationPending
+                ? 'pending'
+                : payload.translatedText
+                  ? 'done'
+                  : undefined,
               startTime: payload.startTime,
               endTime: payload.endTime,
               detectedLanguage: payload.detectedLanguage,

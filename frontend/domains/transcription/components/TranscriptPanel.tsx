@@ -174,6 +174,11 @@ export function TranscriptPanel({
                     {seg.translatedText}
                   </p>
                 )}
+                {!seg.translatedText && seg.translationStatus === 'pending' && (
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-400">
+                    번역 중...
+                  </p>
+                )}
               </div>
             </div>
           </div>

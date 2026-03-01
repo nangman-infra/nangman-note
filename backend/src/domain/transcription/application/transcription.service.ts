@@ -24,15 +24,28 @@ import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum'
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 
 /** 프론트에 emit할 partial/final 이벤트 페이로드 */
-export interface RealtimeTranscriptPayload {
+export interface RealtimeTranscriptContentPayload {
   type: 'partial' | 'final';
   resultId: string;
   text: string;
   translatedText?: string;
+  translationPending?: boolean;
   startTime: number;
   endTime: number;
   detectedLanguage?: string;
 }
+
+/** 프론트에 emit할 번역 후행 완료 이벤트 페이로드 */
+export interface RealtimeTranslationPayload {
+  type: 'translation';
+  resultId: string;
+  translatedText?: string;
+  failed?: boolean;
+}
+
+export type RealtimeTranscriptPayload =
+  | RealtimeTranscriptContentPayload
+  | RealtimeTranslationPayload;
 
 @Injectable()
 export class TranscriptionService {
@@ -84,7 +97,7 @@ export class TranscriptionService {
       meetingId,
       languageCode: meeting.languageCode || null,
       onTranscript: (event: StreamingTranscriptEvent) => {
-        void this.handleTranscriptEvent(
+        this.handleTranscriptEvent(
           meetingId,
           event,
           translateTarget,
@@ -214,15 +227,15 @@ export class TranscriptionService {
    * - partial: 바로 프론트에 전달 (번역 X, DB 저장 X)
    * - final: 번역(필요시) + DB 저장 + 프론트에 전달
    */
-  private async handleTranscriptEvent(
+  private handleTranscriptEvent(
     meetingId: string,
     event: StreamingTranscriptEvent,
     translateTarget: string | null,
     onPayload: (payload: RealtimeTranscriptPayload) => void,
-  ): Promise<void> {
+  ): void {
     if (event.type === 'partial') {
       // partial은 번역/저장 없이 바로 전달
-      onPayload({
+      this.emitPayload(onPayload, {
         type: 'partial',
         resultId: event.resultId,
         text: event.text,
@@ -233,33 +246,52 @@ export class TranscriptionService {
       return;
     }
 
-    // final 결과: 번역 + DB 저장
-    let translatedText: string | undefined;
+    const translationPending = this.shouldTranslate(
+      translateTarget,
+      event.detectedLanguage,
+    );
 
-    if (
-      translateTarget &&
-      !this.translateService.isSameLanguage(
-        event.detectedLanguage,
-        translateTarget,
-      )
-    ) {
-      try {
-        const result = await this.translateService.translateText(
-          event.text,
-          translateTarget,
-          event.detectedLanguage
-            ? event.detectedLanguage.split('-')[0]
-            : 'auto',
-        );
-        translatedText = result.translatedText;
-      } catch (error) {
-        this.logger.warn(
-          `Translation failed for meeting ${meetingId}: ${error}`,
-        );
-      }
-    }
+    // final 원문은 즉시 전달 (번역 완료를 기다리지 않음)
+    this.emitPayload(onPayload, {
+      type: 'final',
+      resultId: event.resultId,
+      text: event.text,
+      translationPending,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      detectedLanguage: event.detectedLanguage,
+    });
 
     // DB 저장 (암호화는 EncryptionSubscriber가 자동 처리)
+    const savedSegmentIdPromise = this.saveFinalSegment(meetingId, event);
+
+    // 번역이 필요한 경우에만 후행 처리
+    if (translationPending && translateTarget) {
+      void this.translateAndPatchSegment(
+        meetingId,
+        event,
+        translateTarget,
+        onPayload,
+        savedSegmentIdPromise,
+      );
+    }
+  }
+
+  private shouldTranslate(
+    translateTarget: string | null,
+    detectedLanguage: string | undefined,
+  ): boolean {
+    if (!translateTarget) return false;
+    return !this.translateService.isSameLanguage(
+      detectedLanguage,
+      translateTarget,
+    );
+  }
+
+  private async saveFinalSegment(
+    meetingId: string,
+    event: StreamingTranscriptEvent,
+  ): Promise<string | null> {
     try {
       const segment = this.transcriptRepository.create({
         meetingId,
@@ -267,26 +299,76 @@ export class TranscriptionService {
         endTime: event.endTime,
         text: event.text,
         confidence: 0.95, // Transcribe Streaming은 개별 confidence를 주지 않음
-        translatedText,
         detectedLanguage: event.detectedLanguage,
       });
-      await this.transcriptRepository.save(segment);
+      const saved = await this.transcriptRepository.save(segment);
+      return saved.id;
     } catch (error) {
       this.logger.warn(
         `Failed to save transcript segment for meeting ${meetingId}: ${error}`,
       );
+      return null;
     }
+  }
 
-    // 프론트에 전달
-    onPayload({
-      type: 'final',
-      resultId: event.resultId,
-      text: event.text,
-      translatedText,
-      startTime: event.startTime,
-      endTime: event.endTime,
-      detectedLanguage: event.detectedLanguage,
-    });
+  private async translateAndPatchSegment(
+    meetingId: string,
+    event: StreamingTranscriptEvent,
+    translateTarget: string,
+    onPayload: (payload: RealtimeTranscriptPayload) => void,
+    savedSegmentIdPromise: Promise<string | null>,
+  ): Promise<void> {
+    try {
+      const result = await this.translateService.translateText(
+        event.text,
+        translateTarget,
+        event.detectedLanguage ? event.detectedLanguage.split('-')[0] : 'auto',
+      );
+      const translatedText = result.translatedText?.trim();
+
+      if (!translatedText) {
+        this.emitPayload(onPayload, {
+          type: 'translation',
+          resultId: event.resultId,
+          failed: true,
+        });
+        return;
+      }
+
+      this.emitPayload(onPayload, {
+        type: 'translation',
+        resultId: event.resultId,
+        translatedText,
+      });
+
+      const savedSegmentId = await savedSegmentIdPromise;
+      if (savedSegmentId) {
+        await this.transcriptRepository.update(
+          { id: savedSegmentId },
+          { translatedText },
+        );
+      }
+    } catch (error) {
+      this.logger.warn(`Translation failed for meeting ${meetingId}: ${error}`);
+      this.emitPayload(onPayload, {
+        type: 'translation',
+        resultId: event.resultId,
+        failed: true,
+      });
+    }
+  }
+
+  private emitPayload(
+    onPayload: (payload: RealtimeTranscriptPayload) => void,
+    payload: RealtimeTranscriptPayload,
+  ): void {
+    try {
+      onPayload(payload);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to emit transcript payload: ${error instanceof Error ? error.message : error}`,
+      );
+    }
   }
 
   private toBuffer(payload: unknown): Buffer | null {
