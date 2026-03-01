@@ -74,7 +74,7 @@ describe('MeetingService', () => {
       );
     });
 
-    it('sets realtime meeting to completed', async () => {
+    it('sets realtime meeting to processing for result generation', async () => {
       const meeting = buildMeeting({
         transcriptionMode: MeetingTranscriptionMode.REALTIME,
       });
@@ -85,19 +85,19 @@ describe('MeetingService', () => {
 
       const result = await service.complete(meeting.id);
 
-      expect(result.status).toBe(MeetingStatus.COMPLETED);
+      expect(result.status).toBe(MeetingStatus.PROCESSING);
       expect(result.endedAt).toBeInstanceOf(Date);
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         MeetingStatusChangedEvent.EVENT_NAME,
         expect.objectContaining({
           meetingId: meeting.id,
-          status: MeetingStatus.COMPLETED,
-          phase: 'completed',
+          status: MeetingStatus.PROCESSING,
+          phase: 'generating',
         }),
       );
     });
 
-    it('sets batch meeting to completed when skipTranscription=true', async () => {
+    it('sets batch meeting to processing when skipTranscription=true', async () => {
       const meeting = buildMeeting({
         transcriptionMode: MeetingTranscriptionMode.BATCH,
       });
@@ -110,14 +110,14 @@ describe('MeetingService', () => {
         skipTranscription: true,
       });
 
-      expect(result.status).toBe(MeetingStatus.COMPLETED);
+      expect(result.status).toBe(MeetingStatus.PROCESSING);
       expect(result.endedAt).toBeInstanceOf(Date);
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         MeetingStatusChangedEvent.EVENT_NAME,
         expect.objectContaining({
           meetingId: meeting.id,
-          status: MeetingStatus.COMPLETED,
-          phase: 'completed',
+          status: MeetingStatus.PROCESSING,
+          phase: 'generating',
         }),
       );
     });
