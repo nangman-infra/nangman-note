@@ -10,14 +10,15 @@ describe('NoteService', () => {
   >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
 
-  const buildNote = (overrides: Partial<NoteEntity> = {}): NoteEntity => ({
-    id: 'note-1',
-    meetingId: 'meeting-1',
-    content: '기본 노트',
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:00:00.000Z'),
-    ...overrides,
-  });
+  const buildNote = (overrides: Partial<NoteEntity> = {}): NoteEntity =>
+    ({
+      id: 'note-1',
+      meetingId: 'meeting-1',
+      content: '기본 노트',
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      ...overrides,
+    }) as unknown as NoteEntity;
 
   beforeEach(() => {
     noteRepository = {
@@ -66,7 +67,7 @@ describe('NoteService', () => {
     it('updates existing note content', async () => {
       const existing = buildNote({ content: 'before' });
       noteRepository.findOne.mockResolvedValue(existing);
-      noteRepository.save.mockImplementation((note) => Promise.resolve(note));
+      noteRepository.save.mockImplementation((note) => Promise.resolve(note as NoteEntity));
 
       const result = await service.upsert('meeting-1', { content: 'after' });
 

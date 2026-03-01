@@ -33,51 +33,54 @@ describe('ResultService', () => {
 
   const buildMeeting = (
     overrides: Partial<MeetingEntity> = {},
-  ): MeetingEntity => ({
-    id: 'meeting-1',
-    title: '테스트 회의',
-    promptId: 'prompt_default_meeting',
-    status: MeetingStatus.COMPLETED,
-    transcriptionMode: MeetingTranscriptionMode.BATCH,
-    startedAt: new Date('2026-03-01T00:00:00.000Z'),
-    endedAt: new Date('2026-03-01T00:10:00.000Z'),
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:10:00.000Z'),
-    ...overrides,
-  });
+  ): MeetingEntity =>
+    ({
+      id: 'meeting-1',
+      title: '테스트 회의',
+      promptId: 'prompt_default_meeting',
+      status: MeetingStatus.COMPLETED,
+      transcriptionMode: MeetingTranscriptionMode.BATCH,
+      startedAt: new Date('2026-03-01T00:00:00.000Z'),
+      endedAt: new Date('2026-03-01T00:10:00.000Z'),
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:10:00.000Z'),
+      ...overrides,
+    }) as unknown as MeetingEntity;
 
   const buildPrompt = (
     overrides: Partial<PromptEntity> = {},
-  ): PromptEntity => ({
-    id: 'prompt_default_meeting',
-    name: '기본 프롬프트',
-    content: '회의 요약 생성',
-    isDefault: true,
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:00:00.000Z'),
-    meetings: [],
-    results: [],
-    ...overrides,
-  });
+  ): PromptEntity =>
+    ({
+      id: 'prompt_default_meeting',
+      name: '기본 프롬프트',
+      content: '회의 요약 생성',
+      isDefault: true,
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      meetings: [],
+      results: [],
+      ...overrides,
+    }) as unknown as PromptEntity;
 
   const buildResult = (
     overrides: Partial<ResultEntity> = {},
-  ): ResultEntity => ({
-    id: 'result-1',
-    meetingId: 'meeting-1',
-    promptId: 'prompt_default_meeting',
-    content: '# 결과',
-    metadata: {
-      title: '테스트 회의',
-      generatedAt: '2026-03-01T00:10:00.000Z',
-      totalDuration: 600,
-      transcriptWordCount: 4,
-      noteLength: 6,
-    },
-    createdAt: new Date('2026-03-01T00:10:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:10:00.000Z'),
-    ...overrides,
-  });
+  ): ResultEntity =>
+    ({
+      id: 'result-1',
+      meetingId: 'meeting-1',
+      promptId: 'prompt_default_meeting',
+      content: '# 결과',
+      metadata: {
+        title: '테스트 회의',
+        generatedAt: '2026-03-01T00:10:00.000Z',
+        totalDuration: 600,
+        transcriptWordCount: 4,
+        noteLength: 6,
+      },
+      createdAt: new Date('2026-03-01T00:10:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:10:00.000Z'),
+      ...overrides,
+    }) as unknown as ResultEntity;
 
   beforeEach(() => {
     resultRepository = {
@@ -149,7 +152,7 @@ describe('ResultService', () => {
         (entity) => entity as ResultEntity,
       );
       resultRepository.save.mockImplementation((entity) =>
-        Promise.resolve(entity),
+        Promise.resolve(entity as ResultEntity),
       );
 
       const result = await service.findByMeetingId('meeting-1');
@@ -185,7 +188,7 @@ describe('ResultService', () => {
       meetingService.findById.mockResolvedValue(buildMeeting());
       resultRepository.findOne.mockResolvedValue(existing);
       resultRepository.save.mockImplementation((entity) =>
-        Promise.resolve(entity),
+        Promise.resolve(entity as ResultEntity),
       );
 
       const updated = await service.update('meeting-1', {
@@ -205,7 +208,7 @@ describe('ResultService', () => {
       meetingService.findById.mockResolvedValue(buildMeeting());
       meetingService.updatePrompt.mockResolvedValue(buildMeeting());
       resultRepository.findOne.mockResolvedValue(existing);
-      promptService.ensureExists.mockResolvedValue(buildPrompt());
+      promptService.ensureExists.mockResolvedValue(undefined as unknown as void);
       promptService.findById.mockResolvedValue(
         buildPrompt({
           id: updatedPromptId,
@@ -220,11 +223,11 @@ describe('ResultService', () => {
         content: '테스트 노트',
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } as unknown as NoteEntity);
       transcriptRepository.find.mockResolvedValue([]);
       bedrockService.generateMeetingResult.mockResolvedValue('재생성 결과');
       resultRepository.save.mockImplementation((entity) =>
-        Promise.resolve(entity),
+        Promise.resolve(entity as ResultEntity),
       );
 
       const regenerated = await service.regenerate('meeting-1', {

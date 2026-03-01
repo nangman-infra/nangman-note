@@ -18,16 +18,17 @@ describe('MeetingService', () => {
 
   const buildMeeting = (
     overrides: Partial<MeetingEntity> = {},
-  ): MeetingEntity => ({
-    id: 'meeting-1',
-    promptId: 'prompt_default_meeting',
-    status: MeetingStatus.RECORDING,
-    transcriptionMode: MeetingTranscriptionMode.BATCH,
-    startedAt: new Date('2026-03-01T00:00:00.000Z'),
-    createdAt: new Date('2026-03-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-03-01T00:00:00.000Z'),
-    ...overrides,
-  });
+  ): MeetingEntity =>
+    ({
+      id: 'meeting-1',
+      promptId: 'prompt_default_meeting',
+      status: MeetingStatus.RECORDING,
+      transcriptionMode: MeetingTranscriptionMode.BATCH,
+      startedAt: new Date('2026-03-01T00:00:00.000Z'),
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      ...overrides,
+    }) as unknown as MeetingEntity;
 
   beforeEach(() => {
     meetingRepository = {
@@ -56,7 +57,7 @@ describe('MeetingService', () => {
       });
       meetingRepository.findOne.mockResolvedValue(meeting);
       meetingRepository.save.mockImplementation((value) =>
-        Promise.resolve(value),
+        Promise.resolve(value as MeetingEntity),
       );
 
       const result = await service.complete(meeting.id);
@@ -80,7 +81,7 @@ describe('MeetingService', () => {
       });
       meetingRepository.findOne.mockResolvedValue(meeting);
       meetingRepository.save.mockImplementation((value) =>
-        Promise.resolve(value),
+        Promise.resolve(value as MeetingEntity),
       );
 
       const result = await service.complete(meeting.id);
@@ -103,7 +104,7 @@ describe('MeetingService', () => {
       });
       meetingRepository.findOne.mockResolvedValue(meeting);
       meetingRepository.save.mockImplementation((value) =>
-        Promise.resolve(value),
+        Promise.resolve(value as MeetingEntity),
       );
 
       const result = await service.complete(meeting.id, {

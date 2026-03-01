@@ -18,7 +18,7 @@ describe('BedrockService', () => {
       createBedrockRuntimeClient: jest.fn().mockReturnValue(mockClient),
     } as unknown as AwsClientFactory;
 
-    const configMap: AppEnv = {
+    const configMap = {
       PORT: 9999,
       NODE_ENV: 'test',
       DB_PATH: ':memory:',
@@ -36,9 +36,9 @@ describe('BedrockService', () => {
       AWS_BEDROCK_TEMPERATURE: 0,
       LOG_LEVEL: 'debug',
       CORS_ORIGIN: 'http://localhost:3000',
-    };
+    } as unknown as AppEnv;
     const configService = {
-      get: jest.fn((key: keyof AppEnv) => configMap[key]),
+      get: jest.fn((key: string) => (configMap as unknown as Record<string, unknown>)[key]),
     } as unknown as ConfigService<AppEnv, true>;
 
     const service = new BedrockService(configService, awsClientFactory);

@@ -1,5 +1,6 @@
 import { EncryptionService } from './encryption.service';
 import { ConfigService } from '@nestjs/config';
+import type { AppEnv } from '../config/env.validation';
 
 describe('EncryptionService', () => {
   let service: EncryptionService;
@@ -9,7 +10,7 @@ describe('EncryptionService', () => {
       get: jest
         .fn()
         .mockReturnValue('dev-only-encryption-key-replace-in-production'),
-    } as unknown as ConfigService;
+    } as unknown as ConfigService<AppEnv, true>;
 
     service = new EncryptionService(configService);
   });
@@ -50,7 +51,7 @@ describe('EncryptionService', () => {
     const hexKey = 'a'.repeat(64);
     const configService = {
       get: jest.fn().mockReturnValue(hexKey),
-    } as unknown as ConfigService;
+    } as unknown as ConfigService<AppEnv, true>;
 
     const hexService = new EncryptionService(configService);
     const plaintext = '테스트';
