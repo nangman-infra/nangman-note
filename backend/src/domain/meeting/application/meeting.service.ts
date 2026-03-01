@@ -241,20 +241,26 @@ export class MeetingService {
     const meeting = await this.findById(id);
     const skipTranscription = options?.skipTranscription ?? false;
 
-    const shouldProcessBatch =
+    const isBatchWithTranscription =
       meeting.transcriptionMode === MeetingTranscriptionMode.BATCH &&
       !skipTranscription;
 
-    meeting.status = shouldProcessBatch
-      ? MeetingStatus.PROCESSING
-      : MeetingStatus.COMPLETED;
+    // 배치 모드: PROCESSING (배치 전사 대기)
+    // 실시간 모드: PROCESSING (AI 결과 생성 대기)
+    // skipTranscription(전사 없음): COMPLETED
+    if (isBatchWithTranscription) {
+      meeting.status = MeetingStatus.PROCESSING;
+      meeting.endedAt = new Date();
+      const updated = await this.meetingRepository.save(meeting);
+      this.emitStatusChanged(updated.id, updated.status, 'transcribing');
+      return updated;
+    }
+
+    // 실시간 모드 또는 전사 없음 → PROCESSING 후 결과 생성 시 COMPLETED
+    meeting.status = MeetingStatus.PROCESSING;
     meeting.endedAt = new Date();
     const updated = await this.meetingRepository.save(meeting);
-    this.emitStatusChanged(
-      updated.id,
-      updated.status,
-      shouldProcessBatch ? 'transcribing' : 'completed',
-    );
+    this.emitStatusChanged(updated.id, updated.status, 'generating');
     return updated;
   }
 

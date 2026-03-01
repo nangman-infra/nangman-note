@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -391,6 +392,31 @@ export class TranscriptionResultCollectorService {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 'generating' phase 이벤트 핸들러.
+   * 실시간 모드에서 회의 종료 시 complete()가 PROCESSING + 'generating'을 emit하면
+   * 여기서 AI 결과 생성 + COMPLETED 전환을 처리합니다.
+   */
+  @OnEvent(MeetingStatusChangedEvent.EVENT_NAME, { async: true })
+  async handleGeneratingPhase(event: MeetingStatusChangedEvent): Promise<void> {
+    if (event.phase !== 'generating') return;
+
+    this.logger.log(
+      `Generating result for meeting ${event.meetingId} (realtime mode)`,
+    );
+
+    try {
+      await this.triggerResultGeneration(event.meetingId);
+      await this.updateMeetingStatus(event.meetingId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate result for meeting ${event.meetingId}: ${error instanceof Error ? error.message : error}`,
+      );
+      // 실패해도 COMPLETED로 전환 (사용자가 결과 페이지에서 재생성 가능)
+      await this.updateMeetingStatus(event.meetingId);
+    }
   }
 
   private emitGeneratingPhase(meetingId: string): void {
