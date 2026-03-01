@@ -160,16 +160,41 @@ export class ResultService {
   }
 
   private async generateAndSave(meetingId: string): Promise<ResultEntity> {
+    // 생성 직전에 한번 더 확인 (race condition 방지)
+    const existingCheck = await this.resultRepository.findOne({
+      where: { meetingId },
+    });
+    if (existingCheck) {
+      return existingCheck;
+    }
+
     const payload = await this.generateResultPayload(meetingId);
 
-    return this.resultRepository.save(
-      this.resultRepository.create({
-        meetingId,
-        promptId: payload.promptId,
-        content: payload.content,
-        metadata: payload.metadata,
-      }),
-    );
+    try {
+      return await this.resultRepository.save(
+        this.resultRepository.create({
+          meetingId,
+          promptId: payload.promptId,
+          content: payload.content,
+          metadata: payload.metadata,
+        }),
+      );
+    } catch (error) {
+      // UNIQUE constraint 실패 시 이미 생성된 결과를 반환
+      if (
+        error instanceof Error &&
+        error.message.includes('UNIQUE constraint failed')
+      ) {
+        this.logger.warn(
+          `Duplicate result generation for meeting ${meetingId}, returning existing`,
+        );
+        const fallback = await this.resultRepository.findOne({
+          where: { meetingId },
+        });
+        if (fallback) return fallback;
+      }
+      throw error;
+    }
   }
 
   private async generateResultPayload(
