@@ -4,6 +4,25 @@ import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
 import '@toast-ui/editor/dist/toastui-editor.css';
 import './globals.css';
 
+/**
+ * 모든 페이지를 동적 렌더링으로 전환.
+ * layout.tsx에서 process.env.WS_URL 을 런타임에 읽어야 하므로
+ * 빌드 타임에 정적으로 고정되면 안 됩니다.
+ */
+export const dynamic = 'force-dynamic';
+
+/**
+ * 런타임 환경변수를 클라이언트에 주입하기 위한 스크립트.
+ * NEXT_PUBLIC_* 와 달리 빌드 타임이 아닌 런타임에 읽힌다.
+ * → 하나의 Docker 이미지를 여러 환경에서 재사용 가능.
+ */
+function buildRuntimeEnvScript(): string {
+  const runtimeEnv = {
+    WS_URL: process.env.WS_URL || '',
+  };
+  return `window.__RUNTIME_ENV__=${JSON.stringify(runtimeEnv)};`;
+}
+
 const manrope = Manrope({
   variable: '--font-display',
   subsets: ['latin'],
@@ -30,6 +49,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: buildRuntimeEnvScript() }}
+        />
+      </head>
       <body className={`${manrope.variable} ${plexMono.variable} antialiased`}>
         <FeedbackProvider>{children}</FeedbackProvider>
       </body>

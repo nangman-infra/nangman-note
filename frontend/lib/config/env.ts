@@ -16,19 +16,19 @@ const commonSchema = z.object({
 
 /**
  * API_URL: same-origin 프록시를 사용하므로 기본값은 빈 문자열.
- * Next.js rewrites 가 /api/* → 백엔드, /ws/* → 백엔드 로 프록시합니다.
+ * Next.js rewrites 가 /api/* → 백엔드로 프록시합니다.
  * 빈 문자열이면 axios baseURL이 현재 origin을 사용합니다.
+ *
+ * WS_URL은 런타임 환경변수로 전환됨 → runtime-env.ts 참고.
  */
 const endpointSchema = z.object({
   NEXT_PUBLIC_API_URL: z.string().trim().default(''),
-  NEXT_PUBLIC_WS_URL: z.string().trim().default(''),
 });
 
 const envSchema = endpointSchema.merge(commonSchema);
 
 const parsedEnv = envSchema.safeParse({
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-  NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
   NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
   NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
   NEXT_PUBLIC_ENABLE_OFFLINE: process.env.NEXT_PUBLIC_ENABLE_OFFLINE,
@@ -47,8 +47,6 @@ export const env = Object.freeze({
   MODE: runtimeMode,
   /** API base URL. 빈 문자열이면 same-origin (Next.js rewrite 프록시). */
   API_URL: parsedEnv.data.NEXT_PUBLIC_API_URL,
-  /** WebSocket base URL. 빈 문자열이면 same-origin (Next.js rewrite 프록시). */
-  WS_URL: parsedEnv.data.NEXT_PUBLIC_WS_URL,
   APP_NAME: parsedEnv.data.NEXT_PUBLIC_APP_NAME,
   APP_VERSION: parsedEnv.data.NEXT_PUBLIC_APP_VERSION,
   ENABLE_OFFLINE: parsedEnv.data.NEXT_PUBLIC_ENABLE_OFFLINE,
