@@ -647,9 +647,11 @@ export class ResultService {
 
   private loadPdfFontBytes(): Uint8Array | null {
     const candidates = [
-      // 번들 폰트 (Docker 컨테이너 + 로컬)
-      join(__dirname, '..', '..', '..', '..', 'assets', 'fonts', 'NotoSansKR-Regular.ttf'),
+      // Docker 컨테이너 (Pretendard TTF, font stage에서 복사)
+      join(__dirname, '..', '..', '..', '..', 'assets', 'fonts', 'KoreanFont.ttf'),
+      '/app/assets/fonts/KoreanFont.ttf',
       // macOS 시스템 폰트 (개발 환경 폴백)
+      '/System/Library/Fonts/Supplemental/AppleGothic.ttf',
       '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
       '/Library/Fonts/Arial Unicode.ttf',
     ];
