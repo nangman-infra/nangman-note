@@ -26,6 +26,10 @@ function isNextAuthPath(pathname: string): boolean {
   return pathname === '/api/auth' || pathname.startsWith('/api/auth/');
 }
 
+function isHealthPath(pathname: string): boolean {
+  return pathname === '/api/health';
+}
+
 /**
  * Next.js Proxy — /api/*, /ws/* 요청을 런타임 BACKEND_URL로 프록시합니다.
  *
@@ -48,7 +52,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (!isBackendProxyPath(pathname) || isNextAuthPath(pathname)) {
+  if (!isBackendProxyPath(pathname) || isNextAuthPath(pathname) || isHealthPath(pathname)) {
     return NextResponse.next();
   }
 
