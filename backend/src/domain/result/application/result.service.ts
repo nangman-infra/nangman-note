@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFFont, PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Repository } from 'typeorm';
@@ -646,6 +647,9 @@ export class ResultService {
 
   private loadPdfFontBytes(): Uint8Array | null {
     const candidates = [
+      // 번들 폰트 (Docker 컨테이너 + 로컬)
+      join(__dirname, '..', '..', '..', '..', 'assets', 'fonts', 'NotoSansKR-Regular.ttf'),
+      // macOS 시스템 폰트 (개발 환경 폴백)
       '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
       '/Library/Fonts/Arial Unicode.ttf',
     ];

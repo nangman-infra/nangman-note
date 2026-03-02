@@ -33,6 +33,9 @@ RUN corepack enable && corepack prepare pnpm@latest --activate && \
 # 빌드 결과물 복사
 COPY --from=build /app/dist ./dist
 
+# PDF 한글 폰트 번들
+COPY --from=build /app/assets ./assets
+
 # data 디렉토리 (개발 sqlite용, prod에서는 불필요하지만 안전하게)
 RUN mkdir -p /app/data && chown nestjs:nodejs /app/data
 
