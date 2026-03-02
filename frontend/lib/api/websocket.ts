@@ -13,18 +13,30 @@ import { getRuntimeEnv } from '@/lib/config/runtime-env';
  *
  * @param path  socket.io path (예: '/ws/transcribe', '/ws/meeting-status')
  * @param query 쿼리 파라미터 (예: { meetingId })
+ * @param authToken 정적 토큰 문자열 또는 최신 토큰을 반환하는 getter 함수.
+ *   getter 함수를 전달하면 socket.io 재연결(reconnect) 시마다 호출되어
+ *   항상 최신 access token 으로 handshake 합니다.
  */
 export function createSocket(
   path: string,
   query?: Record<string, string>,
-  authToken?: string,
+  authToken?: string | (() => string | undefined),
 ): Socket {
   const wsUrl = getRuntimeEnv('WS_URL');
+
+  // auth 를 함수로 전달 → 재연결 시마다 최신 토큰 사용
+  const resolveAuth = (): Record<string, string> | undefined => {
+    const token =
+      typeof authToken === 'function' ? authToken() : authToken;
+    return token ? { token } : undefined;
+  };
 
   const socket = io(wsUrl || undefined, {
     path,
     query,
-    auth: authToken ? { token: authToken } : undefined,
+    auth: (cb) => {
+      cb(resolveAuth() ?? {});
+    },
     transports: ['polling', 'websocket'],
     withCredentials: true,
   });

@@ -27,6 +27,7 @@ export function useMeetingStatus({
   enabled = true,
 }: UseMeetingStatusOptions): void {
   const { data: session, status: authStatus } = useSession();
+  const accessTokenRef = useRef<string | undefined>(undefined);
   const socketRef = useRef<Socket | null>(null);
   const callbackRef = useRef(onStatusChange);
 
@@ -51,11 +52,14 @@ export function useMeetingStatus({
       return;
     }
 
+    accessTokenRef.current = session.accessToken;
+
     const query = meetingId ? { meetingId } : undefined;
+    // getter 함수 전달 → 재연결(reconnect) 시마다 최신 토큰으로 handshake
     const socket = createSocket(
       '/ws/meeting-status',
       query,
-      session.accessToken,
+      () => accessTokenRef.current,
     );
     socketRef.current = socket;
 
@@ -64,5 +68,13 @@ export function useMeetingStatus({
     });
 
     return cleanup;
-  }, [meetingId, cleanup, enabled, authStatus, session?.accessToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetingId, cleanup, enabled, authStatus]);
+
+  // accessToken 이 갱신되면 ref 만 업데이트 (소켓 재연결 안 함)
+  useEffect(() => {
+    if (session?.accessToken) {
+      accessTokenRef.current = session.accessToken;
+    }
+  }, [session?.accessToken]);
 }
