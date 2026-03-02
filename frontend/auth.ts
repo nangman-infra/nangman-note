@@ -3,14 +3,9 @@ import type { JWT } from 'next-auth/jwt';
 import AuthentikProvider from 'next-auth/providers/authentik';
 import { getServerRuntimeVar } from '@/lib/config/env';
 
-const authentikIssuer =
-  getServerRuntimeVar('AUTHENTIK_ISSUER') ||
-  'http://localhost:9000/application/o/transnote/';
-const authentikClientId =
-  getServerRuntimeVar('AUTHENTIK_CLIENT_ID') || 'dev-authentik-client-id';
-const authentikClientSecret =
-  getServerRuntimeVar('AUTHENTIK_CLIENT_SECRET') ||
-  'dev-authentik-client-secret';
+const authentikIssuer = getServerRuntimeVar('AUTHENTIK_ISSUER');
+const authentikClientId = getServerRuntimeVar('AUTHENTIK_CLIENT_ID');
+const authentikClientSecret = getServerRuntimeVar('AUTHENTIK_CLIENT_SECRET');
 
 let cachedTokenEndpoint: string | undefined;
 
@@ -102,7 +97,6 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  debug: true,
   session: {
     strategy: 'jwt',
   },
