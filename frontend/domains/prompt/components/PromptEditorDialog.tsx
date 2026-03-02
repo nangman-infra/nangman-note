@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 
+const PROMPT_CONTENT_MAX_LENGTH = 12_000;
+
 interface PromptEditorDialogProps {
   open: boolean;
   mode: 'create' | 'edit';
@@ -79,14 +81,26 @@ export function PromptEditorDialog({
             id="prompt-content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            maxLength={PROMPT_CONTENT_MAX_LENGTH}
             placeholder={'# ROLE\n당신은...'}
             rows={10}
             className="input-shell w-full resize-y font-mono text-sm"
             disabled={isLoading}
           />
-          <p className="mt-1 text-[11px] text-muted">
-            AI가 회의록을 생성할 때 사용할 지시사항을 작성하세요.
-          </p>
+          <div className="mt-1 flex items-center justify-between">
+            <p className="text-[11px] text-muted">
+              AI가 회의록을 생성할 때 사용할 지시사항을 작성하세요.
+            </p>
+            <p
+              className={`text-[11px] tabular-nums ${
+                content.length > PROMPT_CONTENT_MAX_LENGTH * 0.9
+                  ? 'text-rose-500'
+                  : 'text-muted'
+              }`}
+            >
+              {content.length.toLocaleString()}/{PROMPT_CONTENT_MAX_LENGTH.toLocaleString()}
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2">
