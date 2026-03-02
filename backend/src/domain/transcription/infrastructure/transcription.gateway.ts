@@ -111,14 +111,12 @@ export class TranscriptionGateway
       }
       this.meetingClients.get(meetingId)!.add(client.id);
 
-      // 연결 직후 warm start를 시도해 첫 발화 지연을 줄인다.
+      // Transcribe 세션은 첫 오디오 청크 도착 시 시작 (handleAudio에서)
       client.emit('connected', {
         meetingId,
         hasActiveSession:
           this.transcriptionService.hasActiveRealtimeSession(meetingId),
       });
-
-      void this.ensureRealtimeSessionStarted(meetingId);
 
       this.logger.log(
         `Client ${client.id} connected to meeting ${meetingId} (realtime ready)`,
