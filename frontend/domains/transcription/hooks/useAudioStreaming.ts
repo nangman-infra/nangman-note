@@ -33,9 +33,12 @@ interface UseAudioStreamingReturn {
   stopStreaming: () => void;
 }
 
-const MAX_PENDING_AUDIO_BYTES = 2 * 1024 * 1024;
-const ACK_TIMEOUT_MS = 1500;
-const DEFAULT_RETRY_MS = 200;
+// 100ms 청크 기준 6개면 약 600ms RTT까지 실시간성을 유지하며 버퍼링할 수 있음.
+const MAX_IN_FLIGHT_ACKS = 6;
+const ACK_TIMEOUT_MS = 1200;
+const MAX_CONSECUTIVE_TIMEOUTS = 5;
+const MAX_CONSECUTIVE_BACKPRESSURE = 8;
+const MAX_SATURATION_MS = 2500;
 
 export function useAudioStreaming(): UseAudioStreamingReturn {
   const [state, setState] = useState<AudioStreamingState>('idle');
@@ -47,35 +50,27 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
   const socketRef = useRef<Socket | null>(null);
   const optionsRef = useRef<StartStreamingOptions | undefined>(undefined);
   const fallbackNotifiedRef = useRef(false);
+  const inFlightAckCountRef = useRef(0);
+  const nextAckIdRef = useRef(1);
+  const ackTimeoutMapRef = useRef<Map<number, number>>(new Map());
+  const consecutiveTimeoutRef = useRef(0);
+  const consecutiveBackpressureRef = useRef(0);
+  const saturationStartAtRef = useRef<number | null>(null);
+  const stoppedByGuardRef = useRef(false);
 
-  const pendingQueueRef = useRef<ArrayBuffer[]>([]);
-  const pendingBytesRef = useRef(0);
-  const inFlightRef = useRef(false);
-  const retryTimerRef = useRef<number | null>(null);
-  const flushQueueRef = useRef<() => void>(() => undefined);
-
-  const clearRetryTimer = useCallback(() => {
-    if (retryTimerRef.current !== null) {
-      window.clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = null;
-    }
-  }, []);
-
-  const dropHeadChunk = useCallback(() => {
-    const chunk = pendingQueueRef.current.shift();
-    if (!chunk) return;
-    pendingBytesRef.current = Math.max(0, pendingBytesRef.current - chunk.byteLength);
-  }, []);
-
-  const clearQueue = useCallback(() => {
-    pendingQueueRef.current = [];
-    pendingBytesRef.current = 0;
-    inFlightRef.current = false;
+  const clearAckTrackers = useCallback(() => {
+    ackTimeoutMapRef.current.forEach((timerId) => {
+      window.clearTimeout(timerId);
+    });
+    ackTimeoutMapRef.current.clear();
+    inFlightAckCountRef.current = 0;
+    consecutiveTimeoutRef.current = 0;
+    consecutiveBackpressureRef.current = 0;
+    saturationStartAtRef.current = null;
   }, []);
 
   const cleanup = useCallback(() => {
-    clearRetryTimer();
-    clearQueue();
+    clearAckTrackers();
 
     if (workletNodeRef.current) {
       try {
@@ -104,111 +99,116 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
     socketRef.current = null;
     optionsRef.current = undefined;
     fallbackNotifiedRef.current = false;
-  }, [clearQueue, clearRetryTimer]);
+  }, [clearAckTrackers]);
 
-  const scheduleRetry = useCallback(
-    (retryAfterMs: number, flushQueue: () => void) => {
-      clearRetryTimer();
-      retryTimerRef.current = window.setTimeout(() => {
-        retryTimerRef.current = null;
-        flushQueue();
-      }, Math.max(50, retryAfterMs));
+  const stopForRealtimeInstability = useCallback(
+    (message: string) => {
+      if (stoppedByGuardRef.current) return;
+      stoppedByGuardRef.current = true;
+      cleanup();
+      setState('stopped');
+      setError(message);
     },
-    [clearRetryTimer],
+    [cleanup],
   );
 
-  const flushQueue = useCallback(() => {
-    const socket = socketRef.current;
-    if (!socket?.connected) return;
-    if (inFlightRef.current) return;
-    if (pendingQueueRef.current.length === 0) return;
+  const handleChunk = useCallback(
+    (chunk: ArrayBuffer) => {
+      if (!chunk || chunk.byteLength === 0) return;
 
-    const currentChunk = pendingQueueRef.current[0];
-    inFlightRef.current = true;
-
-    let settled = false;
-    const finish = (response?: AudioAckResponse) => {
-      if (settled) return;
-      settled = true;
-      inFlightRef.current = false;
-
-      const ack = response ?? {
-        ok: false,
-        reason: 'ack-timeout',
-        retryAfterMs: DEFAULT_RETRY_MS,
-      };
-
-      if (ack.ok) {
-        dropHeadChunk();
-        flushQueueRef.current();
+      const socket = socketRef.current;
+      if (!socket?.connected) {
         return;
       }
 
-      const reason = ack.reason ?? 'unknown';
-      if (reason === 'chunk-too-large') {
-        dropHeadChunk();
-        flushQueueRef.current();
-        return;
-      }
+      if (inFlightAckCountRef.current >= MAX_IN_FLIGHT_ACKS) {
+        const now = Date.now();
+        if (saturationStartAtRef.current === null) {
+          saturationStartAtRef.current = now;
+          return;
+        }
 
-      if (
-        reason === 'realtime-capacity-exceeded' &&
-        ack.fallbackToBatch &&
-        ack.mode === 'batch'
-      ) {
-        cleanup();
-        setState('stopped');
-        setError('실시간 전사 용량 초과로 배치 모드로 전환되었습니다.');
-        if (!fallbackNotifiedRef.current) {
-          fallbackNotifiedRef.current = true;
-          optionsRef.current?.onFallbackToBatch?.({ reason });
+        if (now - saturationStartAtRef.current >= MAX_SATURATION_MS) {
+          stopForRealtimeInstability(
+            '네트워크 지연으로 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
+          );
         }
         return;
       }
 
-      const retryAfter = ack.retryAfterMs ?? DEFAULT_RETRY_MS;
-      scheduleRetry(retryAfter, flushQueueRef.current);
-    };
+      saturationStartAtRef.current = null;
 
-    const timeoutId = window.setTimeout(() => {
-      finish({
-        ok: false,
-        reason: 'ack-timeout',
-        retryAfterMs: DEFAULT_RETRY_MS,
+      const ackId = nextAckIdRef.current++;
+      inFlightAckCountRef.current += 1;
+
+      const timeoutId = window.setTimeout(() => {
+        ackTimeoutMapRef.current.delete(ackId);
+        inFlightAckCountRef.current = Math.max(0, inFlightAckCountRef.current - 1);
+        consecutiveTimeoutRef.current += 1;
+        if (consecutiveTimeoutRef.current >= MAX_CONSECUTIVE_TIMEOUTS) {
+          stopForRealtimeInstability(
+            '응답 지연이 지속되어 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
+          );
+        }
+      }, ACK_TIMEOUT_MS);
+
+      ackTimeoutMapRef.current.set(ackId, timeoutId);
+
+      socket.emit('audio', chunk, (ack?: AudioAckResponse) => {
+        const timer = ackTimeoutMapRef.current.get(ackId);
+        if (timer !== undefined) {
+          window.clearTimeout(timer);
+          ackTimeoutMapRef.current.delete(ackId);
+        }
+        inFlightAckCountRef.current = Math.max(0, inFlightAckCountRef.current - 1);
+        consecutiveTimeoutRef.current = 0;
+
+        const response = ack ?? { ok: false, reason: 'ack-timeout' };
+        if (response.ok) {
+          consecutiveBackpressureRef.current = 0;
+          return;
+        }
+
+        if (
+          response.reason === 'realtime-capacity-exceeded' &&
+          response.fallbackToBatch &&
+          response.mode === 'batch'
+        ) {
+          cleanup();
+          setState('stopped');
+          setError('실시간 전사 용량 초과로 배치 모드로 전환되었습니다.');
+          if (!fallbackNotifiedRef.current) {
+            fallbackNotifiedRef.current = true;
+            optionsRef.current?.onFallbackToBatch?.({
+              reason: response.reason,
+            });
+          }
+          return;
+        }
+
+        if (response.reason === 'backpressure') {
+          consecutiveBackpressureRef.current += 1;
+          if (consecutiveBackpressureRef.current >= MAX_CONSECUTIVE_BACKPRESSURE) {
+            stopForRealtimeInstability(
+              '전사 서버 부하가 지속되어 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
+            );
+          } else {
+            setError('전사 서버 처리 지연이 감지되었습니다. 네트워크 상태를 확인해주세요.');
+          }
+          return;
+        }
+
+        if (response.reason === 'chunk-too-large') {
+          setError('오디오 청크가 커서 일부 구간 전송에 실패했습니다.');
+          return;
+        }
+
+        setError(
+          '실시간 전사 연결이 불안정합니다. 잠시 후 자동으로 복구되지 않으면 회의를 다시 시작해주세요.',
+        );
       });
-    }, ACK_TIMEOUT_MS);
-
-    socket.emit('audio', currentChunk, (ack?: AudioAckResponse) => {
-      window.clearTimeout(timeoutId);
-      finish(ack);
-    });
-  }, [cleanup, dropHeadChunk, scheduleRetry]);
-
-  useEffect(() => {
-    flushQueueRef.current = flushQueue;
-  }, [flushQueue]);
-
-  const enqueueChunk = useCallback(
-    (chunk: ArrayBuffer) => {
-      if (chunk.byteLength === 0) return;
-
-      while (
-        pendingBytesRef.current + chunk.byteLength > MAX_PENDING_AUDIO_BYTES &&
-        pendingQueueRef.current.length > 0
-      ) {
-        dropHeadChunk();
-      }
-
-      if (pendingBytesRef.current + chunk.byteLength > MAX_PENDING_AUDIO_BYTES) {
-        setError('오디오 처리량이 높아 일부 구간이 생략되었습니다.');
-        return;
-      }
-
-      pendingQueueRef.current.push(chunk);
-      pendingBytesRef.current += chunk.byteLength;
-      flushQueueRef.current();
     },
-    [dropHeadChunk],
+    [cleanup, stopForRealtimeInstability],
   );
 
   const startStreaming = useCallback(
@@ -225,8 +225,8 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         socketRef.current = socket;
         optionsRef.current = options;
         fallbackNotifiedRef.current = false;
-        clearRetryTimer();
-        clearQueue();
+        stoppedByGuardRef.current = false;
+        clearAckTrackers();
 
         if (audioContext.state === 'suspended') {
           await audioContext.resume();
@@ -248,7 +248,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         workletNode.port.onmessage = (event: MessageEvent) => {
           const pcmBuffer: ArrayBuffer = event.data;
           if (!pcmBuffer || pcmBuffer.byteLength === 0) return;
-          enqueueChunk(pcmBuffer);
+          handleChunk(pcmBuffer);
         };
 
         source.connect(workletNode);
@@ -269,7 +269,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         cleanup();
       }
     },
-    [cleanup, clearQueue, clearRetryTimer, enqueueChunk],
+    [cleanup, clearAckTrackers, handleChunk],
   );
 
   const stopStreaming = useCallback(() => {

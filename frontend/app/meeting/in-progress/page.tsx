@@ -585,6 +585,13 @@ export default function InProgressMeetingPage() {
             message="전사 서버와의 연결이 지연되고 있습니다. 노트는 계속 저장됩니다."
           />
         ) : null}
+        {isRealtimeMode && audioStreamingError ? (
+          <StatusBanner
+            variant="warning"
+            title="오디오 스트리밍 중단"
+            message={audioStreamingError}
+          />
+        ) : null}
 
         {/* 메인 콘텐츠: 노트 + 전사 패널 */}
         <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">

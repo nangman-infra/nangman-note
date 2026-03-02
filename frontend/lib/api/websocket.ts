@@ -14,12 +14,14 @@ export function createSocket(
   path: string,
   query?: Record<string, string>,
 ): Socket {
-  // 백엔드에 직접 연결할 때는 WebSocket transport 사용 (binary 데이터 무손실)
-  // polling 모드에서는 binary가 base64 인코딩되어 오디오 품질이 저하됨
+  // 실시간 전사 경로는 websocket 강제:
+  // polling 모드에서는 오디오 binary가 base64 프레이밍으로 전환되어
+  // 지연/품질 저하를 유발할 수 있음.
+  const forceWebSocket = path === '/ws/transcribe';
   const socket = io(env.WS_URL || undefined, {
     path,
     query,
-    transports: env.WS_URL ? ['websocket'] : ['polling', 'websocket'],
+    transports: forceWebSocket || env.WS_URL ? ['websocket'] : ['polling', 'websocket'],
     withCredentials: true,
   });
 
