@@ -57,6 +57,22 @@ export const env = Object.freeze({
  * 서버 컴포넌트에서 런타임 환경변수를 읽기 위한 헬퍼.
  * (클라이언트 번들 고정값이 아닌 서버 프로세스 런타임 값을 사용)
  */
-export function getServerRuntimeVar(key: 'WS_URL'): string {
+type ServerRuntimeKey =
+  | 'WS_URL'
+  | 'NEXTAUTH_URL'
+  | 'NEXTAUTH_SECRET'
+  | 'AUTHENTIK_ISSUER'
+  | 'AUTHENTIK_CLIENT_ID'
+  | 'AUTHENTIK_CLIENT_SECRET';
+
+export function getServerRuntimeVar(key: ServerRuntimeKey): string {
   return process.env[key] || '';
+}
+
+export function getServerRequiredVar(key: ServerRuntimeKey): string {
+  const value = process.env[key]?.trim();
+  if (!value) {
+    throw new Error(`Missing required server runtime env: ${key}`);
+  }
+  return value;
 }

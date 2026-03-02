@@ -42,8 +42,11 @@ export class ResultService {
     private readonly bedrockService: BedrockService,
   ) {}
 
-  async findByMeetingId(meetingId: string): Promise<ResultEntity> {
-    const meeting = await this.meetingService.findById(meetingId);
+  async findByMeetingId(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<ResultEntity> {
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
 
     const existing = await this.resultRepository.findOne({
       where: { meetingId },
@@ -61,7 +64,7 @@ export class ResultService {
       });
     }
 
-    return this.generateAndSave(meetingId);
+    return this.generateAndSave(meetingId, ownerSub);
   }
 
   /**
@@ -81,8 +84,12 @@ export class ResultService {
     return this.generateAndSave(meetingId);
   }
 
-  async update(meetingId: string, dto: UpdateResultDto): Promise<ResultEntity> {
-    const existing = await this.findByMeetingId(meetingId);
+  async update(
+    meetingId: string,
+    dto: UpdateResultDto,
+    ownerSub?: string,
+  ): Promise<ResultEntity> {
+    const existing = await this.findByMeetingId(meetingId, ownerSub);
 
     existing.content = dto.content;
     existing.metadata = {
@@ -98,14 +105,23 @@ export class ResultService {
   async regenerate(
     meetingId: string,
     dto: RegenerateResultDto,
+    ownerSub?: string,
   ): Promise<ResultEntity> {
-    await this.promptService.ensureExists(dto.promptId);
-    await this.meetingService.updatePrompt(meetingId, {
-      promptId: dto.promptId,
-    });
+    await this.promptService.ensureExists(dto.promptId, ownerSub);
+    await this.meetingService.updatePrompt(
+      meetingId,
+      {
+        promptId: dto.promptId,
+      },
+      ownerSub,
+    );
 
-    const existing = await this.findByMeetingId(meetingId);
-    const generated = await this.generateResultPayload(meetingId, dto.promptId);
+    const existing = await this.findByMeetingId(meetingId, ownerSub);
+    const generated = await this.generateResultPayload(
+      meetingId,
+      dto.promptId,
+      ownerSub,
+    );
 
     existing.promptId = generated.promptId;
     existing.content = generated.content;
@@ -119,12 +135,13 @@ export class ResultService {
   async exportResult(
     meetingId: string,
     rawFormat?: string,
+    ownerSub?: string,
   ): Promise<{
     fileName: string;
     contentType: string;
     buffer: Buffer;
   }> {
-    const result = await this.findByMeetingId(meetingId);
+    const result = await this.findByMeetingId(meetingId, ownerSub);
     const format = this.resolveFormat(rawFormat);
     const stamp = new Date().toISOString().slice(0, 10);
 
@@ -165,7 +182,10 @@ export class ResultService {
     );
   }
 
-  private async generateAndSave(meetingId: string): Promise<ResultEntity> {
+  private async generateAndSave(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<ResultEntity> {
     // 생성 직전에 한번 더 확인 (race condition 방지)
     const existingCheck = await this.resultRepository.findOne({
       where: { meetingId },
@@ -174,7 +194,11 @@ export class ResultService {
       return existingCheck;
     }
 
-    const payload = await this.generateResultPayload(meetingId);
+    const payload = await this.generateResultPayload(
+      meetingId,
+      undefined,
+      ownerSub,
+    );
 
     try {
       const saved = await this.resultRepository.save(
@@ -211,6 +235,7 @@ export class ResultService {
   private async generateResultPayload(
     meetingId: string,
     overridePromptId?: string,
+    ownerSub?: string,
   ): Promise<{
     promptId: string;
     content: string;
@@ -222,9 +247,9 @@ export class ResultService {
       noteLength: number;
     };
   }> {
-    const meeting = await this.meetingService.findById(meetingId);
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
     const promptId = overridePromptId ?? meeting.promptId;
-    const prompt = await this.promptService.findById(promptId);
+    const prompt = await this.promptService.findById(promptId, ownerSub);
 
     const [note, transcripts] = await Promise.all([
       this.noteRepository.findOne({

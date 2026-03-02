@@ -13,5 +13,6 @@ export class MeetingStatusChangedEvent {
     public readonly meetingId: string,
     public readonly status: MeetingStatus,
     public readonly phase?: MeetingStatusPhase,
+    public readonly ownerSub?: string,
   ) {}
 }

@@ -15,8 +15,11 @@ export class NoteService {
     private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
   ) {}
 
-  async findByMeetingId(meetingId: string): Promise<NoteEntity> {
-    await this.meetingService.findById(meetingId);
+  async findByMeetingId(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<NoteEntity> {
+    await this.meetingService.findById(meetingId, ownerSub);
 
     const existing = await this.noteRepository.findOne({
       where: { meetingId },
@@ -36,8 +39,12 @@ export class NoteService {
     } as NoteEntity;
   }
 
-  async upsert(meetingId: string, dto: UpsertNoteDto): Promise<NoteEntity> {
-    await this.meetingService.findById(meetingId);
+  async upsert(
+    meetingId: string,
+    dto: UpsertNoteDto,
+    ownerSub?: string,
+  ): Promise<NoteEntity> {
+    await this.meetingService.findById(meetingId, ownerSub);
 
     const existing = await this.noteRepository.findOne({
       where: { meetingId },

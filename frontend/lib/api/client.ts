@@ -1,4 +1,6 @@
 import axios, { AxiosError } from 'axios';
+import { getSession } from 'next-auth/react';
+import { getAccessToken } from '@/lib/auth/access-token-store';
 import { env } from '@/lib/config/env';
 
 interface ErrorPayload {
@@ -42,12 +44,15 @@ export const apiClient = axios.create({
 
 // 요청 인터셉터
 apiClient.interceptors.request.use(
-  (config) => {
-    // 추후 인증 토큰 추가
-    // const token = localStorage.getItem('auth_token');
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`;
-    // }
+  async (config) => {
+    let token = getAccessToken();
+    if (!token && env.MODE !== 'test' && typeof window !== 'undefined') {
+      const session = await getSession();
+      token = session?.accessToken;
+    }
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => Promise.reject(error)

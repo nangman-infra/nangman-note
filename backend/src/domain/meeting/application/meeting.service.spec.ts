@@ -159,6 +159,7 @@ describe('MeetingService', () => {
 
       expect(promptService.ensureExists).toHaveBeenCalledWith(
         'prompt_default_meeting',
+        undefined,
       );
       expect(meetingRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -190,6 +191,7 @@ describe('MeetingService', () => {
 
       expect(promptService.ensureExists).toHaveBeenCalledWith(
         'prompt_user_custom',
+        undefined,
       );
       expect(meetingRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({

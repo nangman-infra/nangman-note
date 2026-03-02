@@ -20,6 +20,8 @@ import {
   TranscriptionService,
   type RealtimeTranscriptPayload,
 } from '../application/transcription.service';
+import { MeetingService } from '../../meeting/application/meeting.service';
+import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
 
 interface AudioAckResponse {
   ok: boolean;
@@ -52,6 +54,8 @@ export class TranscriptionGateway
 
   /** meetingId → Set<socket.id> (같은 회의에 여러 클라이언트가 연결될 수 있음) */
   private readonly meetingClients = new Map<string, Set<string>>();
+  /** socket.id → ownerSub */
+  private readonly socketUsers = new Map<string, string | undefined>();
   /** 세션 시작 중 중복 호출 방지 락 */
   private readonly startingSession = new Set<string>();
   private readonly maxConcurrentRealtimeSessions: number;
@@ -61,6 +65,8 @@ export class TranscriptionGateway
 
   constructor(
     private readonly transcriptionService: TranscriptionService,
+    private readonly meetingService: MeetingService,
+    private readonly tokenVerifier: OidcTokenVerifierService,
     private readonly configService: ConfigService<AppEnv, true>,
   ) {
     this.maxConcurrentRealtimeSessions = Math.max(
@@ -103,7 +109,10 @@ export class TranscriptionGateway
     }
 
     try {
+      const ownerSub = await this.resolveSocketOwnerSub(client);
+      await this.meetingService.findById(meetingId, ownerSub);
       await client.join(meetingId);
+      this.socketUsers.set(client.id, ownerSub);
 
       // 클라이언트 추적
       if (!this.meetingClients.has(meetingId)) {
@@ -135,6 +144,7 @@ export class TranscriptionGateway
   async handleDisconnect(client: Socket): Promise<void> {
     const meetingId = this.resolveMeetingId(client);
     this.logger.debug(`Socket disconnected: ${client.id}`);
+    this.socketUsers.delete(client.id);
 
     if (!meetingId) return;
 
@@ -166,6 +176,7 @@ export class TranscriptionGateway
     if (!meetingId) {
       return { ok: false, reason: 'missing-meeting-id' };
     }
+    const ownerSub = this.socketUsers.get(client.id);
 
     try {
       const chunk = this.toBuffer(payload);
@@ -180,7 +191,10 @@ export class TranscriptionGateway
         };
       }
 
-      const sessionStart = await this.ensureRealtimeSessionStarted(meetingId);
+      const sessionStart = await this.ensureRealtimeSessionStarted(
+        meetingId,
+        ownerSub,
+      );
       if (!sessionStart.ok) {
         return {
           ok: false,
@@ -240,8 +254,10 @@ export class TranscriptionGateway
     if (!meetingId) {
       return { ok: false };
     }
+    const ownerSub = this.socketUsers.get(client.id);
 
     try {
+      await this.meetingService.findById(meetingId, ownerSub);
       if (this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
         await this.transcriptionService.stopRealtimeSession(meetingId);
       }
@@ -281,6 +297,7 @@ export class TranscriptionGateway
 
   private async ensureRealtimeSessionStarted(
     meetingId: string,
+    ownerSub?: string,
   ): Promise<EnsureSessionResult> {
     if (
       this.transcriptionService.hasActiveRealtimeSession(meetingId) ||
@@ -293,7 +310,10 @@ export class TranscriptionGateway
       this.transcriptionService.getActiveRealtimeSessionCount();
     if (activeSessionCount >= this.maxConcurrentRealtimeSessions) {
       const switchedToBatch =
-        await this.transcriptionService.switchMeetingToBatchFallback(meetingId);
+        await this.transcriptionService.switchMeetingToBatchFallback(
+          meetingId,
+          ownerSub,
+        );
 
       if (switchedToBatch) {
         this.server.to(meetingId).emit('transcript:fallback', {
@@ -337,6 +357,7 @@ export class TranscriptionGateway
             meetingId,
           });
         },
+        ownerSub,
       );
 
       this.logger.log(`Realtime session started for meeting ${meetingId}`);
@@ -420,5 +441,46 @@ export class TranscriptionGateway
     this.logger.warn(
       `Backpressure for meeting ${meetingId}: audio queue is full, retryAfter=${this.backpressureRetryMs}ms`,
     );
+  }
+
+  private async resolveSocketOwnerSub(
+    client: Socket,
+  ): Promise<string | undefined> {
+    if (!this.tokenVerifier.isAuthEnabled()) {
+      return undefined;
+    }
+
+    const token = this.extractSocketToken(client);
+    if (!token) {
+      throw new Error('Missing socket auth token');
+    }
+
+    const user = await this.tokenVerifier.verifyAccessToken(token);
+    return user.sub;
+  }
+
+  private extractSocketToken(client: Socket): string | undefined {
+    const authPayload = client.handshake.auth as
+      | Record<string, unknown>
+      | undefined;
+    const fromAuth = authPayload?.token;
+    if (typeof fromAuth === 'string' && fromAuth.trim().length > 0) {
+      return fromAuth.trim();
+    }
+
+    const authHeader = client.handshake.headers.authorization;
+    if (typeof authHeader === 'string') {
+      const [scheme, credentials] = authHeader.split(' ');
+      if (scheme?.toLowerCase() === 'bearer' && credentials) {
+        return credentials.trim();
+      }
+    }
+
+    const queryToken = client.handshake.query.token;
+    if (typeof queryToken === 'string' && queryToken.trim().length > 0) {
+      return queryToken.trim();
+    }
+
+    return undefined;
   }
 }

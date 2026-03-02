@@ -31,6 +31,10 @@ export interface AppEnv {
   REALTIME_MAX_BUFFERED_AUDIO_BYTES: number;
   REALTIME_MAX_AUDIO_CHUNK_BYTES: number;
   REALTIME_BACKPRESSURE_RETRY_MS: number;
+  AUTH_ENABLED: boolean;
+  AUTH_OIDC_ISSUER: string;
+  AUTH_OIDC_AUDIENCE: string;
+  AUTH_OIDC_JWKS_URI: string;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -171,6 +175,11 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     'DB_MIGRATIONS_RUN',
     dbEngine === 'postgres',
   );
+  const authEnabled = readBoolean(
+    config,
+    'AUTH_ENABLED',
+    typedNodeEnv === 'production',
+  );
   const postgresDefaults =
     typedNodeEnv === 'production'
       ? {
@@ -194,6 +203,14 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       'Environment variable ENCRYPTION_KEY must be a secure 64-character hex value in production.',
     );
   }
+
+  const authIssuer = authEnabled
+    ? readString(config, 'AUTH_OIDC_ISSUER')
+    : readString(config, 'AUTH_OIDC_ISSUER', '');
+  const authAudience = authEnabled
+    ? readString(config, 'AUTH_OIDC_AUDIENCE')
+    : readString(config, 'AUTH_OIDC_AUDIENCE', '');
+  const authJwksUri = readString(config, 'AUTH_OIDC_JWKS_URI', '');
 
   return {
     PORT: port,
@@ -308,6 +325,10 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       'REALTIME_BACKPRESSURE_RETRY_MS',
       200,
     ),
+    AUTH_ENABLED: authEnabled,
+    AUTH_OIDC_ISSUER: authIssuer,
+    AUTH_OIDC_AUDIENCE: authAudience,
+    AUTH_OIDC_JWKS_URI: authJwksUri,
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: readString(
       config,

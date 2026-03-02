@@ -51,13 +51,17 @@ export class MeetingService {
     private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
   ) {}
 
-  async create(dto: CreateMeetingDto): Promise<MeetingEntity> {
+  async create(
+    dto: CreateMeetingDto,
+    ownerSub?: string,
+  ): Promise<MeetingEntity> {
     const promptId = dto.promptId || DEFAULT_PROMPT_ID;
     const transcriptionMode =
       dto.transcriptionMode ?? MeetingTranscriptionMode.BATCH;
-    await this.promptService.ensureExists(promptId);
+    await this.promptService.ensureExists(promptId, ownerSub);
 
     const meeting = this.meetingRepository.create({
+      ownerSub: ownerSub?.trim() || undefined,
       title: dto.title?.trim() || undefined,
       agenda: dto.agenda?.trim() || undefined,
       promptId,
@@ -73,7 +77,10 @@ export class MeetingService {
     return saved;
   }
 
-  async list(query: ListMeetingsQueryDto): Promise<{
+  async list(
+    query: ListMeetingsQueryDto,
+    ownerSub?: string,
+  ): Promise<{
     meetings: MeetingEntity[];
     pagination: { page: number; limit: number; total: number };
   }> {
@@ -82,6 +89,7 @@ export class MeetingService {
     const skip = (page - 1) * limit;
 
     const [meetings, total] = await this.meetingRepository.findAndCount({
+      where: ownerSub ? { ownerSub } : undefined,
       order: { startedAt: 'DESC' },
       skip,
       take: limit,
@@ -97,7 +105,10 @@ export class MeetingService {
     };
   }
 
-  async listTrash(query: ListMeetingsQueryDto): Promise<{
+  async listTrash(
+    query: ListMeetingsQueryDto,
+    ownerSub?: string,
+  ): Promise<{
     meetings: MeetingEntity[];
     pagination: { page: number; limit: number; total: number };
   }> {
@@ -105,10 +116,16 @@ export class MeetingService {
     const limit = query.limit ?? 50;
     const skip = (page - 1) * limit;
 
-    const [meetings, total] = await this.meetingRepository
+    const trashQuery = this.meetingRepository
       .createQueryBuilder('meeting')
       .withDeleted()
-      .where('meeting.deletedAt IS NOT NULL')
+      .where('meeting.deletedAt IS NOT NULL');
+
+    if (ownerSub) {
+      trashQuery.andWhere('meeting.owner_sub = :ownerSub', { ownerSub });
+    }
+
+    const [meetings, total] = await trashQuery
       .orderBy('meeting.deletedAt', 'DESC')
       .offset(skip)
       .limit(limit)
@@ -124,7 +141,10 @@ export class MeetingService {
     };
   }
 
-  async search(query: SearchMeetingsQueryDto): Promise<{
+  async search(
+    query: SearchMeetingsQueryDto,
+    ownerSub?: string,
+  ): Promise<{
     results: MeetingSearchResult[];
     pagination: { page: number; limit: number; total: number };
   }> {
@@ -150,6 +170,7 @@ export class MeetingService {
         scope,
         page,
         limit,
+        ownerSub,
       });
 
       const results = rows.map((row) =>
@@ -179,13 +200,14 @@ export class MeetingService {
         loweredKeyword,
         page,
         limit,
+        ownerSub,
       });
     }
   }
 
-  async findById(id: string): Promise<MeetingEntity> {
+  async findById(id: string, ownerSub?: string): Promise<MeetingEntity> {
     const meeting = await this.meetingRepository.findOne({
-      where: { id },
+      where: ownerSub ? { id, ownerSub } : { id },
     });
 
     if (!meeting) {
@@ -201,8 +223,9 @@ export class MeetingService {
   async updatePrompt(
     id: string,
     dto: UpdateMeetingDto,
+    ownerSub?: string,
   ): Promise<MeetingEntity> {
-    const meeting = await this.findById(id);
+    const meeting = await this.findById(id, ownerSub);
     const hasPromptId = typeof dto.promptId === 'string';
     const hasTranscriptionMode = typeof dto.transcriptionMode === 'string';
 
@@ -213,7 +236,7 @@ export class MeetingService {
     }
 
     if (hasPromptId) {
-      await this.promptService.ensureExists(dto.promptId as string);
+      await this.promptService.ensureExists(dto.promptId as string, ownerSub);
       meeting.promptId = dto.promptId as string;
     }
 
@@ -228,8 +251,9 @@ export class MeetingService {
   async complete(
     id: string,
     options?: { skipTranscription?: boolean },
+    ownerSub?: string,
   ): Promise<MeetingEntity> {
-    const meeting = await this.findById(id);
+    const meeting = await this.findById(id, ownerSub);
     const skipTranscription = options?.skipTranscription ?? false;
 
     const isBatchWithTranscription =
@@ -243,7 +267,12 @@ export class MeetingService {
       meeting.status = MeetingStatus.PROCESSING;
       meeting.endedAt = new Date();
       const updated = await this.meetingRepository.save(meeting);
-      this.emitStatusChanged(updated.id, updated.status, 'transcribing');
+      this.emitStatusChanged(
+        updated.id,
+        updated.status,
+        'transcribing',
+        updated.ownerSub,
+      );
       return updated;
     }
 
@@ -251,33 +280,40 @@ export class MeetingService {
     meeting.status = MeetingStatus.PROCESSING;
     meeting.endedAt = new Date();
     const updated = await this.meetingRepository.save(meeting);
-    this.emitStatusChanged(updated.id, updated.status, 'generating');
+    this.emitStatusChanged(
+      updated.id,
+      updated.status,
+      'generating',
+      updated.ownerSub,
+    );
     return updated;
   }
 
   async updateStatus(
     id: string,
     status: MeetingStatus,
+    ownerSub?: string,
   ): Promise<MeetingEntity> {
-    const meeting = await this.findById(id);
+    const meeting = await this.findById(id, ownerSub);
     meeting.status = status;
     const updated = await this.meetingRepository.save(meeting);
     this.emitStatusChanged(
       updated.id,
       updated.status,
       status === MeetingStatus.COMPLETED ? 'completed' : undefined,
+      updated.ownerSub,
     );
     return updated;
   }
 
-  async remove(id: string): Promise<void> {
-    const meeting = await this.findById(id);
+  async remove(id: string, ownerSub?: string): Promise<void> {
+    const meeting = await this.findById(id, ownerSub);
     await this.meetingRepository.softRemove(meeting);
   }
 
-  async restore(id: string): Promise<void> {
+  async restore(id: string, ownerSub?: string): Promise<void> {
     const meeting = await this.meetingRepository.findOne({
-      where: { id },
+      where: ownerSub ? { id, ownerSub } : { id },
       withDeleted: true,
     });
     if (!meeting || !meeting.deletedAt) {
@@ -287,9 +323,9 @@ export class MeetingService {
     await this.meetingRepository.restore(id);
   }
 
-  async purge(id: string): Promise<void> {
+  async purge(id: string, ownerSub?: string): Promise<void> {
     const meeting = await this.meetingRepository.findOne({
-      where: { id },
+      where: ownerSub ? { id, ownerSub } : { id },
       withDeleted: true,
     });
     if (!meeting || !meeting.deletedAt) {
@@ -301,13 +337,16 @@ export class MeetingService {
 
   async bulkRemove(
     ids: string[],
+    ownerSub?: string,
   ): Promise<{ succeeded: string[]; failed: string[] }> {
     const succeeded: string[] = [];
     const failed: string[] = [];
 
     for (const id of ids) {
       try {
-        const meeting = await this.meetingRepository.findOne({ where: { id } });
+        const meeting = await this.meetingRepository.findOne({
+          where: ownerSub ? { id, ownerSub } : { id },
+        });
         if (!meeting) {
           failed.push(id);
           continue;
@@ -324,6 +363,7 @@ export class MeetingService {
 
   async bulkRestore(
     ids: string[],
+    ownerSub?: string,
   ): Promise<{ succeeded: string[]; failed: string[] }> {
     const succeeded: string[] = [];
     const failed: string[] = [];
@@ -331,7 +371,7 @@ export class MeetingService {
     for (const id of ids) {
       try {
         const meeting = await this.meetingRepository.findOne({
-          where: { id },
+          where: ownerSub ? { id, ownerSub } : { id },
           withDeleted: true,
         });
         if (!meeting || !meeting.deletedAt) {
@@ -350,6 +390,7 @@ export class MeetingService {
 
   async bulkPurge(
     ids: string[],
+    ownerSub?: string,
   ): Promise<{ succeeded: string[]; failed: string[] }> {
     const succeeded: string[] = [];
     const failed: string[] = [];
@@ -357,7 +398,7 @@ export class MeetingService {
     for (const id of ids) {
       try {
         const meeting = await this.meetingRepository.findOne({
-          where: { id },
+          where: ownerSub ? { id, ownerSub } : { id },
           withDeleted: true,
         });
         if (!meeting || !meeting.deletedAt) {
@@ -380,11 +421,12 @@ export class MeetingService {
     loweredKeyword: string;
     page: number;
     limit: number;
+    ownerSub?: string;
   }): Promise<{
     results: MeetingSearchResult[];
     pagination: { page: number; limit: number; total: number };
   }> {
-    const { scope, keyword, loweredKeyword, page, limit } = params;
+    const { scope, keyword, loweredKeyword, page, limit, ownerSub } = params;
     const skip = (page - 1) * limit;
     const likeKeyword = `%${loweredKeyword}%`;
 
@@ -397,6 +439,9 @@ export class MeetingService {
         .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
           keyword: likeKeyword,
         });
+      if (ownerSub) {
+        titleQuery.andWhere('meeting.owner_sub = :ownerSub', { ownerSub });
+      }
 
       total = await titleQuery.clone().getCount();
       if (total > 0) {
@@ -409,6 +454,7 @@ export class MeetingService {
       }
     } else {
       const meetings = await this.meetingRepository.find({
+        where: ownerSub ? { ownerSub } : undefined,
         relations: {
           note: true,
           result: true,
@@ -650,10 +696,11 @@ export class MeetingService {
     meetingId: string,
     status: MeetingStatus,
     phase?: MeetingStatusPhase,
+    ownerSub?: string,
   ): void {
     this.eventEmitter.emit(
       MeetingStatusChangedEvent.EVENT_NAME,
-      new MeetingStatusChangedEvent(meetingId, status, phase),
+      new MeetingStatusChangedEvent(meetingId, status, phase, ownerSub),
     );
   }
 }

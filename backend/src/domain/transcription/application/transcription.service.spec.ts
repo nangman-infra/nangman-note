@@ -115,7 +115,10 @@ describe('TranscriptionService', () => {
 
       const segments = await service.listByMeetingId('meeting-1');
 
-      expect(meetingService.findById).toHaveBeenCalledWith('meeting-1');
+      expect(meetingService.findById).toHaveBeenCalledWith(
+        'meeting-1',
+        undefined,
+      );
       expect(transcriptRepository.find).toHaveBeenCalledWith({
         where: { meetingId: 'meeting-1' },
         order: { startTime: 'ASC' },
@@ -175,9 +178,13 @@ describe('TranscriptionService', () => {
       const switched = await service.switchMeetingToBatchFallback('meeting-1');
 
       expect(switched).toBe(true);
-      expect(meetingService.updatePrompt).toHaveBeenCalledWith('meeting-1', {
-        transcriptionMode: MeetingTranscriptionMode.BATCH,
-      });
+      expect(meetingService.updatePrompt).toHaveBeenCalledWith(
+        'meeting-1',
+        {
+          transcriptionMode: MeetingTranscriptionMode.BATCH,
+        },
+        undefined,
+      );
     });
 
     it('returns false when meeting is already batch mode', async () => {

@@ -1,6 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { Socket } from 'socket.io';
 import { AppEnv } from '../../../shared/config/env.validation';
+import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
+import { MeetingService } from '../../meeting/application/meeting.service';
 import { TranscriptionService } from '../application/transcription.service';
 import { TranscriptionGateway } from './transcription.gateway';
 
@@ -21,6 +23,10 @@ describe('TranscriptionGateway', () => {
     >
   >;
   let configService: jest.Mocked<Pick<ConfigService<AppEnv, true>, 'get'>>;
+  let tokenVerifier: jest.Mocked<
+    Pick<OidcTokenVerifierService, 'isAuthEnabled'>
+  >;
+  let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
   let serverEmit: jest.Mock;
   let serverTo: jest.Mock;
 
@@ -54,9 +60,17 @@ describe('TranscriptionGateway', () => {
         return undefined;
       }),
     };
+    tokenVerifier = {
+      isAuthEnabled: jest.fn().mockReturnValue(false),
+    };
+    meetingService = {
+      findById: jest.fn(),
+    };
 
     gateway = new TranscriptionGateway(
       transcriptionService as unknown as TranscriptionService,
+      meetingService as unknown as MeetingService,
+      tokenVerifier as unknown as OidcTokenVerifierService,
       configService as unknown as ConfigService<AppEnv, true>,
     );
 

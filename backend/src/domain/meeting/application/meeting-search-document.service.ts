@@ -20,6 +20,7 @@ export type MeetingSearchScope =
 
 export interface MeetingSearchDocumentRow {
   meetingId: string;
+  ownerSub?: string;
   title: string;
   noteContent: string;
   resultContent: string;
@@ -79,6 +80,7 @@ export class MeetingSearchDocumentService {
         'meeting' | 'updatedAt'
       > = {
         meetingId,
+        ownerSub: meeting.ownerSub,
         title: (meeting.title ?? '').trim(),
         noteContent: this.limitText(
           note?.content ?? '',
@@ -95,6 +97,7 @@ export class MeetingSearchDocumentService {
       };
 
       if (existing) {
+        existing.ownerSub = nextPayload.ownerSub;
         existing.title = nextPayload.title;
         existing.noteContent = nextPayload.noteContent;
         existing.resultContent = nextPayload.resultContent;
@@ -146,8 +149,9 @@ export class MeetingSearchDocumentService {
     scope: MeetingSearchScope;
     page: number;
     limit: number;
+    ownerSub?: string;
   }): Promise<{ rows: MeetingSearchDocumentRow[]; total: number }> {
-    const { loweredKeyword, scope, page, limit } = params;
+    const { loweredKeyword, scope, page, limit, ownerSub } = params;
     const skip = (page - 1) * limit;
     const keyword = `%${loweredKeyword}%`;
 
@@ -155,6 +159,10 @@ export class MeetingSearchDocumentService {
       .createQueryBuilder('doc')
       .innerJoin(MeetingEntity, 'meeting', 'meeting.id = doc.meeting_id')
       .where('meeting.deleted_at IS NULL');
+
+    if (ownerSub) {
+      query.andWhere('doc.owner_sub = :ownerSub', { ownerSub });
+    }
 
     if (scope === 'title') {
       query.andWhere("LOWER(COALESCE(doc.title, '')) LIKE :keyword", {
@@ -196,6 +204,7 @@ export class MeetingSearchDocumentService {
       .clone()
       .select([
         'doc.meeting_id AS "meetingId"',
+        'doc.owner_sub AS "ownerSub"',
         'doc.title AS "title"',
         'doc.note_content AS "noteContent"',
         'doc.result_content AS "resultContent"',

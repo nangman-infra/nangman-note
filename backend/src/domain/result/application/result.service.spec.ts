@@ -246,10 +246,17 @@ describe('ResultService', () => {
         promptId: updatedPromptId,
       });
 
-      expect(promptService.ensureExists).toHaveBeenCalledWith(updatedPromptId);
-      expect(meetingService.updatePrompt).toHaveBeenCalledWith('meeting-1', {
-        promptId: updatedPromptId,
-      });
+      expect(promptService.ensureExists).toHaveBeenCalledWith(
+        updatedPromptId,
+        undefined,
+      );
+      expect(meetingService.updatePrompt).toHaveBeenCalledWith(
+        'meeting-1',
+        {
+          promptId: updatedPromptId,
+        },
+        undefined,
+      );
       expect(regenerated.promptId).toBe(updatedPromptId);
       expect(regenerated.content).toBe('재생성 결과');
       expect(

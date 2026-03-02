@@ -23,14 +23,16 @@ export class PromptService implements OnModuleInit {
     await this.seedDefaultPrompts();
   }
 
-  async list(): Promise<{ default: PromptEntity[]; user: PromptEntity[] }> {
+  async list(
+    ownerSub?: string,
+  ): Promise<{ default: PromptEntity[]; user: PromptEntity[] }> {
     const [defaultPrompts, userPrompts] = await Promise.all([
       this.promptRepository.find({
         where: { isDefault: true },
         order: { createdAt: 'ASC' },
       }),
       this.promptRepository.find({
-        where: { isDefault: false },
+        where: ownerSub ? { isDefault: false, ownerSub } : { isDefault: false },
         order: { createdAt: 'DESC' },
       }),
     ]);
@@ -41,8 +43,15 @@ export class PromptService implements OnModuleInit {
     };
   }
 
-  async findById(id: string): Promise<PromptEntity> {
-    const prompt = await this.promptRepository.findOne({ where: { id } });
+  async findById(id: string, ownerSub?: string): Promise<PromptEntity> {
+    const prompt = await this.promptRepository.findOne({
+      where: ownerSub
+        ? [
+            { id, isDefault: true },
+            { id, ownerSub },
+          ]
+        : { id },
+    });
 
     if (!prompt) {
       throw new NotFoundException(`Prompt ${id} not found`);
@@ -51,17 +60,25 @@ export class PromptService implements OnModuleInit {
     return prompt;
   }
 
-  async ensureExists(id: string): Promise<void> {
-    const prompt = await this.promptRepository.findOne({ where: { id } });
+  async ensureExists(id: string, ownerSub?: string): Promise<void> {
+    const prompt = await this.promptRepository.findOne({
+      where: ownerSub
+        ? [
+            { id, isDefault: true },
+            { id, ownerSub },
+          ]
+        : { id },
+    });
 
     if (!prompt) {
       throw new BadRequestException(`Prompt ${id} does not exist`);
     }
   }
 
-  async create(dto: CreatePromptDto): Promise<PromptEntity> {
+  async create(dto: CreatePromptDto, ownerSub?: string): Promise<PromptEntity> {
     const prompt = this.promptRepository.create({
       id: `prompt_user_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
+      ownerSub: ownerSub?.trim() || undefined,
       name: dto.name.trim(),
       content: dto.content.trim(),
       isDefault: false,
@@ -70,8 +87,12 @@ export class PromptService implements OnModuleInit {
     return this.promptRepository.save(prompt);
   }
 
-  async update(id: string, dto: UpdatePromptDto): Promise<PromptEntity> {
-    const existing = await this.findById(id);
+  async update(
+    id: string,
+    dto: UpdatePromptDto,
+    ownerSub?: string,
+  ): Promise<PromptEntity> {
+    const existing = await this.findById(id, ownerSub);
 
     if (existing.isDefault) {
       throw new BadRequestException('Default prompts cannot be modified');
@@ -88,14 +109,14 @@ export class PromptService implements OnModuleInit {
     return this.promptRepository.save(existing);
   }
 
-  async remove(id: string): Promise<void> {
-    const existing = await this.findById(id);
+  async remove(id: string, ownerSub?: string): Promise<void> {
+    const existing = await this.findById(id, ownerSub);
 
     if (existing.isDefault) {
       throw new BadRequestException('Default prompts cannot be deleted');
     }
 
-    await this.promptRepository.delete({ id });
+    await this.promptRepository.delete(ownerSub ? { id, ownerSub } : { id });
   }
 
   private async seedDefaultPrompts(): Promise<void> {

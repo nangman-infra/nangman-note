@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { Socket } from 'socket.io-client';
 import { createSocket } from '@/lib/api/websocket';
 
@@ -25,6 +26,7 @@ export function useMeetingStatus({
   onStatusChange,
   enabled = true,
 }: UseMeetingStatusOptions): void {
+  const { data: session, status: authStatus } = useSession();
   const socketRef = useRef<Socket | null>(null);
   const callbackRef = useRef(onStatusChange);
 
@@ -44,9 +46,17 @@ export function useMeetingStatus({
       cleanup();
       return;
     }
+    if (authStatus !== 'authenticated' || !session?.accessToken) {
+      cleanup();
+      return;
+    }
 
     const query = meetingId ? { meetingId } : undefined;
-    const socket = createSocket('/ws/meeting-status', query);
+    const socket = createSocket(
+      '/ws/meeting-status',
+      query,
+      session.accessToken,
+    );
     socketRef.current = socket;
 
     socket.on('meeting:status', (message: MeetingStatusMessage) => {
@@ -54,5 +64,5 @@ export function useMeetingStatus({
     });
 
     return cleanup;
-  }, [meetingId, cleanup, enabled]);
+  }, [meetingId, cleanup, enabled, authStatus, session?.accessToken]);
 }

@@ -13,6 +13,9 @@ export class MeetingSearchDocumentEntity {
   @PrimaryColumn('uuid', { name: 'meeting_id' })
   meetingId: string;
 
+  @Column({ name: 'owner_sub', type: 'varchar', length: 255, nullable: true })
+  ownerSub?: string;
+
   @Column({ type: 'text', default: '' })
   title: string;
 

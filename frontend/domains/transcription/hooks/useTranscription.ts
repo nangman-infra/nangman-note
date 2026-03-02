@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { Socket } from 'socket.io-client';
 import { useTranscriptionStore } from '../stores/transcriptionStore';
 import { createSocket } from '@/lib/api/websocket';
@@ -14,6 +15,7 @@ export function useTranscription(
   options?: UseTranscriptionOptions,
 ) {
   const fallbackHandler = options?.onFallbackToBatch;
+  const { data: session, status: authStatus } = useSession();
   const {
     segments,
     partial,
@@ -76,8 +78,19 @@ export function useTranscription(
       return;
     }
 
+    if (authStatus === 'loading') {
+      return;
+    }
+
+    if (authStatus !== 'authenticated' || !session?.accessToken) {
+      setConnected(false);
+      setHasActiveSession(false);
+      setError('인증 세션이 만료되었습니다. 다시 로그인해주세요.');
+      return;
+    }
+
     // same-origin WebSocket 연결 (Next.js rewrite 프록시)
-    const socket = createSocket('/ws/transcribe', { meetingId });
+    const socket = createSocket('/ws/transcribe', { meetingId }, session.accessToken);
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -136,6 +149,8 @@ export function useTranscription(
     };
   }, [
     isRealtimeEnabled,
+    authStatus,
+    session?.accessToken,
     meetingId,
     clearTranscripts,
     handlePayload,

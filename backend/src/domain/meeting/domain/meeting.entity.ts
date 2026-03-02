@@ -23,6 +23,9 @@ export class MeetingEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ name: 'owner_sub', type: 'varchar', length: 255, nullable: true })
+  ownerSub?: string;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   title?: string;
 

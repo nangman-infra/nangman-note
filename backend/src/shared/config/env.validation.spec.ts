@@ -11,6 +11,7 @@ describe('validateEnv', () => {
     expect(env.DB_ENGINE).toBe('sqljs');
     expect(env.DB_MIGRATIONS_RUN).toBe(false);
     expect(env.DB_POOL_MAX).toBe(0);
+    expect(env.AUTH_ENABLED).toBe(false);
   });
 
   it('defaults DB_ENGINE to postgres in production', () => {
@@ -25,6 +26,8 @@ describe('validateEnv', () => {
       DB_USER: 'app_user',
       DB_PASSWORD: 'secure-password',
       DB_SSL: 'true',
+      AUTH_OIDC_ISSUER: 'https://auth.example.com/application/o/transnote/',
+      AUTH_OIDC_AUDIENCE: 'transnote-api',
     });
 
     expect(env.DB_ENGINE).toBe('postgres');
@@ -34,6 +37,7 @@ describe('validateEnv', () => {
     expect(env.DB_CONNECTION_TIMEOUT_MS).toBe(5000);
     expect(env.DB_IDLE_TIMEOUT_MS).toBe(30000);
     expect(env.DB_STATEMENT_TIMEOUT_MS).toBe(15000);
+    expect(env.AUTH_ENABLED).toBe(true);
   });
 
   it('throws when production DB_ENGINE is not postgres', () => {
@@ -107,9 +111,29 @@ describe('validateEnv', () => {
         DB_PASSWORD: 'secure-password',
         DB_SSL: 'true',
         ENCRYPTION_KEY: 'replace-with-64-char-hex-key',
+        AUTH_OIDC_ISSUER: 'https://auth.example.com/application/o/transnote/',
+        AUTH_OIDC_AUDIENCE: 'transnote-api',
       }),
     ).toThrow(
       'Environment variable ENCRYPTION_KEY must be a secure 64-character hex value in production.',
     );
+  });
+
+  it('throws when AUTH_OIDC_ISSUER is missing while auth is enabled', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        PORT: '9999',
+        DB_HOST: 'db.example.local',
+        DB_PORT: '5432',
+        DB_NAME: 'nangman_note',
+        DB_USER: 'app_user',
+        DB_PASSWORD: 'secure-password',
+        DB_SSL: 'true',
+        ENCRYPTION_KEY:
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        AUTH_OIDC_AUDIENCE: 'transnote-api',
+      }),
+    ).toThrow('Environment variable AUTH_OIDC_ISSUER is required.');
   });
 });

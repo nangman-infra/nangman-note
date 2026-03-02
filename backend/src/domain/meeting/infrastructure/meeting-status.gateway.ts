@@ -15,6 +15,8 @@ import {
 } from '../../../shared/config/cors-origin.util';
 import { createWsCorsOriginHandler } from '../../../shared/config/ws-cors.factory';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
+import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
+import { MeetingService } from '../application/meeting.service';
 
 @WebSocketGateway({
   path: '/ws/meeting-status',
@@ -26,13 +28,16 @@ import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status
 export class MeetingStatusGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  private static readonly GLOBAL_ROOM = 'meeting-status:global';
   private readonly logger = new Logger(MeetingStatusGateway.name);
 
   @WebSocketServer()
   private readonly server!: Server;
 
-  constructor(private readonly configService: ConfigService<AppEnv, true>) {}
+  constructor(
+    private readonly configService: ConfigService<AppEnv, true>,
+    private readonly tokenVerifier: OidcTokenVerifierService,
+    private readonly meetingService: MeetingService,
+  ) {}
 
   async handleConnection(client: Socket): Promise<void> {
     if (!this.isAllowedOrigin(client.handshake.headers.origin)) {
@@ -41,20 +46,27 @@ export class MeetingStatusGateway
       return;
     }
 
-    const meetingId = this.resolveMeetingId(client);
+    try {
+      const userSub = await this.resolveSocketOwnerSub(client);
+      await client.join(this.userRoom(userSub));
 
-    if (!meetingId) {
-      await client.join(MeetingStatusGateway.GLOBAL_ROOM);
+      const meetingId = this.resolveMeetingId(client);
+      if (meetingId) {
+        await this.meetingService.findById(meetingId, userSub);
+      }
+
       this.logger.debug(
-        `Client ${client.id} joined global meeting-status room`,
+        `Client ${client.id} joined meeting-status room (owner=${userSub ?? 'anonymous'})`,
       );
-      return;
+    } catch (error) {
+      client.emit('error', {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Meeting status socket authentication failed',
+      });
+      client.disconnect(true);
     }
-
-    await client.join(meetingId);
-    this.logger.debug(
-      `Client ${client.id} joined meeting-status room: ${meetingId}`,
-    );
   }
 
   handleDisconnect(client: Socket): void {
@@ -67,15 +79,12 @@ export class MeetingStatusGateway
    */
   @OnEvent(MeetingStatusChangedEvent.EVENT_NAME)
   handleMeetingStatusChanged(event: MeetingStatusChangedEvent): void {
+    const ownerSub = event.ownerSub;
+
     this.logger.log(
-      `Broadcasting status change: meeting=${event.meetingId}, status=${event.status}`,
+      `Broadcasting status change: meeting=${event.meetingId}, status=${event.status}, owner=${ownerSub ?? 'anonymous'}`,
     );
-    this.server.to(event.meetingId).emit('meeting:status', {
-      meetingId: event.meetingId,
-      status: event.status,
-      phase: event.phase,
-    });
-    this.server.to(MeetingStatusGateway.GLOBAL_ROOM).emit('meeting:status', {
+    this.server.to(this.userRoom(ownerSub)).emit('meeting:status', {
       meetingId: event.meetingId,
       status: event.status,
       phase: event.phase,
@@ -114,5 +123,49 @@ export class MeetingStatusGateway
       nodeEnv,
       allowWithoutOrigin: false,
     });
+  }
+
+  private userRoom(ownerSub?: string): string {
+    return `meeting-status:user:${ownerSub ?? 'anonymous'}`;
+  }
+
+  private async resolveSocketOwnerSub(
+    client: Socket,
+  ): Promise<string | undefined> {
+    if (!this.tokenVerifier.isAuthEnabled()) {
+      return undefined;
+    }
+
+    const token = this.extractSocketToken(client);
+    if (!token) {
+      throw new Error('Missing socket auth token');
+    }
+    const user = await this.tokenVerifier.verifyAccessToken(token);
+    return user.sub;
+  }
+
+  private extractSocketToken(client: Socket): string | undefined {
+    const authPayload = client.handshake.auth as
+      | Record<string, unknown>
+      | undefined;
+    const fromAuth = authPayload?.token;
+    if (typeof fromAuth === 'string' && fromAuth.trim().length > 0) {
+      return fromAuth.trim();
+    }
+
+    const authHeader = client.handshake.headers.authorization;
+    if (typeof authHeader === 'string') {
+      const [scheme, credentials] = authHeader.split(' ');
+      if (scheme?.toLowerCase() === 'bearer' && credentials) {
+        return credentials.trim();
+      }
+    }
+
+    const queryToken = client.handshake.query.token;
+    if (typeof queryToken === 'string' && queryToken.trim().length > 0) {
+      return queryToken.trim();
+    }
+
+    return undefined;
   }
 }

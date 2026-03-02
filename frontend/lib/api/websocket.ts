@@ -17,12 +17,14 @@ import { getRuntimeEnv } from '@/lib/config/runtime-env';
 export function createSocket(
   path: string,
   query?: Record<string, string>,
+  authToken?: string,
 ): Socket {
   const wsUrl = getRuntimeEnv('WS_URL');
 
   const socket = io(wsUrl || undefined, {
     path,
     query,
+    auth: authToken ? { token: authToken } : undefined,
     transports: ['polling', 'websocket'],
     withCredentials: true,
   });

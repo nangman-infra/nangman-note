@@ -68,8 +68,11 @@ export class TranscriptionService {
     private readonly translationProvider: TranslationProvider,
   ) {}
 
-  async listByMeetingId(meetingId: string): Promise<TranscriptSegmentEntity[]> {
-    await this.meetingService.findById(meetingId);
+  async listByMeetingId(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<TranscriptSegmentEntity[]> {
+    await this.meetingService.findById(meetingId, ownerSub);
 
     return this.transcriptRepository.find({
       where: { meetingId },
@@ -86,8 +89,9 @@ export class TranscriptionService {
     onPayload: (payload: RealtimeTranscriptPayload) => void,
     onError: (error: Error) => void,
     onClose: () => void,
+    ownerSub?: string,
   ): Promise<void> {
-    const meeting = await this.meetingService.findById(meetingId);
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
 
     if (meeting.transcriptionMode !== MeetingTranscriptionMode.REALTIME) {
       throw new BadRequestException(
@@ -145,16 +149,23 @@ export class TranscriptionService {
     return this.streamingProvider.getActiveSessionCount();
   }
 
-  async switchMeetingToBatchFallback(meetingId: string): Promise<boolean> {
-    const meeting = await this.meetingService.findById(meetingId);
+  async switchMeetingToBatchFallback(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<boolean> {
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
 
     if (meeting.transcriptionMode !== MeetingTranscriptionMode.REALTIME) {
       return false;
     }
 
-    await this.meetingService.updatePrompt(meetingId, {
-      transcriptionMode: MeetingTranscriptionMode.BATCH,
-    });
+    await this.meetingService.updatePrompt(
+      meetingId,
+      {
+        transcriptionMode: MeetingTranscriptionMode.BATCH,
+      },
+      ownerSub,
+    );
     this.logger.warn(
       `Meeting ${meetingId} switched from realtime to batch due to capacity constraints`,
     );
@@ -165,8 +176,9 @@ export class TranscriptionService {
   async acceptRealtimeAudioChunk(
     meetingId: string,
     payload: unknown,
+    ownerSub?: string,
   ): Promise<boolean> {
-    await this.ensureRealtimeEnabled(meetingId);
+    await this.ensureRealtimeEnabled(meetingId, ownerSub);
 
     // binary payload를 Buffer로 변환하여 streaming provider에 전달
     const chunk = this.toBuffer(payload);
@@ -176,8 +188,11 @@ export class TranscriptionService {
     return true;
   }
 
-  async ensureRealtimeEnabled(meetingId: string): Promise<void> {
-    const meeting = await this.meetingService.findById(meetingId);
+  async ensureRealtimeEnabled(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<void> {
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
 
     if (meeting.transcriptionMode !== MeetingTranscriptionMode.REALTIME) {
       throw new BadRequestException(
@@ -188,8 +203,9 @@ export class TranscriptionService {
 
   async listBatchJobsByMeetingId(
     meetingId: string,
+    ownerSub?: string,
   ): Promise<TranscriptionJobEntity[]> {
-    await this.meetingService.findById(meetingId);
+    await this.meetingService.findById(meetingId, ownerSub);
 
     return this.transcriptionJobRepository.find({
       where: { meetingId },
@@ -200,8 +216,9 @@ export class TranscriptionService {
   async queueBatchJob(
     meetingId: string,
     dto: CreateBatchTranscriptionJobDto,
+    ownerSub?: string,
   ): Promise<TranscriptionJobEntity> {
-    const meeting = await this.meetingService.findById(meetingId);
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
 
     if (meeting.transcriptionMode !== MeetingTranscriptionMode.BATCH) {
       throw new BadRequestException(

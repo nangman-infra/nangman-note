@@ -51,7 +51,10 @@ describe('NoteService', () => {
 
       const result = await service.findByMeetingId('meeting-1');
 
-      expect(meetingService.findById).toHaveBeenCalledWith('meeting-1');
+      expect(meetingService.findById).toHaveBeenCalledWith(
+        'meeting-1',
+        undefined,
+      );
       expect(noteRepository.findOne).toHaveBeenCalledWith({
         where: { meetingId: 'meeting-1' },
       });

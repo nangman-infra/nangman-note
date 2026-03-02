@@ -14,6 +14,9 @@ export class PromptEntity {
   @PrimaryColumn({ type: 'varchar', length: 120 })
   id: string;
 
+  @Column({ name: 'owner_sub', type: 'varchar', length: 255, nullable: true })
+  ownerSub?: string;
+
   @Column({ type: 'varchar', length: 100 })
   name: string;
 
