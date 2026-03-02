@@ -235,12 +235,14 @@ export default function InProgressMeetingPage() {
   }, [meetingId]);
 
   // 마이크 스트림 획득 후 녹음 시작 (배치) 또는 스트리밍 시작 (실시간)
+  // isConnected도 의존성에 포함하여 소켓 연결 완료 시에도 트리거됨
   useEffect(() => {
     if (!stream || !meetingId) return;
 
     if (isRealtimeMode) {
       // 실시간 모드: AudioWorklet PCM 스트리밍
-      if (audioStreamingState === 'idle' && transcriptionSocketRef.current?.connected) {
+      // audioStreamingState가 idle이고 소켓이 연결된 경우에만 시작
+      if (audioStreamingState === 'idle' && isConnected && transcriptionSocketRef.current?.connected) {
         void startStreaming(stream, transcriptionSocketRef.current, {
           onFallbackToBatch: handleRealtimeFallbackToBatch,
         });
@@ -255,27 +257,10 @@ export default function InProgressMeetingPage() {
     stream,
     meetingId,
     isRealtimeMode,
+    isConnected,
     recorderState,
     audioStreamingState,
     startRecording,
-    startStreaming,
-    transcriptionSocketRef,
-    handleRealtimeFallbackToBatch,
-  ]);
-
-  // 실시간 모드: 소켓 연결 후 오디오 스트리밍 시작
-  // isConnected가 변경될 때 트리거됨 (ref만으로는 useEffect가 재실행 안 됨)
-  useEffect(() => {
-    if (!isRealtimeMode || !stream || audioStreamingState !== 'idle') return;
-    if (!isConnected || !transcriptionSocketRef.current?.connected) return;
-    void startStreaming(stream, transcriptionSocketRef.current, {
-      onFallbackToBatch: handleRealtimeFallbackToBatch,
-    });
-  }, [
-    isRealtimeMode,
-    stream,
-    audioStreamingState,
-    isConnected,
     startStreaming,
     transcriptionSocketRef,
     handleRealtimeFallbackToBatch,

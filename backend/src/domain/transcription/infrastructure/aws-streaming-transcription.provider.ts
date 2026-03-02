@@ -50,6 +50,9 @@ class AudioChunkQueue {
   private bufferedBytes = 0;
   private resolve: ((value: IteratorResult<Buffer>) => void) | null = null;
   private done = false;
+
+  private fullRejectCount = 0; // 버퍼 초과로 거부된 횟수
+
   constructor(private readonly maxBufferedBytes: number) {}
 
   push(chunk: Buffer): boolean {
@@ -67,6 +70,7 @@ class AudioChunkQueue {
     }
 
     if (this.bufferedBytes + chunk.length > this.maxBufferedBytes) {
+      this.fullRejectCount++;
       return false;
     }
 
@@ -82,6 +86,11 @@ class AudioChunkQueue {
       this.resolve = null;
       r({ value: undefined as unknown as Buffer, done: true });
     }
+  }
+
+  /** 버퍼 초과 거부 횟수 */
+  getFullRejectCount(): number {
+    return this.fullRejectCount;
   }
 
   [Symbol.asyncIterator](): AsyncIterator<Buffer> {
@@ -180,7 +189,7 @@ export class AwsStreamingTranscriptionProvider
       MediaSampleRateHertz: effectiveSampleRate,
       AudioStream: audioStream,
       EnablePartialResultsStabilization: true,
-      PartialResultsStability: PartialResultsStability.HIGH,
+      PartialResultsStability: PartialResultsStability.LOW,
     };
 
     if (languageCode) {
