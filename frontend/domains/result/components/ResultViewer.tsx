@@ -6,7 +6,7 @@ import { Copy, Download, Edit3, FileText, RefreshCw, Save, X } from 'lucide-reac
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
-import { copyToClipboard } from '@/lib/utils/markdown';
+import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
 import { useResult } from '../hooks/useResult';
 import {
   resultTabDataApi,
@@ -332,7 +332,7 @@ export function ResultViewer({
           <div className="surface-card p-5">
             {noteContent.trim() ? (
               <article className="result-markdown">
-                <ReactMarkdown>{noteContent}</ReactMarkdown>
+                <ReactMarkdown>{sanitizeNoteMarkdown(noteContent)}</ReactMarkdown>
               </article>
             ) : (
               <p className="text-center text-sm text-muted">작성된 메모가 없습니다.</p>
