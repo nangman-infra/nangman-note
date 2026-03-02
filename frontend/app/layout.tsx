@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { IBM_Plex_Mono, Manrope } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/auth/AuthSessionProvider';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
@@ -58,12 +59,8 @@ export const metadata: Metadata = {
   },
   manifest: '/manifest.webmanifest',
   icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icon', sizes: '512x512', type: 'image/png' },
-    ],
+    icon: [{ url: '/icon', sizes: '512x512', type: 'image/png' }],
     apple: [{ url: '/apple-icon', sizes: '180x180', type: 'image/png' }],
-    shortcut: ['/favicon.ico'],
   },
   openGraph: {
     type: 'website',
@@ -131,6 +128,11 @@ export default function RootLayout({
         <AuthSessionProvider>
           <FeedbackProvider>{children}</FeedbackProvider>
         </AuthSessionProvider>
+        <Script
+          src="https://analytics.example.com/api/script.js"
+          data-site-id="REDACTED-SITE-ID"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
