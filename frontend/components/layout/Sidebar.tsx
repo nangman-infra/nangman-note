@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { CalendarDays, FileClock, FolderKanban, Plus, Settings, Sparkles, Tags, Trash2 } from 'lucide-react';
+import { signOut, useSession } from 'next-auth/react';
+import { CalendarDays, FileClock, FolderKanban, LogOut, Plus, Settings, Sparkles, Tags, Trash2, User } from 'lucide-react';
 
 export type SidebarTimeFilter = 'today' | 'recent' | 'all';
 
@@ -95,6 +96,7 @@ export function Sidebar({
       </section>
 
       <div className="mt-auto space-y-2 pt-4">
+        <UserInfo />
         <Link href="/settings" className="btn-neo w-full justify-start text-muted">
           <Settings className="h-4 w-4" />
           설정
@@ -108,6 +110,33 @@ export function Sidebar({
           새 회의 시작
         </Link>
       </div>
+    </div>
+  );
+}
+
+function UserInfo() {
+  const { data: session } = useSession();
+
+  if (!session?.user) return null;
+
+  return (
+    <div className="surface-card flex items-center justify-between px-3 py-2.5">
+      <div className="flex items-center gap-2 overflow-hidden">
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
+          <User className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold">{session.user.email || '사용자'}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => void signOut({ callbackUrl: '/auth/signin' })}
+        className="flex-shrink-0 rounded-md p-1.5 text-muted transition hover:bg-rose-50 hover:text-rose-600"
+        title="로그아웃"
+      >
+        <LogOut className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

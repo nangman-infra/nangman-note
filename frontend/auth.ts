@@ -86,6 +86,9 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 }
 
 export const authOptions: NextAuthOptions = {
+  pages: {
+    signIn: '/auth/signin',
+  },
   providers: [
     AuthentikProvider({
       issuer: authentikIssuer,
@@ -94,11 +97,12 @@ export const authOptions: NextAuthOptions = {
       checks: ['pkce', 'state'],
       authorization: {
         params: {
-          scope: 'openid profile email offline_access',
+          scope: 'openid profile email',
         },
       },
     }),
   ],
+  debug: true,
   session: {
     strategy: 'jwt',
   },
