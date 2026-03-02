@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { IBM_Plex_Mono, Manrope } from 'next/font/google';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
+import { getServerRuntimeVar } from '@/lib/config/env';
 import '@toast-ui/editor/dist/toastui-editor.css';
 import './globals.css';
 
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic';
  */
 function buildRuntimeEnvScript(): string {
   const runtimeEnv = {
-    WS_URL: process.env.WS_URL || '',
+    WS_URL: getServerRuntimeVar('WS_URL'),
   };
   return `window.__RUNTIME_ENV__=${JSON.stringify(runtimeEnv)};`;
 }

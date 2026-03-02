@@ -52,3 +52,11 @@ export const env = Object.freeze({
   ENABLE_OFFLINE: parsedEnv.data.NEXT_PUBLIC_ENABLE_OFFLINE,
   AUTO_SAVE_DELAY: parsedEnv.data.NEXT_PUBLIC_AUTO_SAVE_DELAY,
 });
+
+/**
+ * 서버 컴포넌트에서 런타임 환경변수를 읽기 위한 헬퍼.
+ * (클라이언트 번들 고정값이 아닌 서버 프로세스 런타임 값을 사용)
+ */
+export function getServerRuntimeVar(key: 'WS_URL'): string {
+  return process.env[key] || '';
+}

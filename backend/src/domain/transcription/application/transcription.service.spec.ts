@@ -19,10 +19,7 @@ import {
 describe('TranscriptionService', () => {
   let service: TranscriptionService;
   let transcriptRepository: jest.Mocked<
-    Pick<
-      Repository<TranscriptSegmentEntity>,
-      'find' | 'create' | 'save' | 'update'
-    >
+    Pick<Repository<TranscriptSegmentEntity>, 'find' | 'create' | 'save'>
   >;
   let transcriptionJobRepository: jest.Mocked<
     Pick<Repository<TranscriptionJobEntity>, 'find' | 'create' | 'save'>
@@ -71,7 +68,6 @@ describe('TranscriptionService', () => {
       find: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
-      update: jest.fn(),
     };
     transcriptionJobRepository = {
       find: jest.fn(),
@@ -255,14 +251,14 @@ describe('TranscriptionService', () => {
       transcriptRepository.create.mockImplementation(
         (entity) => entity as TranscriptSegmentEntity,
       );
-      transcriptRepository.save.mockResolvedValue({
-        id: 'segment-1',
-      } as TranscriptSegmentEntity);
-      transcriptRepository.update.mockResolvedValue({
-        generatedMaps: [],
-        raw: [],
-        affected: 1,
-      });
+      transcriptRepository.save
+        .mockResolvedValueOnce({
+          id: 'segment-1',
+        } as TranscriptSegmentEntity)
+        .mockResolvedValueOnce({
+          id: 'segment-1',
+          translatedText: 'hello team',
+        } as TranscriptSegmentEntity);
 
       await service.startRealtimeSession(
         'meeting-1',
@@ -300,9 +296,16 @@ describe('TranscriptionService', () => {
         }),
       );
 
-      expect(transcriptRepository.update).toHaveBeenCalledWith(
-        { id: 'segment-1' },
-        { translatedText: 'hello team' },
+      expect(transcriptRepository.create).toHaveBeenCalledWith({
+        id: 'segment-1',
+        translatedText: 'hello team',
+      });
+      expect(transcriptRepository.save).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          id: 'segment-1',
+          translatedText: 'hello team',
+        }),
       );
     });
   });

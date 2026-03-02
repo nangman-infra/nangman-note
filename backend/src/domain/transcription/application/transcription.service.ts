@@ -372,10 +372,12 @@ export class TranscriptionService {
 
       const savedSegmentId = await savedSegmentIdPromise;
       if (savedSegmentId) {
-        await this.transcriptRepository.update(
-          { id: savedSegmentId },
-          { translatedText },
-        );
+        // save 경로를 사용해 암호화 subscriber(beforeUpdate/afterUpdate)를 일관되게 거치도록 보장
+        const patch = this.transcriptRepository.create({
+          id: savedSegmentId,
+          translatedText,
+        });
+        await this.transcriptRepository.save(patch);
       }
     } catch (error) {
       this.logger.warn(`Translation failed for meeting ${meetingId}: ${error}`);

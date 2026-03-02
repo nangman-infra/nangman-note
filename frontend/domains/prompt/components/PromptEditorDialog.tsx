@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 
 const PROMPT_CONTENT_MAX_LENGTH = 12_000;
+const PROMPT_NAME_MAX_LENGTH = 100;
 
 interface PromptEditorDialogProps {
   open: boolean;
@@ -66,11 +67,23 @@ export function PromptEditorDialog({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={PROMPT_NAME_MAX_LENGTH}
             placeholder="예: 일일 스탠드업"
             className="input-shell w-full"
             disabled={isLoading}
             autoFocus
           />
+          <div className="mt-1 flex justify-end">
+            <p
+              className={`text-[11px] tabular-nums ${
+                name.length > PROMPT_NAME_MAX_LENGTH * 0.9
+                  ? 'text-rose-500'
+                  : 'text-muted'
+              }`}
+            >
+              {name.length.toLocaleString()}/{PROMPT_NAME_MAX_LENGTH.toLocaleString()}
+            </p>
+          </div>
         </div>
 
         <div>
