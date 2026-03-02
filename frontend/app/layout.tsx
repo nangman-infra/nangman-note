@@ -1,8 +1,9 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Mono, Manrope } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/auth/AuthSessionProvider';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
 import { getServerRuntimeVar } from '@/lib/config/env';
+import { getSiteUrl } from '@/lib/seo/site-url';
 import '@toast-ui/editor/dist/toastui-editor.css';
 import './globals.css';
 
@@ -39,9 +40,79 @@ const plexMono = IBM_Plex_Mono({
   display: 'swap',
 });
 
+const siteUrl = getSiteUrl();
+const siteUrlString = siteUrl.toString();
+const appTitle = 'TransNote | AI Meeting Notes Workspace';
+const appDescription = '실시간 전사와 노트 중심 워크플로우를 결합한 회의 기록 워크스페이스';
+
 export const metadata: Metadata = {
-  title: 'TransNote | AI Meeting Notes Workspace',
-  description: '실시간 전사와 노트 중심 워크플로우를 결합한 회의 기록 워크스페이스',
+  metadataBase: siteUrl,
+  title: {
+    default: appTitle,
+    template: '%s | TransNote',
+  },
+  applicationName: 'TransNote',
+  description: appDescription,
+  alternates: {
+    canonical: '/',
+  },
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-icon', sizes: '180x180', type: 'image/png' }],
+    shortcut: ['/favicon.ico'],
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'ko_KR',
+    siteName: 'TransNote',
+    url: siteUrlString,
+    title: appTitle,
+    description: appDescription,
+    images: [
+      {
+        url: '/opengraph-image?v=3',
+        width: 1200,
+        height: 630,
+        alt: 'TransNote AI Meeting Notes Workspace',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: appTitle,
+    description: appDescription,
+    images: ['/twitter-image?v=3'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-snippet': -1,
+      'max-image-preview': 'large',
+      'max-video-preview': -1,
+    },
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'TransNote',
+  },
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#08131f',
+  colorScheme: 'dark light',
 };
 
 export default function RootLayout({
