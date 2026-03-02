@@ -16,6 +16,7 @@ export function useTranscription(
 ) {
   const fallbackHandler = options?.onFallbackToBatch;
   const { data: session, status: authStatus } = useSession();
+  const hasSessionToken = Boolean(session?.accessToken);
   // accessToken 을 ref 로 저장 → 토큰 갱신 시 소켓이 끊기지 않도록
   const accessTokenRef = useRef<string | undefined>(undefined);
   const {
@@ -84,7 +85,7 @@ export function useTranscription(
       return;
     }
 
-    if (authStatus !== 'authenticated' || !session?.accessToken) {
+    if (authStatus !== 'authenticated' || !hasSessionToken) {
       setConnected(false);
       setHasActiveSession(false);
       setError('인증 세션이 만료되었습니다. 다시 로그인해주세요.');
@@ -157,6 +158,7 @@ export function useTranscription(
   }, [
     isRealtimeEnabled,
     authStatus,
+    hasSessionToken,
     meetingId,
     clearTranscripts,
     handlePayload,

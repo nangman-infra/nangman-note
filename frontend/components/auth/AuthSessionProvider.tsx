@@ -16,7 +16,11 @@ function SessionTokenSync() {
     if (session?.error === 'RefreshAccessTokenError') {
       // refresh token 마저 만료 → 재로그인
       setAccessToken(undefined);
-      signIn('authentik');
+      const callbackUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}${window.location.hash}`
+          : '/';
+      void signIn('authentik', { callbackUrl });
       return;
     }
     setAccessToken(session?.accessToken);
@@ -41,4 +45,3 @@ export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
     </SessionProvider>
   );
 }
-

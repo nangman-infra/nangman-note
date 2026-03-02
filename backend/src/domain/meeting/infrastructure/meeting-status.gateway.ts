@@ -18,6 +18,11 @@ import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status
 import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
 import { MeetingService } from '../application/meeting.service';
 
+interface SocketAuthContext {
+  ownerSub?: string;
+  expiresAtMs?: number;
+}
+
 @WebSocketGateway({
   path: '/ws/meeting-status',
   cors: {
@@ -32,6 +37,7 @@ export class MeetingStatusGateway
 
   @WebSocketServer()
   private readonly server!: Server;
+  private readonly socketAuthExpiryTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly configService: ConfigService<AppEnv, true>,
@@ -47,29 +53,29 @@ export class MeetingStatusGateway
     }
 
     try {
-      const userSub = await this.resolveSocketOwnerSub(client);
-      await client.join(this.userRoom(userSub));
+      const authContext = await this.resolveSocketAuthContext(client);
+      const ownerSub = authContext?.ownerSub;
+      await client.join(this.userRoom(ownerSub));
+      this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
 
       const meetingId = this.resolveMeetingId(client);
       if (meetingId) {
-        await this.meetingService.findById(meetingId, userSub);
+        await this.meetingService.findById(meetingId, ownerSub);
       }
 
       this.logger.debug(
-        `Client ${client.id} joined meeting-status room (owner=${userSub ?? 'anonymous'})`,
+        `Client ${client.id} joined meeting-status room (owner=${ownerSub ?? 'anonymous'})`,
       );
-    } catch (error) {
+    } catch {
       client.emit('error', {
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Meeting status socket authentication failed',
+        message: 'Meeting status socket connection failed',
       });
       client.disconnect(true);
     }
   }
 
   handleDisconnect(client: Socket): void {
+    this.unregisterSocketAuthExpiry(client.id);
     this.logger.debug(`Client ${client.id} disconnected from meeting-status`);
   }
 
@@ -129,9 +135,9 @@ export class MeetingStatusGateway
     return `meeting-status:user:${ownerSub ?? 'anonymous'}`;
   }
 
-  private async resolveSocketOwnerSub(
+  private async resolveSocketAuthContext(
     client: Socket,
-  ): Promise<string | undefined> {
+  ): Promise<SocketAuthContext | undefined> {
     if (!this.tokenVerifier.isAuthEnabled()) {
       return undefined;
     }
@@ -141,7 +147,13 @@ export class MeetingStatusGateway
       throw new Error('Missing socket auth token');
     }
     const user = await this.tokenVerifier.verifyAccessToken(token);
-    return user.sub;
+    const expiresAtMs =
+      typeof user.raw.exp === 'number' ? user.raw.exp * 1000 : undefined;
+
+    return {
+      ownerSub: user.sub,
+      expiresAtMs,
+    };
   }
 
   private extractSocketToken(client: Socket): string | undefined {
@@ -161,11 +173,46 @@ export class MeetingStatusGateway
       }
     }
 
-    const queryToken = client.handshake.query.token;
-    if (typeof queryToken === 'string' && queryToken.trim().length > 0) {
-      return queryToken.trim();
+    return undefined;
+  }
+
+  private registerSocketAuthExpiry(client: Socket, expiresAtMs?: number): void {
+    this.unregisterSocketAuthExpiry(client.id);
+
+    if (!expiresAtMs) {
+      return;
     }
 
-    return undefined;
+    const disconnectDelayMs = expiresAtMs - Date.now() + 1000;
+    if (disconnectDelayMs <= 0) {
+      this.disconnectExpiredSocket(client);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      this.disconnectExpiredSocket(client);
+    }, disconnectDelayMs);
+
+    if (typeof timer.unref === 'function') {
+      timer.unref();
+    }
+
+    this.socketAuthExpiryTimers.set(client.id, timer);
+  }
+
+  private unregisterSocketAuthExpiry(clientId: string): void {
+    const timer = this.socketAuthExpiryTimers.get(clientId);
+    if (timer) {
+      clearTimeout(timer);
+      this.socketAuthExpiryTimers.delete(clientId);
+    }
+  }
+
+  private disconnectExpiredSocket(client: Socket): void {
+    this.logger.warn(
+      `Meeting-status socket ${client.id} disconnected due to expired auth`,
+    );
+    client.emit('error', { message: 'Authentication expired' });
+    client.disconnect(true);
   }
 }

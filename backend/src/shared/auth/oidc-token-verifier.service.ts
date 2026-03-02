@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { JWTPayload } from 'jose';
 import { AppEnv } from '../config/env.validation';
@@ -9,11 +9,13 @@ type JoseJwtKeyResolver = Parameters<JoseModule['jwtVerify']>[1];
 
 @Injectable()
 export class OidcTokenVerifierService {
+  private readonly logger = new Logger(OidcTokenVerifierService.name);
   private readonly authEnabled: boolean;
   private readonly issuer: string;
   private readonly audience: string;
   private readonly jwksUri: string;
   private joseModulePromise: Promise<JoseModule> | undefined;
+  private discoveredJwksUriPromise: Promise<string> | undefined;
   private jwks: JoseJwtKeyResolver | undefined;
 
   constructor(private readonly configService: ConfigService<AppEnv, true>) {
@@ -46,9 +48,10 @@ export class OidcTokenVerifierService {
 
       return this.toAuthUser(payload);
     } catch (error) {
-      throw new UnauthorizedException(
-        `Invalid access token: ${error instanceof Error ? error.message : 'unknown error'}`,
+      this.logger.warn(
+        `Access token verification failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+      throw new UnauthorizedException('Invalid access token');
     }
   }
 
@@ -64,6 +67,26 @@ export class OidcTokenVerifierService {
       return this.jwks;
     }
 
+    const jwksUri = await this.resolveJwksUri();
+
+    const jose = await this.getJoseModule();
+    this.jwks = jose.createRemoteJWKSet(new URL(jwksUri));
+    return this.jwks;
+  }
+
+  private async resolveJwksUri(): Promise<string> {
+    const explicitJwksUri = this.jwksUri.trim();
+    if (explicitJwksUri.length > 0) {
+      return explicitJwksUri;
+    }
+
+    if (!this.discoveredJwksUriPromise) {
+      this.discoveredJwksUriPromise = this.discoverJwksUri();
+    }
+    return this.discoveredJwksUriPromise;
+  }
+
+  private async discoverJwksUri(): Promise<string> {
     const normalizedIssuer = this.issuer.endsWith('/')
       ? this.issuer
       : `${this.issuer}/`;
@@ -71,11 +94,38 @@ export class OidcTokenVerifierService {
       '.well-known/jwks.json',
       normalizedIssuer,
     ).toString();
-    const jwksUri = this.jwksUri.trim() || defaultJwksUri;
+    const discoveryUrl = new URL(
+      '.well-known/openid-configuration',
+      normalizedIssuer,
+    ).toString();
 
-    const jose = await this.getJoseModule();
-    this.jwks = jose.createRemoteJWKSet(new URL(jwksUri));
-    return this.jwks;
+    try {
+      const response = await fetch(discoveryUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        this.logger.warn(
+          `Failed to fetch OIDC discovery document (${response.status}), fallback to ${defaultJwksUri}`,
+        );
+        return defaultJwksUri;
+      }
+
+      const data = (await response.json()) as { jwks_uri?: string };
+      if (
+        typeof data.jwks_uri === 'string' &&
+        data.jwks_uri.trim().length > 0
+      ) {
+        return data.jwks_uri.trim();
+      }
+
+      this.logger.warn(
+        `OIDC discovery document missing jwks_uri, fallback to ${defaultJwksUri}`,
+      );
+      return defaultJwksUri;
+    } catch (error) {
+      this.logger.warn(
+        `OIDC discovery fetch failed, fallback to ${defaultJwksUri}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return defaultJwksUri;
+    }
   }
 
   private toAuthUser(payload: JWTPayload): AuthUser {

@@ -2,11 +2,15 @@ import { ConfigService } from '@nestjs/config';
 import { Socket } from 'socket.io';
 import { AppEnv } from '../../../shared/config/env.validation';
 import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
+import type { AuthUser } from '../../../shared/auth/auth-user.interface';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { TranscriptionService } from '../application/transcription.service';
 import { TranscriptionGateway } from './transcription.gateway';
 
-type MockSocket = Pick<Socket, 'handshake' | 'emit' | 'id'>;
+type MockSocket = Pick<
+  Socket,
+  'handshake' | 'emit' | 'id' | 'join' | 'disconnect'
+>;
 
 describe('TranscriptionGateway', () => {
   let gateway: TranscriptionGateway;
@@ -24,7 +28,7 @@ describe('TranscriptionGateway', () => {
   >;
   let configService: jest.Mocked<Pick<ConfigService<AppEnv, true>, 'get'>>;
   let tokenVerifier: jest.Mocked<
-    Pick<OidcTokenVerifierService, 'isAuthEnabled'>
+    Pick<OidcTokenVerifierService, 'isAuthEnabled' | 'verifyAccessToken'>
   >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
   let serverEmit: jest.Mock;
@@ -34,8 +38,14 @@ describe('TranscriptionGateway', () => {
     ({
       id: 'socket-1',
       emit: jest.fn(),
+      disconnect: jest.fn(),
+      join: jest.fn().mockResolvedValue(undefined),
       handshake: {
         query: meetingId ? { meetingId } : {},
+        headers: {
+          origin: 'http://localhost:3000',
+        },
+        auth: {},
       },
     }) as unknown as MockSocket;
 
@@ -62,6 +72,7 @@ describe('TranscriptionGateway', () => {
     };
     tokenVerifier = {
       isAuthEnabled: jest.fn().mockReturnValue(false),
+      verifyAccessToken: jest.fn(),
     };
     meetingService = {
       findById: jest.fn(),
@@ -176,5 +187,37 @@ describe('TranscriptionGateway', () => {
       meetingId: 'meeting-1',
       hasActiveSession: true,
     });
+  });
+
+  it('rejects query token when auth is enabled', async () => {
+    tokenVerifier.isAuthEnabled.mockReturnValue(true);
+    const socket = createSocket('meeting-1');
+    socket.handshake.query = { meetingId: 'meeting-1', token: 'query-token' };
+
+    await gateway.handleConnection(socket as unknown as Socket);
+
+    expect(tokenVerifier.verifyAccessToken).not.toHaveBeenCalled();
+    expect(socket.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it('accepts handshake auth token when auth is enabled', async () => {
+    tokenVerifier.isAuthEnabled.mockReturnValue(true);
+    tokenVerifier.verifyAccessToken.mockResolvedValue({
+      sub: 'user-1',
+      scope: [],
+      raw: {
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      },
+    } as AuthUser);
+
+    const socket = createSocket('meeting-1');
+    socket.handshake.auth = { token: 'auth-token' };
+
+    await gateway.handleConnection(socket as unknown as Socket);
+
+    expect(tokenVerifier.verifyAccessToken).toHaveBeenCalledWith('auth-token');
+    expect(meetingService.findById).toHaveBeenCalledWith('meeting-1', 'user-1');
+    expect(socket.join).toHaveBeenCalledWith('meeting-1');
+    expect(socket.disconnect).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,12 @@
 import NextAuth from 'next-auth';
-import { authOptions } from '@/auth';
+import { createAuthOptions } from '@/auth';
 
-const handler = NextAuth(authOptions);
+const buildHandler = () => NextAuth(createAuthOptions());
 
-export { handler as GET, handler as POST };
+export async function GET(request: Request, context: unknown) {
+  return buildHandler()(request, context);
+}
 
+export async function POST(request: Request, context: unknown) {
+  return buildHandler()(request, context);
+}

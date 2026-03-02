@@ -37,6 +37,11 @@ interface EnsureSessionResult {
   fallbackToBatch?: boolean;
 }
 
+interface SocketAuthContext {
+  ownerSub?: string;
+  expiresAtMs?: number;
+}
+
 @WebSocketGateway({
   path: '/ws/transcribe',
   cors: {
@@ -56,6 +61,10 @@ export class TranscriptionGateway
   private readonly meetingClients = new Map<string, Set<string>>();
   /** socket.id → ownerSub */
   private readonly socketUsers = new Map<string, string | undefined>();
+  /** socket.id → access token exp(ms) */
+  private readonly socketAuthExpiresAt = new Map<string, number>();
+  /** socket.id → access token expiry disconnect timer */
+  private readonly socketAuthExpiryTimers = new Map<string, NodeJS.Timeout>();
   /** 세션 시작 중 중복 호출 방지 락 */
   private readonly startingSession = new Set<string>();
   private readonly maxConcurrentRealtimeSessions: number;
@@ -109,10 +118,12 @@ export class TranscriptionGateway
     }
 
     try {
-      const ownerSub = await this.resolveSocketOwnerSub(client);
+      const authContext = await this.resolveSocketAuthContext(client);
+      const ownerSub = authContext?.ownerSub;
       await this.meetingService.findById(meetingId, ownerSub);
       await client.join(meetingId);
       this.socketUsers.set(client.id, ownerSub);
+      this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
 
       // 클라이언트 추적
       if (!this.meetingClients.has(meetingId)) {
@@ -145,6 +156,7 @@ export class TranscriptionGateway
     const meetingId = this.resolveMeetingId(client);
     this.logger.debug(`Socket disconnected: ${client.id}`);
     this.socketUsers.delete(client.id);
+    this.unregisterSocketAuthExpiry(client.id);
 
     if (!meetingId) return;
 
@@ -176,6 +188,12 @@ export class TranscriptionGateway
     if (!meetingId) {
       return { ok: false, reason: 'missing-meeting-id' };
     }
+
+    if (this.isSocketAuthExpired(client.id)) {
+      this.disconnectExpiredSocket(client);
+      return { ok: false, reason: 'auth-expired' };
+    }
+
     const ownerSub = this.socketUsers.get(client.id);
 
     try {
@@ -254,6 +272,12 @@ export class TranscriptionGateway
     if (!meetingId) {
       return { ok: false };
     }
+
+    if (this.isSocketAuthExpired(client.id)) {
+      this.disconnectExpiredSocket(client);
+      return { ok: false, reason: 'auth-expired' };
+    }
+
     const ownerSub = this.socketUsers.get(client.id);
 
     try {
@@ -443,9 +467,9 @@ export class TranscriptionGateway
     );
   }
 
-  private async resolveSocketOwnerSub(
+  private async resolveSocketAuthContext(
     client: Socket,
-  ): Promise<string | undefined> {
+  ): Promise<SocketAuthContext | undefined> {
     if (!this.tokenVerifier.isAuthEnabled()) {
       return undefined;
     }
@@ -456,7 +480,13 @@ export class TranscriptionGateway
     }
 
     const user = await this.tokenVerifier.verifyAccessToken(token);
-    return user.sub;
+    const expiresAtMs =
+      typeof user.raw.exp === 'number' ? user.raw.exp * 1000 : undefined;
+
+    return {
+      ownerSub: user.sub,
+      expiresAtMs,
+    };
   }
 
   private extractSocketToken(client: Socket): string | undefined {
@@ -476,11 +506,52 @@ export class TranscriptionGateway
       }
     }
 
-    const queryToken = client.handshake.query.token;
-    if (typeof queryToken === 'string' && queryToken.trim().length > 0) {
-      return queryToken.trim();
+    return undefined;
+  }
+
+  private registerSocketAuthExpiry(client: Socket, expiresAtMs?: number): void {
+    this.unregisterSocketAuthExpiry(client.id);
+
+    if (!expiresAtMs) {
+      return;
     }
 
-    return undefined;
+    this.socketAuthExpiresAt.set(client.id, expiresAtMs);
+
+    const disconnectDelayMs = expiresAtMs - Date.now() + 1000;
+    if (disconnectDelayMs <= 0) {
+      this.disconnectExpiredSocket(client);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      this.disconnectExpiredSocket(client);
+    }, disconnectDelayMs);
+
+    if (typeof timer.unref === 'function') {
+      timer.unref();
+    }
+
+    this.socketAuthExpiryTimers.set(client.id, timer);
+  }
+
+  private unregisterSocketAuthExpiry(clientId: string): void {
+    const timer = this.socketAuthExpiryTimers.get(clientId);
+    if (timer) {
+      clearTimeout(timer);
+      this.socketAuthExpiryTimers.delete(clientId);
+    }
+    this.socketAuthExpiresAt.delete(clientId);
+  }
+
+  private isSocketAuthExpired(clientId: string): boolean {
+    const expiresAtMs = this.socketAuthExpiresAt.get(clientId);
+    return typeof expiresAtMs === 'number' && Date.now() >= expiresAtMs;
+  }
+
+  private disconnectExpiredSocket(client: Socket): void {
+    this.logger.warn(`Socket ${client.id} disconnected due to expired auth`);
+    client.emit('error', { message: 'Authentication expired' });
+    client.disconnect(true);
   }
 }

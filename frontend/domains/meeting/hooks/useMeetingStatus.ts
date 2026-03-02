@@ -27,6 +27,7 @@ export function useMeetingStatus({
   enabled = true,
 }: UseMeetingStatusOptions): void {
   const { data: session, status: authStatus } = useSession();
+  const hasSessionToken = Boolean(session?.accessToken);
   const accessTokenRef = useRef<string | undefined>(undefined);
   const socketRef = useRef<Socket | null>(null);
   const callbackRef = useRef(onStatusChange);
@@ -47,7 +48,7 @@ export function useMeetingStatus({
       cleanup();
       return;
     }
-    if (authStatus !== 'authenticated' || !session?.accessToken) {
+    if (authStatus !== 'authenticated' || !hasSessionToken) {
       cleanup();
       return;
     }
@@ -69,7 +70,7 @@ export function useMeetingStatus({
 
     return cleanup;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meetingId, cleanup, enabled, authStatus]);
+  }, [meetingId, cleanup, enabled, authStatus, hasSessionToken]);
 
   // accessToken 이 갱신되면 ref 만 업데이트 (소켓 재연결 안 함)
   useEffect(() => {

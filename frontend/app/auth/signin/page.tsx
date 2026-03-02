@@ -1,11 +1,15 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import { ShieldCheck, Sparkles, Lock } from 'lucide-react';
 
 export default function SignInPage() {
+  const searchParams = useSearchParams();
+
   const handleSignIn = () => {
-    void signIn('authentik', { callbackUrl: '/' });
+    const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'));
+    void signIn('authentik', { callbackUrl });
   };
 
   return (
@@ -79,4 +83,25 @@ function FeatureChip({ emoji, label }: { emoji: string; label: string }) {
       <span className="text-[10px] font-medium text-muted">{label}</span>
     </div>
   );
+}
+
+function normalizeCallbackUrl(rawValue: string | null): string {
+  if (!rawValue) {
+    return '/';
+  }
+
+  if (rawValue.startsWith('/')) {
+    return rawValue;
+  }
+
+  try {
+    const url = new URL(rawValue);
+    if (typeof window !== 'undefined' && url.origin === window.location.origin) {
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch {
+    // noop: fallback to root
+  }
+
+  return '/';
 }
