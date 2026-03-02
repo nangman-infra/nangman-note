@@ -10,7 +10,7 @@ import { TranscriptionJobProvider } from '../domain/transcription-job-provider.e
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
 import type { BatchTranscriptionProvider } from './ports/batch-transcription-provider.port';
 import type { StreamingTranscriptionProvider } from './ports/streaming-transcription-provider.port';
-import type { TranslateService } from '../../../shared/aws/translate/translate.service';
+import type { TranslationProvider } from './ports/translation-provider.port';
 import {
   type RealtimeTranscriptPayload,
   TranscriptionService,
@@ -32,8 +32,8 @@ describe('TranscriptionService', () => {
   >;
   let batchTranscriptionProvider: jest.Mocked<BatchTranscriptionProvider>;
   let streamingProvider: jest.Mocked<StreamingTranscriptionProvider>;
-  let translateService: jest.Mocked<
-    Pick<TranslateService, 'translateText' | 'isSameLanguage'>
+  let translationProvider: jest.Mocked<
+    Pick<TranslationProvider, 'translateText' | 'isSameLanguage'>
   >;
 
   const buildMeeting = (
@@ -93,7 +93,7 @@ describe('TranscriptionService', () => {
       hasActiveSession: jest.fn().mockReturnValue(false),
       getActiveSessionCount: jest.fn().mockReturnValue(0),
     };
-    translateService = {
+    translationProvider = {
       translateText: jest.fn(),
       isSameLanguage: jest.fn().mockReturnValue(false),
     };
@@ -104,7 +104,7 @@ describe('TranscriptionService', () => {
       meetingService as unknown as MeetingService,
       batchTranscriptionProvider,
       streamingProvider,
-      translateService as unknown as TranslateService,
+      translationProvider,
     );
   });
 
@@ -242,8 +242,8 @@ describe('TranscriptionService', () => {
         }, 0);
       });
 
-      translateService.isSameLanguage.mockReturnValue(false);
-      translateService.translateText.mockReturnValue(deferredTranslate);
+      translationProvider.isSameLanguage.mockReturnValue(false);
+      translationProvider.translateText.mockReturnValue(deferredTranslate);
 
       transcriptRepository.create.mockImplementation(
         (entity) => entity as TranscriptSegmentEntity,

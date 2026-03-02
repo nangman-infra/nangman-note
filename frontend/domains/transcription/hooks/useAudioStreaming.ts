@@ -58,6 +58,18 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
   const saturationStartAtRef = useRef<number | null>(null);
   const stoppedByGuardRef = useRef(false);
 
+  const notifyFallbackToBatch = useCallback((reason?: string) => {
+    if (fallbackNotifiedRef.current) return;
+    fallbackNotifiedRef.current = true;
+    optionsRef.current?.onFallbackToBatch?.({ reason });
+  }, []);
+
+  const requestRealtimeSessionStop = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+    socket.emit('transcript:stop', () => undefined);
+  }, []);
+
   const clearAckTrackers = useCallback(() => {
     ackTimeoutMapRef.current.forEach((timerId) => {
       window.clearTimeout(timerId);
@@ -102,14 +114,16 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
   }, [clearAckTrackers]);
 
   const stopForRealtimeInstability = useCallback(
-    (message: string) => {
+    (message: string, reason: string) => {
       if (stoppedByGuardRef.current) return;
       stoppedByGuardRef.current = true;
+      requestRealtimeSessionStop();
+      notifyFallbackToBatch(reason);
       cleanup();
       setState('stopped');
       setError(message);
     },
-    [cleanup],
+    [cleanup, notifyFallbackToBatch, requestRealtimeSessionStop],
   );
 
   const handleChunk = useCallback(
@@ -131,6 +145,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         if (now - saturationStartAtRef.current >= MAX_SATURATION_MS) {
           stopForRealtimeInstability(
             '네트워크 지연으로 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
+            'client-network-saturation',
           );
         }
         return;
@@ -142,12 +157,17 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
       inFlightAckCountRef.current += 1;
 
       const timeoutId = window.setTimeout(() => {
+        const trackedTimer = ackTimeoutMapRef.current.get(ackId);
+        if (trackedTimer === undefined) {
+          return;
+        }
         ackTimeoutMapRef.current.delete(ackId);
         inFlightAckCountRef.current = Math.max(0, inFlightAckCountRef.current - 1);
         consecutiveTimeoutRef.current += 1;
         if (consecutiveTimeoutRef.current >= MAX_CONSECUTIVE_TIMEOUTS) {
           stopForRealtimeInstability(
             '응답 지연이 지속되어 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
+            'client-ack-timeout',
           );
         }
       }, ACK_TIMEOUT_MS);
@@ -156,10 +176,11 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
 
       socket.emit('audio', chunk, (ack?: AudioAckResponse) => {
         const timer = ackTimeoutMapRef.current.get(ackId);
-        if (timer !== undefined) {
-          window.clearTimeout(timer);
-          ackTimeoutMapRef.current.delete(ackId);
+        if (timer === undefined) {
+          return;
         }
+        window.clearTimeout(timer);
+        ackTimeoutMapRef.current.delete(ackId);
         inFlightAckCountRef.current = Math.max(0, inFlightAckCountRef.current - 1);
         consecutiveTimeoutRef.current = 0;
 
@@ -174,15 +195,11 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
           response.fallbackToBatch &&
           response.mode === 'batch'
         ) {
+          requestRealtimeSessionStop();
+          notifyFallbackToBatch(response.reason);
           cleanup();
           setState('stopped');
           setError('실시간 전사 용량 초과로 배치 모드로 전환되었습니다.');
-          if (!fallbackNotifiedRef.current) {
-            fallbackNotifiedRef.current = true;
-            optionsRef.current?.onFallbackToBatch?.({
-              reason: response.reason,
-            });
-          }
           return;
         }
 
@@ -191,6 +208,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
           if (consecutiveBackpressureRef.current >= MAX_CONSECUTIVE_BACKPRESSURE) {
             stopForRealtimeInstability(
               '전사 서버 부하가 지속되어 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
+              'client-backpressure',
             );
           } else {
             setError('전사 서버 처리 지연이 감지되었습니다. 네트워크 상태를 확인해주세요.');
@@ -208,7 +226,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         );
       });
     },
-    [cleanup, stopForRealtimeInstability],
+    [cleanup, notifyFallbackToBatch, requestRealtimeSessionStop, stopForRealtimeInstability],
   );
 
   const startStreaming = useCallback(
@@ -274,9 +292,10 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
 
   const stopStreaming = useCallback(() => {
     setState('stopping');
+    requestRealtimeSessionStop();
     cleanup();
     setState('stopped');
-  }, [cleanup]);
+  }, [cleanup, requestRealtimeSessionStop]);
 
   useEffect(() => {
     return () => {

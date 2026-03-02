@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api/client';
 import type { Meeting, CreateMeetingDto, SearchResult } from '../types/meeting.types';
+import { MeetingTranscriptionMode } from '../types/meeting.types';
 
 interface CompleteMeetingOptions {
   skipTranscription?: boolean;
@@ -50,6 +51,18 @@ export const meetingApi = {
     const response = await apiClient.patch<{ data: Meeting }>(
       `/api/v1/meetings/${id}`,
       { promptId }
+    );
+    return response.data.data;
+  },
+
+  // 전사 모드 변경
+  updateTranscriptionMode: async (
+    id: string,
+    transcriptionMode: MeetingTranscriptionMode,
+  ): Promise<Meeting> => {
+    const response = await apiClient.patch<{ data: Meeting }>(
+      `/api/v1/meetings/${id}`,
+      { transcriptionMode },
     );
     return response.data.data;
   },

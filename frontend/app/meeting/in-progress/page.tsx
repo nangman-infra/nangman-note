@@ -102,6 +102,17 @@ export default function InProgressMeetingPage() {
           ...currentMeeting,
           transcriptionMode: MeetingTranscriptionMode.BATCH,
         });
+        void meetingApi
+          .updateTranscriptionMode(
+            currentMeeting.id,
+            MeetingTranscriptionMode.BATCH,
+          )
+          .then((updatedMeeting) => {
+            setCurrentMeeting(updatedMeeting);
+          })
+          .catch(() => {
+            // 로컬 모드만 batch로 유지하고 종료 플로우를 계속 진행한다.
+          });
       }
 
       pushToast({
@@ -109,6 +120,8 @@ export default function InProgressMeetingPage() {
         description:
           payload?.reason === 'realtime-capacity-exceeded'
             ? '동시 사용량이 높아 배치 전사로 자동 전환했습니다.'
+            : payload?.reason?.startsWith('client-')
+              ? '실시간 연결이 불안정해 남은 구간을 배치 전사로 전환했습니다.'
             : '전사 안정성을 위해 배치 모드로 전환했습니다.',
         variant: 'info',
       });

@@ -15,7 +15,10 @@ import {
   type StreamingTranscriptionProvider,
   type StreamingTranscriptEvent,
 } from './ports/streaming-transcription-provider.port';
-import { TranslateService } from '../../../shared/aws/translate/translate.service';
+import {
+  TRANSLATION_PROVIDER,
+  type TranslationProvider,
+} from './ports/translation-provider.port';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
@@ -61,7 +64,8 @@ export class TranscriptionService {
     private readonly batchTranscriptionProvider: BatchTranscriptionProvider,
     @Inject(STREAMING_TRANSCRIPTION_PROVIDER)
     private readonly streamingProvider: StreamingTranscriptionProvider,
-    private readonly translateService: TranslateService,
+    @Inject(TRANSLATION_PROVIDER)
+    private readonly translationProvider: TranslationProvider,
   ) {}
 
   async listByMeetingId(meetingId: string): Promise<TranscriptSegmentEntity[]> {
@@ -303,7 +307,7 @@ export class TranscriptionService {
     detectedLanguage: string | undefined,
   ): boolean {
     if (!translateTarget) return false;
-    return !this.translateService.isSameLanguage(
+    return !this.translationProvider.isSameLanguage(
       detectedLanguage,
       translateTarget,
     );
@@ -340,7 +344,7 @@ export class TranscriptionService {
     savedSegmentIdPromise: Promise<string | null>,
   ): Promise<void> {
     try {
-      const result = await this.translateService.translateText(
+      const result = await this.translationProvider.translateText(
         event.text,
         translateTarget,
         event.detectedLanguage ? event.detectedLanguage.split('-')[0] : 'auto',

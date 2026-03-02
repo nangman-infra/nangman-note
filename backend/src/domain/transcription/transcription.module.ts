@@ -6,12 +6,14 @@ import { TranscriptionService } from './application/transcription.service';
 import { TranscriptionResultCollectorService } from './application/transcription-result-collector.service';
 import { BATCH_TRANSCRIPTION_PROVIDER } from './application/ports/batch-transcription-provider.port';
 import { STREAMING_TRANSCRIPTION_PROVIDER } from './application/ports/streaming-transcription-provider.port';
+import { TRANSLATION_PROVIDER } from './application/ports/translation-provider.port';
 import { TranscriptionJobEntity } from './domain/transcription-job.entity';
 import { TranscriptSegmentEntity } from './domain/transcript-segment.entity';
 import { AwsBatchTranscriptionProvider } from './infrastructure/aws-batch-transcription.provider';
 import { AwsStreamingTranscriptionProvider } from './infrastructure/aws-streaming-transcription.provider';
 import { TranscriptionController } from './infrastructure/transcription.controller';
 import { TranscriptionGateway } from './infrastructure/transcription.gateway';
+import { TranslateService } from '../../shared/aws/translate/translate.service';
 
 @Module({
   imports: [
@@ -33,6 +35,10 @@ import { TranscriptionGateway } from './infrastructure/transcription.gateway';
     {
       provide: STREAMING_TRANSCRIPTION_PROVIDER,
       useExisting: AwsStreamingTranscriptionProvider,
+    },
+    {
+      provide: TRANSLATION_PROVIDER,
+      useExisting: TranslateService,
     },
   ],
   exports: [
