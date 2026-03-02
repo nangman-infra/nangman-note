@@ -1,6 +1,6 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getSession } from 'next-auth/react';
-import { getAccessToken } from '@/lib/auth/access-token-store';
+import { getAccessToken, setAccessToken } from '@/lib/auth/access-token-store';
 import { env } from '@/lib/config/env';
 
 interface ErrorPayload {
@@ -55,19 +55,45 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
-// 응답 인터셉터 (에러 메시지 표준화)
+// 응답 인터셉터: 401 시 세션 갱신 후 1회 재시도 + 에러 메시지 표준화
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error instanceof AxiosError) {
+      const originalRequest = error.config as InternalAxiosRequestConfig & {
+        _retry?: boolean;
+      };
+
+      // 401 && 아직 재시도하지 않은 요청 → 세션 갱신 후 재시도
+      if (
+        error.response?.status === 401 &&
+        originalRequest &&
+        !originalRequest._retry &&
+        typeof window !== 'undefined'
+      ) {
+        originalRequest._retry = true;
+
+        try {
+          // getSession()은 서버에 /api/auth/session 을 요청 → JWT 콜백에서 refresh
+          const session = await getSession();
+          const newToken = session?.accessToken;
+
+          if (newToken) {
+            setAccessToken(newToken);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return apiClient(originalRequest);
+          }
+        } catch {
+          // 갱신 실패 시 그대로 에러 전파
+        }
+      }
+
       const payload = error.response?.data as ErrorPayload | undefined;
       const message =
-        payload?.error?.message ||
-        error.message ||
-        '오류가 발생했습니다';
+        payload?.error?.message || error.message || '오류가 발생했습니다';
 
       return Promise.reject(
         new ApiError({
@@ -82,5 +108,5 @@ apiClient.interceptors.response.use(
     const fallbackMessage =
       error instanceof Error ? error.message : '오류가 발생했습니다';
     return Promise.reject(new ApiError({ message: fallbackMessage }));
-  }
+  },
 );
