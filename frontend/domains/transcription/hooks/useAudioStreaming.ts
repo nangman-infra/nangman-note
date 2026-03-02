@@ -137,21 +137,6 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         return;
       }
 
-      const transportName = socket.io.engine?.transport?.name;
-      if (transportName !== 'websocket') {
-        const now = Date.now();
-        if (
-          lastTransportNoticeAtRef.current === null ||
-          now - lastTransportNoticeAtRef.current >= 1500
-        ) {
-          lastTransportNoticeAtRef.current = now;
-          setError('실시간 연결 업그레이드 중입니다. 잠시만 기다려주세요.');
-        }
-        return;
-      }
-
-      lastTransportNoticeAtRef.current = null;
-
       if (inFlightAckCountRef.current >= MAX_IN_FLIGHT_ACKS) {
         const now = Date.now();
         if (saturationStartAtRef.current === null) {
