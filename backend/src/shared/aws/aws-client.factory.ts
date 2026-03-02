@@ -12,6 +12,7 @@ import { AppEnv } from '../config/env.validation';
 export class AwsClientFactory {
   private readonly region: string;
   private readonly credentials: ReturnType<typeof fromNodeProviderChain>;
+  private credentialWarmupPromise: Promise<void> | null = null;
 
   constructor(private readonly configService: ConfigService<AppEnv, true>) {
     this.region = this.configService.get('AWS_REGION', { infer: true });
@@ -57,6 +58,13 @@ export class AwsClientFactory {
       region: this.region,
       credentials: this.credentials,
     });
+  }
+
+  warmCredentials(): Promise<void> {
+    if (!this.credentialWarmupPromise) {
+      this.credentialWarmupPromise = this.credentials().then(() => undefined);
+    }
+    return this.credentialWarmupPromise;
   }
 
   getRegion(): string {

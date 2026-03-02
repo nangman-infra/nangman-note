@@ -296,7 +296,7 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     REALTIME_MAX_BUFFERED_AUDIO_BYTES: readNumber(
       config,
       'REALTIME_MAX_BUFFERED_AUDIO_BYTES',
-      4 * 1024 * 1024,
+      8 * 1024 * 1024,
     ),
     REALTIME_MAX_AUDIO_CHUNK_BYTES: readNumber(
       config,

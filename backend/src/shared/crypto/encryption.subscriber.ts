@@ -39,9 +39,19 @@ export class EncryptionSubscriber implements EntitySubscriberInterface {
     this.encryptFields(event.entity);
   }
 
+  afterInsert(event: InsertEvent<EncryptableEntity>): void {
+    this.decryptFields(event.entity);
+  }
+
   beforeUpdate(event: UpdateEvent<EncryptableEntity>): void {
     if (event.entity) {
       this.encryptFields(event.entity as EncryptableEntity);
+    }
+  }
+
+  afterUpdate(event: UpdateEvent<EncryptableEntity>): void {
+    if (event.entity) {
+      this.decryptFields(event.entity as EncryptableEntity);
     }
   }
 

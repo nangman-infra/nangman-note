@@ -29,6 +29,12 @@ interface AudioAckResponse {
   mode?: 'batch';
 }
 
+interface EnsureSessionResult {
+  ok: boolean;
+  reason?: 'realtime-capacity-exceeded' | 'session-start-failed';
+  fallbackToBatch?: boolean;
+}
+
 @WebSocketGateway({
   path: '/ws/transcribe',
   cors: {
@@ -105,13 +111,14 @@ export class TranscriptionGateway
       }
       this.meetingClients.get(meetingId)!.add(client.id);
 
-      // Transcribe 세션은 첫 오디오 청크 도착 시 시작 (handleAudio에서)
-      // 여기서는 연결만 확인
+      // 연결 직후 warm start를 시도해 첫 발화 지연을 줄인다.
       client.emit('connected', {
         meetingId,
         hasActiveSession:
           this.transcriptionService.hasActiveRealtimeSession(meetingId),
       });
+
+      void this.ensureRealtimeSessionStarted(meetingId);
 
       this.logger.log(
         `Client ${client.id} connected to meeting ${meetingId} (realtime ready)`,
@@ -175,90 +182,15 @@ export class TranscriptionGateway
         };
       }
 
-      // 첫 오디오 청크가 도착하면 Transcribe 세션 시작 (중복 방지)
-      if (
-        !this.transcriptionService.hasActiveRealtimeSession(meetingId) &&
-        !this.startingSession.has(meetingId)
-      ) {
-        const activeSessionCount =
-          this.transcriptionService.getActiveRealtimeSessionCount();
-        if (activeSessionCount >= this.maxConcurrentRealtimeSessions) {
-          const switchedToBatch =
-            await this.transcriptionService.switchMeetingToBatchFallback(
-              meetingId,
-            );
-
-          if (switchedToBatch) {
-            this.server.to(meetingId).emit('transcript:fallback', {
-              meetingId,
-              mode: 'batch',
-              reason: 'realtime-capacity-exceeded',
-            });
-            this.server.to(meetingId).emit('connected', {
-              meetingId,
-              hasActiveSession: false,
-            });
-            this.logger.warn(
-              `Realtime capacity exceeded; meeting ${meetingId} switched to batch mode`,
-            );
-          }
-
-          return {
-            ok: false,
-            reason: 'realtime-capacity-exceeded',
-            fallbackToBatch: switchedToBatch,
-            mode: switchedToBatch ? 'batch' : undefined,
-            retryAfterMs: this.backpressureRetryMs,
-          };
-        }
-
-        this.startingSession.add(meetingId);
-        try {
-          await this.transcriptionService.startRealtimeSession(
-            meetingId,
-            (transcriptPayload: RealtimeTranscriptPayload) => {
-              this.emitToMeeting(meetingId, transcriptPayload);
-            },
-            (error: Error) => {
-              this.server.to(meetingId).emit('transcript:error', {
-                message: error.message,
-              });
-            },
-            () => {
-              this.logger.debug(
-                `Streaming session closed for meeting ${meetingId}`,
-              );
-              // 세션이 닫히면 클라이언트에게 알림
-              this.server.to(meetingId).emit('transcript:session-ended', {
-                meetingId,
-              });
-            },
-          );
-
-          this.startingSession.delete(meetingId);
-
-          this.logger.log(
-            `Realtime session started on first audio for meeting ${meetingId}`,
-          );
-
-          // 세션 시작을 클라이언트에게 알림
-          this.server.to(meetingId).emit('connected', {
-            meetingId,
-            hasActiveSession: true,
-          });
-        } catch (error) {
-          this.startingSession.delete(meetingId);
-          this.logger.warn(
-            `Failed to start realtime session for meeting ${meetingId}: ${error instanceof Error ? error.message : error}`,
-          );
-          client.emit('transcript:error', {
-            message:
-              error instanceof Error
-                ? error.message
-                : 'Failed to start transcription session',
-          });
-          return { ok: false, reason: 'session-start-failed' };
-        }
+      const sessionStart = await this.ensureRealtimeSessionStarted(meetingId);
+      if (!sessionStart.ok) {
+        return {
+          ok: false,
+          reason: sessionStart.reason,
+          fallbackToBatch: sessionStart.fallbackToBatch,
+          mode: sessionStart.fallbackToBatch ? 'batch' : undefined,
+          retryAfterMs: this.backpressureRetryMs,
+        };
       }
 
       // 오디오 청크를 streaming provider에 전달
@@ -267,6 +199,22 @@ export class TranscriptionGateway
         chunk,
       );
       if (!accepted) {
+        if (!this.transcriptionService.isRealtimeSessionReady(meetingId)) {
+          return {
+            ok: false,
+            reason: 'session-warming',
+            retryAfterMs: this.backpressureRetryMs,
+          };
+        }
+
+        if (!this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
+          return {
+            ok: false,
+            reason: 'session-start-failed',
+            retryAfterMs: this.backpressureRetryMs,
+          };
+        }
+
         this.logBackpressure(meetingId);
         return {
           ok: false,
@@ -331,6 +279,88 @@ export class TranscriptionGateway
           ? 'transcript:final'
           : 'transcript:translation';
     this.server.to(meetingId).emit(eventName, payload);
+  }
+
+  private async ensureRealtimeSessionStarted(
+    meetingId: string,
+  ): Promise<EnsureSessionResult> {
+    if (
+      this.transcriptionService.hasActiveRealtimeSession(meetingId) ||
+      this.startingSession.has(meetingId)
+    ) {
+      return { ok: true };
+    }
+
+    const activeSessionCount =
+      this.transcriptionService.getActiveRealtimeSessionCount();
+    if (activeSessionCount >= this.maxConcurrentRealtimeSessions) {
+      const switchedToBatch =
+        await this.transcriptionService.switchMeetingToBatchFallback(meetingId);
+
+      if (switchedToBatch) {
+        this.server.to(meetingId).emit('transcript:fallback', {
+          meetingId,
+          mode: 'batch',
+          reason: 'realtime-capacity-exceeded',
+        });
+        this.server.to(meetingId).emit('connected', {
+          meetingId,
+          hasActiveSession: false,
+        });
+        this.logger.warn(
+          `Realtime capacity exceeded; meeting ${meetingId} switched to batch mode`,
+        );
+      }
+
+      return {
+        ok: false,
+        reason: 'realtime-capacity-exceeded',
+        fallbackToBatch: switchedToBatch,
+      };
+    }
+
+    this.startingSession.add(meetingId);
+    try {
+      await this.transcriptionService.startRealtimeSession(
+        meetingId,
+        (transcriptPayload: RealtimeTranscriptPayload) => {
+          this.emitToMeeting(meetingId, transcriptPayload);
+        },
+        (error: Error) => {
+          this.server.to(meetingId).emit('transcript:error', {
+            message: error.message,
+          });
+        },
+        () => {
+          this.logger.debug(
+            `Streaming session closed for meeting ${meetingId}`,
+          );
+          this.server.to(meetingId).emit('transcript:session-ended', {
+            meetingId,
+          });
+        },
+      );
+
+      this.logger.log(`Realtime session started for meeting ${meetingId}`);
+      this.server.to(meetingId).emit('connected', {
+        meetingId,
+        hasActiveSession: true,
+      });
+      return { ok: true };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to start realtime session for meeting ${meetingId}: ${error instanceof Error ? error.message : error}`,
+      );
+      this.server.to(meetingId).emit('transcript:error', {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to start transcription session',
+      });
+      return { ok: false, reason: 'session-start-failed' };
+    } finally {
+      this.startingSession.delete(meetingId);
+    }
   }
 
   private resolveMeetingId(client: Socket): string | undefined {

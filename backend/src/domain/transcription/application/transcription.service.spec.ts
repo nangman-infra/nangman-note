@@ -91,6 +91,7 @@ describe('TranscriptionService', () => {
       feedAudio: jest.fn().mockReturnValue(true),
       stopSession: jest.fn(),
       hasActiveSession: jest.fn().mockReturnValue(false),
+      isSessionReady: jest.fn().mockReturnValue(false),
       getActiveSessionCount: jest.fn().mockReturnValue(0),
     };
     translationProvider = {
@@ -159,6 +160,12 @@ describe('TranscriptionService', () => {
       streamingProvider.getActiveSessionCount.mockReturnValue(7);
 
       expect(service.getActiveRealtimeSessionCount()).toBe(7);
+    });
+
+    it('returns realtime session readiness from provider', () => {
+      streamingProvider.isSessionReady.mockReturnValue(true);
+
+      expect(service.isRealtimeSessionReady('meeting-1')).toBe(true);
     });
   });
 

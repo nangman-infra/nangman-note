@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   TranscribeStreamingClient,
@@ -18,7 +18,7 @@ import type {
 } from '../application/ports/streaming-transcription-provider.port';
 
 const DEFAULT_SAMPLE_RATE = 48_000;
-const DEFAULT_MAX_BUFFERED_AUDIO_BYTES = 4 * 1024 * 1024; // 4MB
+const DEFAULT_MAX_BUFFERED_AUDIO_BYTES = 8 * 1024 * 1024; // 8MB
 const DEFAULT_LANGUAGE_OPTIONS = [
   'ko-KR',
   'en-US',
@@ -35,6 +35,8 @@ interface ActiveSession {
   audioQueue: AudioChunkQueue;
   /** 세션 정리 완료 플래그 */
   closed: boolean;
+  /** Transcribe 스트림 핸드셰이크 완료 여부 */
+  ready: boolean;
   /** abort signal */
   abortController: AbortController;
 }
@@ -108,7 +110,9 @@ class AudioChunkQueue {
 }
 
 @Injectable()
-export class AwsStreamingTranscriptionProvider implements StreamingTranscriptionProvider {
+export class AwsStreamingTranscriptionProvider
+  implements StreamingTranscriptionProvider, OnModuleInit
+{
   private readonly logger = new Logger(AwsStreamingTranscriptionProvider.name);
   private readonly sessions = new Map<string, ActiveSession>();
   private readonly client: TranscribeStreamingClient;
@@ -125,6 +129,14 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
         infer: true,
       }) || DEFAULT_MAX_BUFFERED_AUDIO_BYTES,
     );
+  }
+
+  onModuleInit(): void {
+    void this.awsClientFactory.warmCredentials().catch((error: unknown) => {
+      this.logger.warn(
+        `Failed to warm AWS credentials on boot: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
   }
 
   async startSession(options: StreamingSessionOptions): Promise<void> {
@@ -152,6 +164,7 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
       meetingId,
       audioQueue,
       closed: false,
+      ready: false,
       abortController,
     };
     this.sessions.set(meetingId, session);
@@ -217,6 +230,11 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
     return !!session && !session.closed;
   }
 
+  isSessionReady(meetingId: string): boolean {
+    const session = this.sessions.get(meetingId);
+    return !!session && !session.closed && session.ready;
+  }
+
   getActiveSessionCount(): number {
     return this.sessions.size;
   }
@@ -249,6 +267,10 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
           `Sending StartStreamTranscription command for meeting ${meetingId}...`,
         );
         const response = await this.client.send(command);
+        const activeSession = this.sessions.get(meetingId);
+        if (activeSession) {
+          activeSession.ready = true;
+        }
         this.logger.debug(
           `StartStreamTranscription response received for meeting ${meetingId}, SessionId=${response.SessionId}`,
         );
@@ -324,6 +346,7 @@ export class AwsStreamingTranscriptionProvider implements StreamingTranscription
         const session = this.sessions.get(meetingId);
         if (session) {
           session.closed = true;
+          session.ready = false;
           this.sessions.delete(meetingId);
         }
 

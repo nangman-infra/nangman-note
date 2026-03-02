@@ -16,6 +16,7 @@ describe('TranscriptionGateway', () => {
       | 'switchMeetingToBatchFallback'
       | 'startRealtimeSession'
       | 'feedRealtimeAudio'
+      | 'isRealtimeSessionReady'
       | 'stopRealtimeSession'
     >
   >;
@@ -39,6 +40,7 @@ describe('TranscriptionGateway', () => {
       switchMeetingToBatchFallback: jest.fn().mockResolvedValue(false),
       startRealtimeSession: jest.fn().mockResolvedValue(undefined),
       feedRealtimeAudio: jest.fn().mockReturnValue(true),
+      isRealtimeSessionReady: jest.fn().mockReturnValue(true),
       stopRealtimeSession: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -96,6 +98,22 @@ describe('TranscriptionGateway', () => {
     expect(response).toEqual({
       ok: false,
       reason: 'backpressure',
+      retryAfterMs: 200,
+    });
+  });
+
+  it('returns session-warming when queue is full before stream is ready', async () => {
+    transcriptionService.feedRealtimeAudio.mockReturnValue(false);
+    transcriptionService.isRealtimeSessionReady.mockReturnValue(false);
+
+    const response = await gateway.handleAudio(
+      createSocket('meeting-1') as unknown as Socket,
+      Buffer.from([1, 2, 3]),
+    );
+
+    expect(response).toEqual({
+      ok: false,
+      reason: 'session-warming',
       retryAfterMs: 200,
     });
   });

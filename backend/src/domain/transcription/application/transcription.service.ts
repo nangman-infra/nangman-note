@@ -137,6 +137,10 @@ export class TranscriptionService {
     return this.streamingProvider.hasActiveSession(meetingId);
   }
 
+  isRealtimeSessionReady(meetingId: string): boolean {
+    return this.streamingProvider.isSessionReady(meetingId);
+  }
+
   getActiveRealtimeSessionCount(): number {
     return this.streamingProvider.getActiveSessionCount();
   }

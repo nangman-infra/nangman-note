@@ -47,6 +47,8 @@ export interface StreamingTranscriptionProvider {
   stopSession(meetingId: string): Promise<void>;
   /** 세션 활성 여부 확인 */
   hasActiveSession(meetingId: string): boolean;
+  /** 스트림 핸드셰이크 완료 여부 */
+  isSessionReady(meetingId: string): boolean;
   /** 활성 세션 개수 */
   getActiveSessionCount(): number;
 }

@@ -187,6 +187,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         const response = ack ?? { ok: false, reason: 'ack-timeout' };
         if (response.ok) {
           consecutiveBackpressureRef.current = 0;
+          setError(null);
           return;
         }
 
@@ -213,6 +214,12 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
           } else {
             setError('전사 서버 처리 지연이 감지되었습니다. 네트워크 상태를 확인해주세요.');
           }
+          return;
+        }
+
+        if (response.reason === 'session-warming') {
+          consecutiveBackpressureRef.current = 0;
+          setError('실시간 전사 세션 준비 중입니다. 잠시만 기다려주세요.');
           return;
         }
 
@@ -296,6 +303,20 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
     cleanup();
     setState('stopped');
   }, [cleanup, requestRealtimeSessionStop]);
+
+  useEffect(() => {
+    const head = document.head;
+    const existing = head.querySelector<HTMLLinkElement>(
+      'link[data-audio-worklet-preload="true"]',
+    );
+    if (existing) return;
+
+    const preload = document.createElement('link');
+    preload.rel = 'modulepreload';
+    preload.href = '/audio-worklet/pcm-processor.js';
+    preload.setAttribute('data-audio-worklet-preload', 'true');
+    head.appendChild(preload);
+  }, []);
 
   useEffect(() => {
     return () => {
