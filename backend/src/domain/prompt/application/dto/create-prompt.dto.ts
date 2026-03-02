@@ -8,5 +8,6 @@ export class CreatePromptDto {
 
   @IsString()
   @MinLength(1)
+  @MaxLength(12000)
   content: string;
 }

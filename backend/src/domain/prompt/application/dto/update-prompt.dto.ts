@@ -10,5 +10,6 @@ export class UpdatePromptDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(12000)
   content?: string;
 }
