@@ -97,7 +97,7 @@ export const authOptions: NextAuthOptions = {
       checks: ['pkce', 'state'],
       authorization: {
         params: {
-          scope: 'openid profile email',
+          scope: 'openid profile email offline_access',
         },
       },
     }),
