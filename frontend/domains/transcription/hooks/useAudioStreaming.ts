@@ -57,6 +57,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
   const consecutiveBackpressureRef = useRef(0);
   const saturationStartAtRef = useRef<number | null>(null);
   const stoppedByGuardRef = useRef(false);
+  const lastTransportNoticeAtRef = useRef<number | null>(null);
 
   const notifyFallbackToBatch = useCallback((reason?: string) => {
     if (fallbackNotifiedRef.current) return;
@@ -111,6 +112,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
     socketRef.current = null;
     optionsRef.current = undefined;
     fallbackNotifiedRef.current = false;
+    lastTransportNoticeAtRef.current = null;
   }, [clearAckTrackers]);
 
   const stopForRealtimeInstability = useCallback(
@@ -134,6 +136,21 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
       if (!socket?.connected) {
         return;
       }
+
+      const transportName = socket.io.engine?.transport?.name;
+      if (transportName !== 'websocket') {
+        const now = Date.now();
+        if (
+          lastTransportNoticeAtRef.current === null ||
+          now - lastTransportNoticeAtRef.current >= 1500
+        ) {
+          lastTransportNoticeAtRef.current = now;
+          setError('실시간 연결 업그레이드 중입니다. 잠시만 기다려주세요.');
+        }
+        return;
+      }
+
+      lastTransportNoticeAtRef.current = null;
 
       if (inFlightAckCountRef.current >= MAX_IN_FLIGHT_ACKS) {
         const now = Date.now();
@@ -251,6 +268,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         optionsRef.current = options;
         fallbackNotifiedRef.current = false;
         stoppedByGuardRef.current = false;
+        lastTransportNoticeAtRef.current = null;
         clearAckTrackers();
 
         if (audioContext.state === 'suspended') {
