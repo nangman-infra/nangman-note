@@ -31,6 +31,13 @@ function formatSegmentTime(seconds: number): string {
 
 type ResultTab = 'result' | 'transcript' | 'note';
 
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return '데이터를 불러오지 못했습니다.';
+}
+
 export function ResultViewer({
   meetingId,
   onMeetingUnavailable,
@@ -58,24 +65,40 @@ export function ResultViewer({
     [],
   );
   const [noteContent, setNoteContent] = useState<string>('');
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [tabDataMeetingId, setTabDataMeetingId] = useState('');
 
   // 탭 데이터 로드
   useEffect(() => {
     if (!meetingId) return;
 
     let disposed = false;
+
     const loadTabData = async () => {
-      try {
-        const [segments, note] = await Promise.all([
-          resultTabDataApi.listTranscripts(meetingId).catch(() => []),
-          resultTabDataApi.getNoteContent(meetingId).catch(() => ''),
-        ]);
-        if (disposed) return;
-        setTranscripts(segments);
-        setNoteContent(note ?? '');
-      } catch {
-        // 에러 무시 — 탭에서 빈 상태로 표시
+      const [segmentsResult, noteResult] = await Promise.allSettled([
+        resultTabDataApi.listTranscripts(meetingId),
+        resultTabDataApi.getNoteContent(meetingId),
+      ]);
+      if (disposed) return;
+
+      if (segmentsResult.status === 'fulfilled') {
+        setTranscripts(segmentsResult.value);
+        setTranscriptError(null);
+      } else {
+        setTranscripts([]);
+        setTranscriptError(toErrorMessage(segmentsResult.reason));
       }
+
+      if (noteResult.status === 'fulfilled') {
+        setNoteContent(noteResult.value ?? '');
+        setNoteError(null);
+      } else {
+        setNoteContent('');
+        setNoteError(toErrorMessage(noteResult.reason));
+      }
+
+      setTabDataMeetingId(meetingId);
     };
     void loadTabData();
     return () => {
@@ -103,6 +126,11 @@ export function ResultViewer({
   }, [isMissingMeeting, meetingId, onMeetingUnavailable, pushToast]);
 
   const resolvedRegeneratePromptId = regeneratePromptId || promptOptions[0]?.id || '';
+  const isCurrentTabData = tabDataMeetingId === meetingId;
+  const visibleTranscripts = isCurrentTabData ? transcripts : [];
+  const visibleNoteContent = isCurrentTabData ? noteContent : '';
+  const visibleTranscriptError = isCurrentTabData ? transcriptError : null;
+  const visibleNoteError = isCurrentTabData ? noteError : null;
 
   if (isLoading) {
     return (
@@ -271,7 +299,7 @@ export function ResultViewer({
         <div className="flex gap-1">
           {([
             { key: 'result' as ResultTab, label: '회의록' },
-            { key: 'transcript' as ResultTab, label: `전사 원본 (${transcripts.length})` },
+            { key: 'transcript' as ResultTab, label: `전사 원본 (${visibleTranscripts.length})` },
             { key: 'note' as ResultTab, label: '메모' },
           ]).map((tab) => (
             <button
@@ -310,11 +338,17 @@ export function ResultViewer({
         {/* 전사 원본 탭 */}
         {activeTab === 'transcript' && (
           <div className="surface-card p-5">
-            {transcripts.length === 0 ? (
+            {visibleTranscriptError ? (
+              <StatusBanner
+                variant="error"
+                title="전사 데이터를 불러오지 못했습니다"
+                message={visibleTranscriptError}
+              />
+            ) : visibleTranscripts.length === 0 ? (
               <p className="text-center text-sm text-muted">아직 수집된 전사 데이터가 없습니다.</p>
             ) : (
               <div className="space-y-2">
-                {transcripts.map((segment) => (
+                {visibleTranscripts.map((segment) => (
                   <div key={segment.id} className="flex gap-3 text-sm">
                     <span className="shrink-0 font-mono text-xs text-muted">
                       [{formatSegmentTime(segment.startTime)} ~ {formatSegmentTime(segment.endTime)}]
@@ -330,9 +364,15 @@ export function ResultViewer({
         {/* 메모 탭 */}
         {activeTab === 'note' && (
           <div className="surface-card p-5">
-            {noteContent.trim() ? (
+            {visibleNoteError ? (
+              <StatusBanner
+                variant="error"
+                title="메모를 불러오지 못했습니다"
+                message={visibleNoteError}
+              />
+            ) : visibleNoteContent.trim() ? (
               <article className="result-markdown">
-                <ReactMarkdown>{sanitizeNoteMarkdown(noteContent)}</ReactMarkdown>
+                <ReactMarkdown>{sanitizeNoteMarkdown(visibleNoteContent)}</ReactMarkdown>
               </article>
             ) : (
               <p className="text-center text-sm text-muted">작성된 메모가 없습니다.</p>
