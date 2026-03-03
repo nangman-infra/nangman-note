@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
 import { meetingApi } from '../api/meetingApi';
 import { useMeetingStatus } from '../hooks/useMeetingStatus';
@@ -33,6 +33,17 @@ export function ProcessingProgress({
   const [backendStep, setBackendStep] = useState<
     'transcribing' | 'generating' | 'completed'
   >('transcribing');
+  const completeNotifiedRef = useRef(false);
+
+  const notifyComplete = useCallback(() => {
+    if (completeNotifiedRef.current) return;
+    completeNotifiedRef.current = true;
+    onComplete?.();
+  }, [onComplete]);
+
+  useEffect(() => {
+    completeNotifiedRef.current = false;
+  }, [meetingId]);
 
   // WebSocket 으로 회의 상태 변경 수신 (폴링 대체)
   const handleStatusChange = useCallback(
@@ -46,7 +57,7 @@ export function ProcessingProgress({
         message.phase === 'completed'
       ) {
         setBackendStep('completed');
-        onComplete?.();
+        notifyComplete();
         return;
       }
 
@@ -59,7 +70,7 @@ export function ProcessingProgress({
         setBackendStep('generating');
       }
     },
-    [onComplete],
+    [notifyComplete],
   );
 
   useMeetingStatus({
@@ -80,7 +91,7 @@ export function ProcessingProgress({
         if (disposed) return;
         if (meeting.status === MeetingStatus.COMPLETED) {
           setBackendStep('completed');
-          onComplete?.();
+          notifyComplete();
         }
       } catch {
         // 폴백 확인 실패는 무시하고 다음 틱에서 재시도
@@ -91,7 +102,7 @@ export function ProcessingProgress({
       disposed = true;
       window.clearInterval(timerId);
     };
-  }, [backendStep, meetingId, onComplete, uploadState]);
+  }, [backendStep, meetingId, notifyComplete, uploadState]);
 
   const currentStep: ProcessingStep =
     uploadState === 'failed'
