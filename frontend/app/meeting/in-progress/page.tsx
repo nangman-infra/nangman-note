@@ -238,6 +238,7 @@ export default function InProgressMeetingPage() {
   // isConnected도 의존성에 포함하여 소켓 연결 완료 시에도 트리거됨
   useEffect(() => {
     if (!stream || !meetingId) return;
+    if (isEnding) return;
 
     if (isRealtimeMode) {
       // 실시간 모드: AudioWorklet PCM 스트리밍
@@ -260,6 +261,7 @@ export default function InProgressMeetingPage() {
   }, [
     stream,
     meetingId,
+    isEnding,
     isRealtimeMode,
     isConnected,
     recorderState,
@@ -346,9 +348,6 @@ export default function InProgressMeetingPage() {
     // 1. 녹음 중지 + Blob 합성
     if (recorderState === 'recording' || recorderState === 'stopping') {
       audioBlob = await stopRecording();
-      stopCapture();
-    } else {
-      stopCapture();
     }
 
     const shouldRunBatchTranscription =
@@ -363,12 +362,13 @@ export default function InProgressMeetingPage() {
       setIsEnding(false);
       pushToast({
         title: '회의 종료에 실패했습니다',
-        description: error || '네트워크 상태를 확인해주세요.',
+        description: error || '녹음은 유지된 상태입니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요.',
         variant: 'error',
       });
       return;
     }
 
+    stopCapture();
     setIsEnding(false);
     setShowEndDialog(false);
 
