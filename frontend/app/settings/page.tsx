@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const {
     prompts,
     isLoading,
+    error: promptError,
     createPrompt,
     updatePrompt,
     deletePrompt,
@@ -59,10 +60,26 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       if (editorMode === 'create') {
-        await createPrompt({ name, content });
+        const success = await createPrompt({ name, content });
+        if (!success) {
+          pushToast({
+            title: '프롬프트 생성에 실패했습니다',
+            description: promptError || '잠시 후 다시 시도해주세요.',
+            variant: 'error',
+          });
+          return;
+        }
         pushToast({ title: '프롬프트가 생성되었습니다', variant: 'success' });
       } else if (editingPromptId) {
-        await updatePrompt(editingPromptId, { name, content });
+        const success = await updatePrompt(editingPromptId, { name, content });
+        if (!success) {
+          pushToast({
+            title: '프롬프트 수정에 실패했습니다',
+            description: promptError || '잠시 후 다시 시도해주세요.',
+            variant: 'error',
+          });
+          return;
+        }
         pushToast({ title: '프롬프트가 수정되었습니다', variant: 'success' });
       }
       setEditorOpen(false);
@@ -73,7 +90,15 @@ export default function SettingsPage() {
 
   const handleDelete = async (id: string) => {
     setDeleteConfirmId(null);
-    await deletePrompt(id);
+    const success = await deletePrompt(id);
+    if (!success) {
+      pushToast({
+        title: '프롬프트 삭제에 실패했습니다',
+        description: promptError || '잠시 후 다시 시도해주세요.',
+        variant: 'error',
+      });
+      return;
+    }
     pushToast({ title: '프롬프트가 삭제되었습니다', variant: 'info' });
   };
 

@@ -9,9 +9,9 @@ interface PromptState {
   isLoading: boolean;
   error: string | null;
   fetchPrompts: () => Promise<void>;
-  createPrompt: (dto: CreatePromptDto) => Promise<void>;
-  updatePrompt: (id: string, dto: Partial<CreatePromptDto>) => Promise<void>;
-  deletePrompt: (id: string) => Promise<void>;
+  createPrompt: (dto: CreatePromptDto) => Promise<boolean>;
+  updatePrompt: (id: string, dto: Partial<CreatePromptDto>) => Promise<boolean>;
+  deletePrompt: (id: string) => Promise<boolean>;
   setSelectedPrompt: (id: string) => void;
 }
 
@@ -57,11 +57,13 @@ export const usePromptStore = create<PromptState>()(
             prompts: [...state.prompts, newPrompt],
             isLoading: false,
           }));
+          return true;
         } catch (error) {
           set({
             error: error instanceof Error ? error.message : 'Failed to create prompt',
             isLoading: false,
           });
+          return false;
         }
       },
 
@@ -75,11 +77,13 @@ export const usePromptStore = create<PromptState>()(
             ),
             isLoading: false,
           }));
+          return true;
         } catch (error) {
           set({
             error: error instanceof Error ? error.message : 'Failed to update prompt',
             isLoading: false,
           });
+          return false;
         }
       },
 
@@ -91,11 +95,13 @@ export const usePromptStore = create<PromptState>()(
             prompts: state.prompts.filter((prompt) => prompt.id !== id),
             isLoading: false,
           }));
+          return true;
         } catch (error) {
           set({
             error: error instanceof Error ? error.message : 'Failed to delete prompt',
             isLoading: false,
           });
+          return false;
         }
       },
 
