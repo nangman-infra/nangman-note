@@ -46,6 +46,7 @@ export default function InProgressMeetingPage() {
   // 오디오 캡처 (마이크 권한 + 디바이스 선택)
   const {
     permission,
+    error: audioCaptureError,
     devices,
     selectedDeviceId,
     stream,
@@ -225,8 +226,8 @@ export default function InProgressMeetingPage() {
     if (!meetingId || permission !== 'prompt') return;
 
     const init = async () => {
-      const granted = await requestPermission();
-      if (!granted) {
+      const captureResult = await requestPermission();
+      if (!captureResult.granted && captureResult.reason === 'denied') {
         pushToast({
           title: '마이크 접근이 차단되었습니다',
           description: '노트 전용 모드로 계속합니다. 전사 없이 노트 기반으로 결과를 생성합니다.',
@@ -288,8 +289,8 @@ export default function InProgressMeetingPage() {
         await stopRecording();
       }
 
-      const granted = await requestPermission(deviceId);
-      if (granted) {
+      const captureResult = await requestPermission(deviceId);
+      if (captureResult.granted) {
         // stream이 변경되면 위 useEffect에서 자동 재시작
       }
     },
@@ -593,6 +594,15 @@ export default function InProgressMeetingPage() {
             variant="error"
             title="마이크 미지원 브라우저"
             message="현재 브라우저는 마이크 캡처를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요."
+          />
+        ) : null}
+        {audioCaptureError &&
+        permission !== 'denied' &&
+        permission !== 'unsupported' ? (
+          <StatusBanner
+            variant="warning"
+            title="마이크 연결 오류"
+            message={audioCaptureError}
           />
         ) : null}
         {isRealtimeMode && transcriptionError ? (

@@ -8,13 +8,26 @@ export interface AudioDevice {
 }
 
 export type AudioCapturePermission = 'prompt' | 'granted' | 'denied' | 'unsupported';
+export type AudioCaptureFailureReason =
+  | 'denied'
+  | 'unsupported'
+  | 'device-not-found'
+  | 'device-unavailable'
+  | 'invalid-device'
+  | 'unknown';
+
+export interface AudioCaptureRequestResult {
+  granted: boolean;
+  reason?: AudioCaptureFailureReason;
+}
 
 interface UseAudioCaptureReturn {
   permission: AudioCapturePermission;
+  error: string | null;
   devices: AudioDevice[];
   selectedDeviceId: string | null;
   stream: MediaStream | null;
-  requestPermission: (nextDeviceId?: string) => Promise<boolean>;
+  requestPermission: (nextDeviceId?: string) => Promise<AudioCaptureRequestResult>;
   selectDevice: (deviceId: string) => void;
   stopCapture: () => void;
 }
@@ -41,6 +54,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
   const [permission, setPermission] = useState<AudioCapturePermission>(() =>
     isMediaDevicesSupported() ? 'prompt' : 'unsupported',
   );
+  const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -57,15 +71,17 @@ export function useAudioCapture(): UseAudioCaptureReturn {
   }, []);
 
   const requestPermission = useCallback(
-    async (nextDeviceId?: string): Promise<boolean> => {
+    async (nextDeviceId?: string): Promise<AudioCaptureRequestResult> => {
       if (!isMediaDevicesSupported()) {
         setPermission('unsupported');
-        return false;
+        setError('현재 브라우저는 마이크 캡처를 지원하지 않습니다.');
+        return { granted: false, reason: 'unsupported' };
       }
 
       // 이전 스트림이 남아있으면 정리
       stopCapture();
       const effectiveDeviceId = nextDeviceId ?? selectedDeviceId;
+      setError(null);
 
       const audioConstraints: MediaTrackConstraints = {
         // 장치 선택
@@ -88,6 +104,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
         streamRef.current = mediaStream;
         setStream(mediaStream);
         setPermission('granted');
+        setError(null);
 
         // 권한 획득 후 디바이스 목록 갱신 (label이 채워짐)
         const audioDevices = await enumerateAudioDevices();
@@ -104,7 +121,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
           setSelectedDeviceId(effectiveDeviceId);
         }
 
-        return true;
+        return { granted: true };
       } catch (error) {
         if (error instanceof DOMException) {
           if (
@@ -112,11 +129,35 @@ export function useAudioCapture(): UseAudioCaptureReturn {
             error.name === 'PermissionDeniedError'
           ) {
             setPermission('denied');
-            return false;
+            setError('브라우저에서 마이크 접근이 차단되었습니다.');
+            return { granted: false, reason: 'denied' };
+          }
+
+          if (
+            error.name === 'NotFoundError' ||
+            error.name === 'DevicesNotFoundError'
+          ) {
+            setPermission('prompt');
+            setError('사용 가능한 마이크를 찾을 수 없습니다. 마이크 연결 상태를 확인해주세요.');
+            return { granted: false, reason: 'device-not-found' };
+          }
+
+          if (error.name === 'OverconstrainedError') {
+            setPermission('prompt');
+            setError('선택한 마이크를 사용할 수 없습니다. 다른 입력 장치를 선택해주세요.');
+            return { granted: false, reason: 'invalid-device' };
+          }
+
+          if (error.name === 'NotReadableError' || error.name === 'AbortError') {
+            setPermission('prompt');
+            setError('마이크를 사용할 수 없습니다. 다른 앱에서 사용 중인지 확인해주세요.');
+            return { granted: false, reason: 'device-unavailable' };
           }
         }
-        setPermission('denied');
-        return false;
+
+        setPermission('prompt');
+        setError('마이크를 초기화하지 못했습니다. 잠시 후 다시 시도해주세요.');
+        return { granted: false, reason: 'unknown' };
       }
     },
     [selectedDeviceId, stopCapture],
@@ -149,6 +190,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
 
   return {
     permission,
+    error,
     devices,
     selectedDeviceId,
     stream,
