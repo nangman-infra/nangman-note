@@ -70,13 +70,14 @@ export function useAudioCapture(): UseAudioCaptureReturn {
       const audioConstraints: MediaTrackConstraints = {
         // 장치 선택
         ...(effectiveDeviceId ? { deviceId: { exact: effectiveDeviceId } } : {}),
-        // 전사 품질 개선을 위한 기본 DSP 옵션
+        // 회의 양측 음성을 함께 수집하기 위해 브라우저 DSP(특히 echo cancellation)를 비활성화한다.
+        // 노트북 스피커로 재생되는 상대방 음성은 echo cancellation이 켜져 있으면 제거될 수 있다.
         channelCount: { ideal: 1 },
         sampleRate: { ideal: 48_000 },
         sampleSize: { ideal: 16 },
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
       };
 
       try {
