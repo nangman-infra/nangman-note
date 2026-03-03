@@ -93,6 +93,11 @@ export const usePromptStore = create<PromptState>()(
           await promptApi.delete(id);
           set((state) => ({
             prompts: state.prompts.filter((prompt) => prompt.id !== id),
+            selectedPromptId:
+              state.selectedPromptId === id
+                ? (state.prompts.find((prompt) => prompt.isDefault)?.id ??
+                  'prompt_default_meeting')
+                : state.selectedPromptId,
             isLoading: false,
           }));
           return true;
