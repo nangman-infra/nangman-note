@@ -21,7 +21,7 @@ describe('TranscriptionResultCollectorService', () => {
   let batchProvider: jest.Mocked<
     Pick<BatchTranscriptionProvider, 'getJobStatus'>
   >;
-  let meetingService: jest.Mocked<Pick<MeetingService, 'updateStatus'>>;
+  let meetingService: jest.Mocked<Pick<MeetingService, 'findById' | 'updateStatus'>>;
   let resultService: jest.Mocked<Pick<ResultService, 'generateForPipeline'>>;
   let s3AudioService: jest.Mocked<
     Pick<S3AudioService, 'getObjectAsStringFromBucket' | 'deleteAudioFile'>
@@ -57,6 +57,10 @@ describe('TranscriptionResultCollectorService', () => {
       getJobStatus: jest.fn(),
     };
     meetingService = {
+      findById: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        ownerSub: 'user-1',
+      }),
       updateStatus: jest.fn(),
     };
     resultService = {
@@ -150,6 +154,7 @@ describe('TranscriptionResultCollectorService', () => {
         meetingId: 'meeting-1',
         status: MeetingStatus.PROCESSING,
         phase: 'generating',
+        ownerSub: 'user-1',
       }),
     );
   });
@@ -182,6 +187,7 @@ describe('TranscriptionResultCollectorService', () => {
         meetingId: 'meeting-1',
         status: MeetingStatus.PROCESSING,
         phase: 'generating',
+        ownerSub: 'user-1',
       }),
     );
   });

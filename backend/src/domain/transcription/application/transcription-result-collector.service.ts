@@ -63,6 +63,14 @@ export class TranscriptionResultCollectorService {
     meetingId: string,
     jobId: string,
   ): Promise<{ success: boolean; segmentCount: number }> {
+    let meetingOwnerSub: string | undefined;
+    try {
+      const meeting = await this.meetingService.findById(meetingId);
+      meetingOwnerSub = meeting.ownerSub;
+    } catch {
+      meetingOwnerSub = undefined;
+    }
+
     const job = await this.jobRepository.findOne({ where: { id: jobId } });
     if (!job) {
       this.logger.error(`Transcription job ${jobId} not found`);
@@ -100,7 +108,7 @@ export class TranscriptionResultCollectorService {
           await this.deleteAudioFile(job.mediaUri);
 
           // 결과 생성 단계 진입 이벤트
-          this.emitGeneratingPhase(meetingId);
+          this.emitGeneratingPhase(meetingId, meetingOwnerSub);
 
           return { success: true, segmentCount };
         }
@@ -109,7 +117,11 @@ export class TranscriptionResultCollectorService {
           this.logger.error(
             `Transcription job ${job.providerJobId} failed: ${result.errorMessage}`,
           );
-          await this.finalizeAfterFailedTranscription(meetingId, job.mediaUri);
+          await this.finalizeAfterFailedTranscription(
+            meetingId,
+            job.mediaUri,
+            meetingOwnerSub,
+          );
           return { success: false, segmentCount: 0 };
         }
 
@@ -131,7 +143,11 @@ export class TranscriptionResultCollectorService {
     this.logger.error(
       `Transcription job ${job.providerJobId} timed out for meeting ${meetingId}`,
     );
-    await this.finalizeAfterFailedTranscription(meetingId, job.mediaUri);
+    await this.finalizeAfterFailedTranscription(
+      meetingId,
+      job.mediaUri,
+      meetingOwnerSub,
+    );
     return { success: false, segmentCount: 0 };
   }
 
@@ -377,9 +393,10 @@ export class TranscriptionResultCollectorService {
   private async finalizeAfterFailedTranscription(
     meetingId: string,
     mediaUri: string,
+    ownerSub?: string,
   ): Promise<void> {
     await this.deleteAudioFile(mediaUri);
-    this.emitGeneratingPhase(meetingId);
+    this.emitGeneratingPhase(meetingId, ownerSub);
   }
 
   private sleep(ms: number): Promise<void> {
@@ -411,13 +428,14 @@ export class TranscriptionResultCollectorService {
     }
   }
 
-  private emitGeneratingPhase(meetingId: string): void {
+  private emitGeneratingPhase(meetingId: string, ownerSub?: string): void {
     this.eventEmitter.emit(
       MeetingStatusChangedEvent.EVENT_NAME,
       new MeetingStatusChangedEvent(
         meetingId,
         MeetingStatus.PROCESSING,
         'generating',
+        ownerSub,
       ),
     );
   }
