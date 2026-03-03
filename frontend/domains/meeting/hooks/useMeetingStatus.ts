@@ -65,6 +65,9 @@ export function useMeetingStatus({
     socketRef.current = socket;
 
     socket.on('meeting:status', (message: MeetingStatusMessage) => {
+      if (meetingId && message.meetingId !== meetingId) {
+        return;
+      }
       callbackRef.current?.(message);
     });
 
