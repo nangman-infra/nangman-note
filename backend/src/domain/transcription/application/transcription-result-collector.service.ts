@@ -102,12 +102,6 @@ export class TranscriptionResultCollectorService {
           // 결과 생성 단계 진입 이벤트
           this.emitGeneratingPhase(meetingId);
 
-          // AI 결과물 자동 생성
-          await this.triggerResultGeneration(meetingId);
-
-          // 생성 완료 후 Meeting 상태 변경
-          await this.updateMeetingStatus(meetingId);
-
           return { success: true, segmentCount };
         }
 
@@ -386,8 +380,6 @@ export class TranscriptionResultCollectorService {
   ): Promise<void> {
     await this.deleteAudioFile(mediaUri);
     this.emitGeneratingPhase(meetingId);
-    await this.triggerResultGeneration(meetingId);
-    await this.updateMeetingStatus(meetingId);
   }
 
   private sleep(ms: number): Promise<void> {

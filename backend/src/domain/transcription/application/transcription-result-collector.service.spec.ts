@@ -142,11 +142,8 @@ describe('TranscriptionResultCollectorService', () => {
     expect(s3AudioService.deleteAudioFile).toHaveBeenCalledWith(
       'meeting-1/audio.webm',
     );
-    expect(meetingService.updateStatus).toHaveBeenCalledWith(
-      'meeting-1',
-      MeetingStatus.COMPLETED,
-    );
-    expect(resultService.generateForPipeline).toHaveBeenCalledWith('meeting-1');
+    expect(meetingService.updateStatus).not.toHaveBeenCalled();
+    expect(resultService.generateForPipeline).not.toHaveBeenCalled();
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'meeting.status.changed',
       expect.objectContaining({
@@ -177,11 +174,8 @@ describe('TranscriptionResultCollectorService', () => {
     expect(s3AudioService.deleteAudioFile).toHaveBeenCalledWith(
       'meeting-1/audio.webm',
     );
-    expect(meetingService.updateStatus).toHaveBeenCalledWith(
-      'meeting-1',
-      MeetingStatus.COMPLETED,
-    );
-    expect(resultService.generateForPipeline).toHaveBeenCalledWith('meeting-1');
+    expect(meetingService.updateStatus).not.toHaveBeenCalled();
+    expect(resultService.generateForPipeline).not.toHaveBeenCalled();
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'meeting.status.changed',
       expect.objectContaining({
@@ -189,6 +183,39 @@ describe('TranscriptionResultCollectorService', () => {
         status: MeetingStatus.PROCESSING,
         phase: 'generating',
       }),
+    );
+  });
+
+  it('generates result and updates meeting status on generating phase event', async () => {
+    resultService.generateForPipeline.mockResolvedValue({} as never);
+    meetingService.updateStatus.mockResolvedValue({} as never);
+
+    await service.handleGeneratingPhase({
+      meetingId: 'meeting-1',
+      status: MeetingStatus.PROCESSING,
+      phase: 'generating',
+    } as never);
+
+    expect(resultService.generateForPipeline).toHaveBeenCalledWith('meeting-1');
+    expect(meetingService.updateStatus).toHaveBeenCalledWith(
+      'meeting-1',
+      MeetingStatus.COMPLETED,
+    );
+  });
+
+  it('still marks meeting completed when result generation fails on generating phase', async () => {
+    resultService.generateForPipeline.mockRejectedValue(new Error('generation failed'));
+    meetingService.updateStatus.mockResolvedValue({} as never);
+
+    await service.handleGeneratingPhase({
+      meetingId: 'meeting-1',
+      status: MeetingStatus.PROCESSING,
+      phase: 'generating',
+    } as never);
+
+    expect(meetingService.updateStatus).toHaveBeenCalledWith(
+      'meeting-1',
+      MeetingStatus.COMPLETED,
     );
   });
 });
