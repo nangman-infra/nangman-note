@@ -24,6 +24,10 @@ import {
 } from './MeetingActionDialog';
 import { MeetingCard } from './MeetingCard';
 import type { SidebarTimeFilter } from '@/components/layout/Sidebar';
+import {
+  areAllVisibleMeetingsSelected,
+  pruneSelectionToVisible,
+} from './meetingSelection';
 
 interface MeetingListProps {
   initialShowTrash?: boolean;
@@ -248,6 +252,19 @@ export function MeetingList({
     return result;
   }, [activeFilter, meetings, isSearchApplied, showTrash, tagFilter, timeFilter, trashMeetings]);
 
+  const visibleMeetingIds = useMemo(
+    () => filteredMeetings.map((meeting) => meeting.id),
+    [filteredMeetings],
+  );
+
+  useEffect(() => {
+    if (!selectionMode) {
+      return;
+    }
+
+    setSelectedIds((prev) => pruneSelectionToVisible(prev, visibleMeetingIds));
+  }, [selectionMode, visibleMeetingIds]);
+
   // ── 다중 선택 핸들러 ──
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -262,14 +279,17 @@ export function MeetingList({
   };
 
   const selectAll = () => {
-    setSelectedIds(new Set(filteredMeetings.map((m) => m.id)));
+    setSelectedIds(new Set(visibleMeetingIds));
   };
 
   const deselectAll = () => {
     setSelectedIds(new Set());
   };
 
-  const isAllSelected = filteredMeetings.length > 0 && selectedIds.size === filteredMeetings.length;
+  const isAllSelected = areAllVisibleMeetingsSelected(
+    selectedIds,
+    visibleMeetingIds,
+  );
 
   const toggleSelectionMode = () => {
     setSelectionMode((prev) => !prev);
