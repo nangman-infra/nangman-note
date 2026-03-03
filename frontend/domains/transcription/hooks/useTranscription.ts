@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useSession } from 'next-auth/react';
+import { getSession, useSession } from 'next-auth/react';
 import { Socket } from 'socket.io-client';
 import { useTranscriptionStore } from '../stores/transcriptionStore';
 import { createSocket } from '@/lib/api/websocket';
+import { extractSocketErrorMessage, isSocketAuthError } from '@/lib/api/socketAuth';
 import type { RealtimeTranscriptPayload } from '../types/transcription.types';
 
 interface UseTranscriptionOptions {
@@ -36,6 +37,8 @@ export function useTranscription(
 
   const socketRef = useRef<Socket | null>(null);
   const fallbackCallbackRef = useRef(options?.onFallbackToBatch);
+  const authRecoveryPendingRef = useRef(false);
+  const isRecoveringAuthRef = useRef(false);
 
   useEffect(() => {
     fallbackCallbackRef.current = fallbackHandler;
@@ -72,6 +75,30 @@ export function useTranscription(
     return success;
   }, [setHasActiveSession]);
 
+  const recoverSocketAuth = useCallback(async (socket: Socket) => {
+    if (isRecoveringAuthRef.current) {
+      return;
+    }
+    isRecoveringAuthRef.current = true;
+
+    try {
+      const refreshedSession = await getSession();
+      const refreshedToken = refreshedSession?.accessToken;
+      if (!refreshedToken) {
+        setError('인증 세션이 만료되었습니다. 다시 로그인해주세요.');
+        return;
+      }
+
+      accessTokenRef.current = refreshedToken;
+
+      if (!socket.connected && socketRef.current === socket) {
+        socket.connect();
+      }
+    } finally {
+      isRecoveringAuthRef.current = false;
+    }
+  }, [setError]);
+
   useEffect(() => {
     if (!meetingId || !isRealtimeEnabled) {
       setConnected(false);
@@ -101,21 +128,45 @@ export function useTranscription(
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      authRecoveryPendingRef.current = false;
       setConnected(true);
       setError(null);
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
       setConnected(false);
       setHasActiveSession(false);
+
+      if (reason === 'io server disconnect' && authRecoveryPendingRef.current) {
+        authRecoveryPendingRef.current = false;
+        void recoverSocketAuth(socket);
+      }
     });
 
     socket.on('connected', (data: { meetingId: string; hasActiveSession: boolean }) => {
       setHasActiveSession(data.hasActiveSession);
     });
 
-    socket.on('error', (err: { message?: string }) => {
-      setError(err.message || 'Transcription error');
+    socket.on('error', (payload: unknown) => {
+      if (isSocketAuthError(payload)) {
+        authRecoveryPendingRef.current = true;
+        void recoverSocketAuth(socket);
+      }
+
+      setError(extractSocketErrorMessage(payload) || 'Transcription error');
+    });
+
+    socket.on('connect_error', (payload: unknown) => {
+      if (isSocketAuthError(payload)) {
+        authRecoveryPendingRef.current = true;
+        void recoverSocketAuth(socket);
+      }
+
+      setConnected(false);
+      setHasActiveSession(false);
+      setError(
+        extractSocketErrorMessage(payload) || 'Transcription connection failed',
+      );
     });
 
     // 실시간 전사 이벤트 수신
@@ -152,6 +203,8 @@ export function useTranscription(
     return () => {
       socketRef.current?.disconnect();
       socketRef.current = null;
+      authRecoveryPendingRef.current = false;
+      isRecoveringAuthRef.current = false;
       clearTranscripts();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,6 +218,7 @@ export function useTranscription(
     setConnected,
     setHasActiveSession,
     setError,
+    recoverSocketAuth,
   ]);
 
   // accessToken 이 갱신되면 ref 만 업데이트 (소켓 재연결 안 함)

@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { getSession, useSession } from 'next-auth/react';
 import { Socket } from 'socket.io-client';
 import { createSocket } from '@/lib/api/websocket';
+import { isSocketAuthError } from '@/lib/api/socketAuth';
 
 interface MeetingStatusMessage {
   meetingId: string;
@@ -30,6 +31,8 @@ export function useMeetingStatus({
   const hasSessionToken = Boolean(session?.accessToken);
   const accessTokenRef = useRef<string | undefined>(undefined);
   const socketRef = useRef<Socket | null>(null);
+  const authRecoveryPendingRef = useRef(false);
+  const isRecoveringAuthRef = useRef(false);
   const callbackRef = useRef(onStatusChange);
 
   useEffect(() => {
@@ -40,6 +43,31 @@ export function useMeetingStatus({
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current = null;
+    }
+    authRecoveryPendingRef.current = false;
+    isRecoveringAuthRef.current = false;
+  }, []);
+
+  const recoverSocketAuth = useCallback(async (socket: Socket) => {
+    if (isRecoveringAuthRef.current) {
+      return;
+    }
+    isRecoveringAuthRef.current = true;
+
+    try {
+      const refreshedSession = await getSession();
+      const refreshedToken = refreshedSession?.accessToken;
+      if (!refreshedToken) {
+        return;
+      }
+
+      accessTokenRef.current = refreshedToken;
+
+      if (!socket.connected && socketRef.current === socket) {
+        socket.connect();
+      }
+    } finally {
+      isRecoveringAuthRef.current = false;
     }
   }, []);
 
@@ -64,6 +92,37 @@ export function useMeetingStatus({
     );
     socketRef.current = socket;
 
+    socket.on('connect', () => {
+      authRecoveryPendingRef.current = false;
+    });
+
+    socket.on('error', (payload: unknown) => {
+      if (!isSocketAuthError(payload)) {
+        return;
+      }
+
+      authRecoveryPendingRef.current = true;
+      void recoverSocketAuth(socket);
+    });
+
+    socket.on('connect_error', (payload: unknown) => {
+      if (!isSocketAuthError(payload)) {
+        return;
+      }
+
+      authRecoveryPendingRef.current = true;
+      void recoverSocketAuth(socket);
+    });
+
+    socket.on('disconnect', (reason) => {
+      if (reason !== 'io server disconnect' || !authRecoveryPendingRef.current) {
+        return;
+      }
+
+      authRecoveryPendingRef.current = false;
+      void recoverSocketAuth(socket);
+    });
+
     socket.on('meeting:status', (message: MeetingStatusMessage) => {
       if (meetingId && message.meetingId !== meetingId) {
         return;
@@ -73,7 +132,7 @@ export function useMeetingStatus({
 
     return cleanup;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meetingId, cleanup, enabled, authStatus, hasSessionToken]);
+  }, [meetingId, cleanup, enabled, authStatus, hasSessionToken, recoverSocketAuth]);
 
   // accessToken 이 갱신되면 ref 만 업데이트 (소켓 재연결 안 함)
   useEffect(() => {
