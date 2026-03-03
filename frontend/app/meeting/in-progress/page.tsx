@@ -241,8 +241,12 @@ export default function InProgressMeetingPage() {
 
     if (isRealtimeMode) {
       // 실시간 모드: AudioWorklet PCM 스트리밍
-      // audioStreamingState가 idle이고 소켓이 연결된 경우에만 시작
-      if (audioStreamingState === 'idle' && isConnected && transcriptionSocketRef.current?.connected) {
+      // 초기 진입(idle)과 디바이스 재선택 후(stopped) 모두 재시작 가능해야 한다.
+      if (
+        (audioStreamingState === 'idle' || audioStreamingState === 'stopped') &&
+        isConnected &&
+        transcriptionSocketRef.current?.connected
+      ) {
         void startStreaming(stream, transcriptionSocketRef.current, {
           onFallbackToBatch: handleRealtimeFallbackToBatch,
         });
@@ -270,16 +274,27 @@ export default function InProgressMeetingPage() {
   const handleDeviceChange = useCallback(
     async (deviceId: string) => {
       selectDevice(deviceId);
-      // 디바이스 변경 후 재연결: 녹음 중이면 중지 후 재시작
-      if (recorderState === 'recording' || recorderState === 'stopping') {
+
+      // 디바이스 변경 후 재연결: 현재 모드별 캡처를 먼저 정리한다.
+      if (isRealtimeMode) {
+        stopStreaming();
+      } else if (recorderState === 'recording' || recorderState === 'stopping') {
         await stopRecording();
       }
+
       const granted = await requestPermission(deviceId);
       if (granted) {
         // stream이 변경되면 위 useEffect에서 자동 재시작
       }
     },
-    [selectDevice, recorderState, stopRecording, requestPermission],
+    [
+      selectDevice,
+      isRealtimeMode,
+      stopStreaming,
+      recorderState,
+      stopRecording,
+      requestPermission,
+    ],
   );
 
   // 연결 상태 배지
