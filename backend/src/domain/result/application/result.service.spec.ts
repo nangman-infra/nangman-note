@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
@@ -178,6 +178,55 @@ describe('ResultService', () => {
         meetingSearchDocumentService.refreshByMeetingId,
       ).toHaveBeenCalledWith('meeting-1');
       expect(result.content).toBe('# AI 결과');
+    });
+
+    it('returns existing result when save fails with unique constraint', async () => {
+      const existing = buildResult({ content: '# 기존 결과' });
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existing);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue({
+        id: 'note-1',
+        meetingId: 'meeting-1',
+        content: '핵심 내용',
+      } as NoteEntity);
+      transcriptRepository.find.mockResolvedValue([]);
+      bedrockService.generateMeetingResult.mockResolvedValue('# 신규 결과');
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockRejectedValue(
+        new QueryFailedError('INSERT INTO result ...', [], {
+          code: '23505',
+          detail: 'duplicate key value violates unique constraint',
+        }),
+      );
+
+      const result = await service.findByMeetingId('meeting-1');
+
+      expect(result).toEqual(existing);
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith('meeting-1');
+    });
+
+    it('rethrows save failure when it is not a unique constraint error', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue(null);
+      transcriptRepository.find.mockResolvedValue([]);
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockRejectedValue(new Error('database timeout'));
+
+      await expect(service.findByMeetingId('meeting-1')).rejects.toThrow(
+        'database timeout',
+      );
     });
   });
 

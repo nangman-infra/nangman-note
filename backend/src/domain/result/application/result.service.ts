@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import fontkit from '@pdf-lib/fontkit';
 import { PDFFont, PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
@@ -214,10 +214,7 @@ export class ResultService {
       return saved;
     } catch (error) {
       // UNIQUE constraint 실패 시 이미 생성된 결과를 반환
-      if (
-        error instanceof Error &&
-        error.message.includes('UNIQUE constraint failed')
-      ) {
+      if (this.isUniqueConstraintError(error)) {
         this.logger.warn(
           `Duplicate result generation for meeting ${meetingId}, returning existing`,
         );
@@ -231,6 +228,38 @@ export class ResultService {
       }
       throw error;
     }
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverError = error.driverError as
+      | {
+          code?: string;
+          errno?: number;
+          message?: string;
+        }
+      | undefined;
+
+    if (
+      driverError?.code === '23505' || // PostgreSQL unique_violation
+      driverError?.code === 'ER_DUP_ENTRY' || // MySQL duplicate entry
+      driverError?.code === 'SQLITE_CONSTRAINT' || // SQLite generic constraint
+      driverError?.code === 'SQLITE_CONSTRAINT_UNIQUE' || // SQLite unique constraint
+      driverError?.errno === 1062 // MySQL duplicate entry errno
+    ) {
+      return true;
+    }
+
+    const message =
+      `${error.message} ${driverError?.message ?? ''}`.toLowerCase();
+    return (
+      message.includes('unique constraint failed') ||
+      message.includes('duplicate key') ||
+      message.includes('duplicate entry')
+    );
   }
 
   private async generateResultPayload(
