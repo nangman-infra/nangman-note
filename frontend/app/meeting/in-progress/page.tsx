@@ -144,8 +144,12 @@ export default function InProgressMeetingPage() {
     fallbackHandledRef.current = false;
   }, [meetingId]);
 
-  // 탭 닫기 방지: 녹음 중일 때
-  const isActiveRecording = recorderState === 'recording';
+  // 탭 닫기 방지: 배치 녹음 또는 실시간 스트리밍이 활성일 때
+  const isActiveRecording =
+    recorderState === 'recording' ||
+    recorderState === 'stopping' ||
+    (isRealtimeMode &&
+      (audioStreamingState === 'streaming' || audioStreamingState === 'stopping'));
   useBeforeUnloadGuard(isActiveRecording);
 
   // 타이머
