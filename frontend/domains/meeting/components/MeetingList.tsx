@@ -82,6 +82,7 @@ export function MeetingList({
   } = useMeetings();
   const { pushToast } = useFeedback();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchApplied, setIsSearchApplied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | MeetingStatus>('all');
   const [showTrash, setShowTrash] = useState(initialShowTrash);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
@@ -119,7 +120,7 @@ export function MeetingList({
   }, [fetchMeetings, fetchTrashMeetings, refreshToken, showTrash]);
 
   useEffect(() => {
-    if (!showTrash && searchQuery.trim().length > 0) {
+    if (!showTrash && isSearchApplied) {
       return;
     }
 
@@ -134,7 +135,7 @@ export function MeetingList({
     return () => {
       window.clearInterval(timerId);
     };
-  }, [fetchMeetings, fetchTrashMeetings, searchQuery, showTrash]);
+  }, [fetchMeetings, fetchTrashMeetings, isSearchApplied, showTrash]);
 
   useEffect(() => {
     setShowTrash(initialShowTrash);
@@ -240,12 +241,12 @@ export function MeetingList({
       result = result.filter((m) => new Date(m.startedAt) >= weekAgo);
     }
 
-    if (tagFilter && searchQuery.trim().length === 0) {
+    if (tagFilter && !isSearchApplied) {
       result = result.filter((m) => m.promptId === tagFilter);
     }
 
     return result;
-  }, [activeFilter, meetings, searchQuery, showTrash, tagFilter, timeFilter, trashMeetings]);
+  }, [activeFilter, meetings, isSearchApplied, showTrash, tagFilter, timeFilter, trashMeetings]);
 
   // ── 다중 선택 핸들러 ──
   const toggleSelect = (id: string) => {
@@ -325,12 +326,14 @@ export function MeetingList({
 
     if (!normalized) {
       setSearchQuery('');
+      setIsSearchApplied(false);
       setIsSuggestionOpen(false);
       void fetchMeetings();
       return;
     }
 
     setSearchQuery(normalized);
+    setIsSearchApplied(true);
     storeRecentSearch(normalized);
     setIsSuggestionOpen(false);
     void searchMeetings(normalized, 'all');
@@ -356,6 +359,7 @@ export function MeetingList({
 
   const clearSearch = () => {
     setSearchQuery('');
+    setIsSearchApplied(false);
     setIsSuggestionOpen(false);
     if (showTrash) {
       return;
@@ -669,6 +673,7 @@ export function MeetingList({
             onClick={() => {
               setShowTrash((prev) => !prev);
               setSearchQuery('');
+              setIsSearchApplied(false);
               setIsSuggestionOpen(false);
               onSelectMeeting?.(null);
             }}
