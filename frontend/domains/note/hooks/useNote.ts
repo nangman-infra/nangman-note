@@ -14,18 +14,29 @@ export function useNote(meetingId: string) {
     clearNote,
   } = useNoteStore();
   const lastPersistedContentRef = useRef('');
+  const readyMeetingIdRef = useRef<string | null>(null);
 
   const debouncedContent = useDebounce(noteContent, 3000);
 
   // 노트 로드
   useEffect(() => {
-    if (!meetingId) return;
+    if (!meetingId) {
+      readyMeetingIdRef.current = null;
+      lastPersistedContentRef.current = '';
+      clearNote();
+      return;
+    }
 
     let disposed = false;
+    readyMeetingIdRef.current = null;
+    lastPersistedContentRef.current = '';
+    clearNote();
+
     const restore = async () => {
       const loadedContent = await loadNote(meetingId);
       if (!disposed) {
         lastPersistedContentRef.current = loadedContent;
+        readyMeetingIdRef.current = meetingId;
       }
     };
     void restore();
@@ -33,11 +44,12 @@ export function useNote(meetingId: string) {
     return () => {
       disposed = true;
     };
-  }, [meetingId, loadNote]);
+  }, [meetingId, loadNote, clearNote]);
 
   // 자동 저장
   useEffect(() => {
     if (!meetingId) return;
+    if (readyMeetingIdRef.current !== meetingId) return;
     if (debouncedContent === lastPersistedContentRef.current) return;
 
     const persist = async () => {
@@ -51,6 +63,7 @@ export function useNote(meetingId: string) {
 
   useEffect(() => {
     if (!meetingId) {
+      readyMeetingIdRef.current = null;
       lastPersistedContentRef.current = '';
     }
   }, [meetingId]);

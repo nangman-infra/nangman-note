@@ -23,6 +23,7 @@ describe('useNote', () => {
     let noteContent = '기존 텍스트';
     const saveNote = vi.fn().mockResolvedValue(true);
     const loadNote = vi.fn().mockResolvedValue('기존 텍스트');
+    const clearNote = vi.fn();
     const setContent = vi.fn((value: string) => {
       noteContent = value;
     });
@@ -35,7 +36,7 @@ describe('useNote', () => {
       setContent,
       saveNote,
       loadNote,
-      clearNote: vi.fn(),
+      clearNote,
     }));
 
     const { rerender } = renderHook(() => useNote('meeting-1'));
@@ -57,6 +58,7 @@ describe('useNote', () => {
   it('does not load or auto-save when meetingId is empty', async () => {
     const saveNote = vi.fn().mockResolvedValue(true);
     const loadNote = vi.fn().mockResolvedValue('동일 텍스트');
+    const clearNote = vi.fn();
 
     useNoteStoreMock.mockReturnValue({
       noteContent: '동일 텍스트',
@@ -66,7 +68,7 @@ describe('useNote', () => {
       setContent: vi.fn(),
       saveNote,
       loadNote,
-      clearNote: vi.fn(),
+      clearNote,
     });
 
     renderHook(() => useNote(''));

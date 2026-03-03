@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { noteApi } from '../api/noteApi';
 
+let latestLoadRequestSeq = 0;
+
 interface NoteState {
   noteContent: string;
   isSaving: boolean;
@@ -40,14 +42,26 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   loadNote: async (meetingId) => {
+    const requestSeq = ++latestLoadRequestSeq;
     try {
       set({ error: null });
       const note = await noteApi.get(meetingId);
-      set({ noteContent: note.content });
+      set((state) => {
+        if (requestSeq !== latestLoadRequestSeq) {
+          return state;
+        }
+        return { ...state, noteContent: note.content };
+      });
       return note.content;
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to load note',
+      set((state) => {
+        if (requestSeq !== latestLoadRequestSeq) {
+          return state;
+        }
+        return {
+          ...state,
+          error: error instanceof Error ? error.message : 'Failed to load note',
+        };
       });
       return '';
     }
