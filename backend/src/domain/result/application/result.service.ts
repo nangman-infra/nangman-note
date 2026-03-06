@@ -443,11 +443,12 @@ export class ResultService {
   }): Promise<string> {
     const { meeting, prompt, noteContent, transcripts } = params;
 
-    const transcriptText = transcripts
-      .filter((segment) => segment.text?.trim())
+    const preprocessed = this.preprocessTranscriptsForAI(transcripts);
+    const transcriptText = preprocessed
+      .filter((segment) => segment.text.length > 0)
       .map(
         (segment) =>
-          `[${segment.startTime.toFixed(1)}s ~ ${segment.endTime.toFixed(1)}s] ${segment.text.trim()}`,
+          `[${segment.startTime.toFixed(1)}s ~ ${segment.endTime.toFixed(1)}s] ${segment.text}`,
       )
       .join('\n');
 
@@ -774,6 +775,66 @@ export class ResultService {
     }
 
     return lines;
+  }
+
+  /**
+   * Bedrock에 전달하기 전 전사 세그먼트를 전처리합니다.
+   * DB 원본은 변경하지 않고, 순수 데이터 객체 배열을 반환합니다.
+   *
+   * 처리 단계:
+   * 1. startTime 기준 정렬 재검증
+   * 2. 한국어 필러/간투사 세그먼트 제거 (학술 근거: 한국음성학회 담화표지 연구)
+   * 3. 연속 동일 텍스트 중복 제거
+   * 4. 3자 이하 초단편 세그먼트를 직전 세그먼트에 병합
+   */
+  private preprocessTranscriptsForAI(
+    segments: TranscriptSegmentEntity[],
+  ): Array<{ startTime: number; endTime: number; text: string }> {
+    if (segments.length === 0) return [];
+
+    // 한국어 필러/간투사 정규식 (한국음성학회 담화표지 '아','어','음' 연구 + Quizlet 필러 목록 기반)
+    const FILLER_ONLY_REGEX = /^[어음아네예응그저막자뭐에오]+[.?!]?$/;
+    const PUNCTUATION_ONLY_REGEX = /^[.?!,;:…]+$/;
+
+    // 1. startTime 기준 정렬 (안전장치)
+    const sorted = [...segments].sort((a, b) => a.startTime - b.startTime);
+
+    // 2. 필러 세그먼트 + 구두점만 있는 세그먼트 제거
+    const filtered = sorted.filter((seg) => {
+      const trimmed = seg.text?.trim() ?? '';
+      if (trimmed.length === 0) return false;
+      if (trimmed.length <= 4 && FILLER_ONLY_REGEX.test(trimmed)) return false;
+      if (PUNCTUATION_ONLY_REGEX.test(trimmed)) return false;
+      return true;
+    });
+
+    // 3. 연속 동일 텍스트 중복 제거
+    const deduped = filtered.filter((seg, i) => {
+      if (i === 0) return true;
+      return seg.text.trim() !== filtered[i - 1].text.trim();
+    });
+
+    // 4. 3자 이하 초단편을 직전 세그먼트에 병합 (순수 데이터 객체로 변환)
+    const result: Array<{ startTime: number; endTime: number; text: string }> =
+      [];
+
+    for (const seg of deduped) {
+      const trimmed = seg.text.trim();
+
+      if (trimmed.length <= 3 && result.length > 0) {
+        const prev = result[result.length - 1];
+        prev.text = `${prev.text} ${trimmed}`;
+        prev.endTime = Math.max(prev.endTime, seg.endTime);
+      } else {
+        result.push({
+          startTime: seg.startTime,
+          endTime: seg.endTime,
+          text: trimmed,
+        });
+      }
+    }
+
+    return result;
   }
 
   private loadPdfFontBytes(): Uint8Array | null {
