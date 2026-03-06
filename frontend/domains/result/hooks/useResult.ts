@@ -34,7 +34,7 @@ export function useResult(meetingId: string) {
     if (!meetingId || !isPending) return;
 
     const timerId = window.setInterval(() => {
-      void fetchResult(meetingId);
+      void fetchResult(meetingId, { silent: true });
     }, 5000);
 
     return () => {
@@ -47,7 +47,7 @@ export function useResult(meetingId: string) {
     if (!meetingId || !isRegenerating) return;
 
     const timerId = window.setInterval(() => {
-      void fetchResult(meetingId);
+      void fetchResult(meetingId, { silent: true });
     }, 5000);
 
     return () => {

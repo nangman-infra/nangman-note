@@ -10,7 +10,7 @@ interface ResultState {
   isPending: boolean;
   isMissingMeeting: boolean;
   error: string | null;
-  fetchResult: (meetingId: string) => Promise<void>;
+  fetchResult: (meetingId: string, options?: { silent?: boolean }) => Promise<void>;
   updateResult: (meetingId: string, content: string) => Promise<boolean>;
   regenerateResult: (meetingId: string, promptId: string) => Promise<boolean>;
   applyRegenerateEvent: (event: { meetingId: string; phase: string; errorMessage?: string }) => void;
@@ -27,20 +27,31 @@ export const useResultStore = create<ResultState>((set) => ({
   isMissingMeeting: false,
   error: null,
 
-  fetchResult: async (meetingId) => {
+  fetchResult: async (meetingId, options) => {
+    const silent = options?.silent ?? false;
     try {
-      set({
-        isLoading: true,
-        error: null,
-        isPending: false,
-        isMissingMeeting: false,
-      });
+      if (!silent) {
+        set({
+          isLoading: true,
+          error: null,
+          isPending: false,
+          isMissingMeeting: false,
+        });
+      }
       const result = await resultApi.get(meetingId);
+      const prev = useResultStore.getState();
+      // 폴링 폴백: 재생성 중 결과가 바뀌면 (generatedAt 변경) → isRegenerating 해제
+      const wasRegenerating = prev.isRegenerating;
+      const generatedAtChanged =
+        wasRegenerating &&
+        prev.result?.metadata?.generatedAt !== result.metadata?.generatedAt;
+
       set({
         result,
         isLoading: false,
         isPending: false,
         isMissingMeeting: false,
+        ...(generatedAtChanged ? { isRegenerating: false, error: null } : {}),
       });
     } catch (error) {
       const message =
@@ -76,12 +87,14 @@ export const useResultStore = create<ResultState>((set) => ({
         return;
       }
 
-      set({
-        error: message,
-        isLoading: false,
-        isPending: false,
-        isMissingMeeting: false,
-      });
+      if (!silent) {
+        set({
+          error: message,
+          isLoading: false,
+          isPending: false,
+          isMissingMeeting: false,
+        });
+      }
     }
   },
 
@@ -125,8 +138,8 @@ export const useResultStore = create<ResultState>((set) => ({
       set({ isRegenerating: true, error: null });
     } else if (event.phase === 'completed') {
       set({ isRegenerating: false, error: null });
-      // 완료 시 결과를 다시 fetch
-      void useResultStore.getState().fetchResult(event.meetingId);
+      // 완료 시 결과를 다시 fetch (silent — 로딩 화면 방지)
+      void useResultStore.getState().fetchResult(event.meetingId, { silent: true });
     } else if (event.phase === 'failed') {
       set({
         isRegenerating: false,
