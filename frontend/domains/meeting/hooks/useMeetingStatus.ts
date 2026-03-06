@@ -144,6 +144,9 @@ export function useMeetingStatus({
     });
 
     socket.on('result:regenerate', (message: ResultRegenerateMessage) => {
+      if (meetingId && message.meetingId !== meetingId) {
+        return;
+      }
       regenerateCallbackRef.current?.(message);
     });
 

@@ -23,6 +23,7 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
   private readonly defaultLanguageCode: string;
   private readonly outputBucket: string;
   private readonly mediaFormat: string;
+  private readonly maxSpeakerLabels: number;
 
   constructor(
     private readonly configService: ConfigService<AppEnv, true>,
@@ -42,6 +43,12 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
     this.mediaFormat = this.configService.get('AWS_TRANSCRIBE_MEDIA_FORMAT', {
       infer: true,
     });
+    this.maxSpeakerLabels = this.configService.get(
+      'AWS_TRANSCRIBE_MAX_SPEAKER_LABELS',
+      {
+        infer: true,
+      },
+    );
   }
 
   async submitBatchJob(
@@ -63,7 +70,7 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
         : undefined,
       Settings: {
         ShowSpeakerLabels: true,
-        MaxSpeakerLabels: 8,
+        MaxSpeakerLabels: this.maxSpeakerLabels,
       },
     });
 

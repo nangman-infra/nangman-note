@@ -17,6 +17,11 @@ import { UpdateResultDto } from '../application/dto/update-result.dto';
 import { ResultService } from '../application/result.service';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import type { AuthUser } from '../../../shared/auth/auth-user.interface';
+import { ResultEntity } from '../domain/result.entity';
+
+type ResultResponse = ResultEntity & {
+  isRegenerating: boolean;
+};
 
 @Controller('api/v1/meetings/:meetingId/result')
 export class ResultController {
@@ -27,7 +32,8 @@ export class ResultController {
     @Param('meetingId') meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
-    return this.resultService.findByMeetingId(meetingId, user?.sub);
+    const result = await this.resultService.findByMeetingId(meetingId, user?.sub);
+    return this.toResultResponse(result);
   }
 
   @Patch()
@@ -36,7 +42,8 @@ export class ResultController {
     @Body() dto: UpdateResultDto,
     @CurrentUser() user?: AuthUser,
   ) {
-    return this.resultService.update(meetingId, dto, user?.sub);
+    const result = await this.resultService.update(meetingId, dto, user?.sub);
+    return this.toResultResponse(result);
   }
 
   @Post('regenerate')
@@ -74,5 +81,12 @@ export class ResultController {
     );
 
     return new StreamableFile(exported.buffer);
+  }
+
+  private toResultResponse(result: ResultEntity): ResultResponse {
+    return {
+      ...result,
+      isRegenerating: this.resultService.isRegenerating(result.meetingId),
+    };
   }
 }

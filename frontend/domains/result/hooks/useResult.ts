@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useMeetingStatus } from '@/domains/meeting/hooks/useMeetingStatus';
 import { useResultStore } from '../stores/resultStore';
 
 /** 재생성 폴링 폴백 최대 대기 시간 (2분) */
@@ -32,6 +33,14 @@ export function useResult(meetingId: string) {
       clearResult();
     };
   }, [meetingId, fetchResult, clearResult]);
+
+  useMeetingStatus({
+    meetingId,
+    enabled: Boolean(meetingId),
+    onResultRegenerate: (event) => {
+      useResultStore.getState().applyRegenerateEvent(event);
+    },
+  });
 
   // 처리 중 결과는 주기적으로 재조회해 새로고침 없이 자동 반영
   useEffect(() => {

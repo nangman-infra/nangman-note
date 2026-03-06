@@ -3,6 +3,7 @@ export interface MeetingResult {
   meetingId: string;
   promptId: string;
   content: string; // Markdown
+  isRegenerating?: boolean;
   metadata: {
     title?: string;
     generatedAt: string;

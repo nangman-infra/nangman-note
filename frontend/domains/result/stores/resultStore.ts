@@ -19,14 +19,19 @@ interface ResultState {
   clearResult: () => void;
 }
 
-export const useResultStore = create<ResultState>((set) => ({
-  result: null,
-  isLoading: false,
-  isRegenerating: false,
-  isPending: false,
-  isMissingMeeting: false,
-  error: null,
+function createInitialResultState() {
+  return {
+    result: null,
+    isLoading: false,
+    isRegenerating: false,
+    isPending: false,
+    isMissingMeeting: false,
+    error: null,
+  };
+}
 
+export const useResultStore = create<ResultState>()((set, _get, store) => ({
+  ...createInitialResultState(),
   fetchResult: async (meetingId, options) => {
     const silent = options?.silent ?? false;
     try {
@@ -44,6 +49,7 @@ export const useResultStore = create<ResultState>((set) => ({
       const wasRegenerating = prev.isRegenerating;
       const prevGeneratedAt = prev.result?.metadata?.generatedAt ?? null;
       const nextGeneratedAt = result.metadata?.generatedAt ?? null;
+      const serverReportedRegenerating = result.isRegenerating;
       const generatedAtChanged =
         wasRegenerating &&
         prevGeneratedAt !== null &&
@@ -55,7 +61,13 @@ export const useResultStore = create<ResultState>((set) => ({
         isLoading: false,
         isPending: false,
         isMissingMeeting: false,
-        ...(generatedAtChanged ? { isRegenerating: false, error: null } : {}),
+        error: null,
+        isRegenerating:
+          typeof serverReportedRegenerating === 'boolean'
+            ? serverReportedRegenerating
+            : generatedAtChanged
+              ? false
+              : prev.isRegenerating,
       });
     } catch (error) {
       const message =
@@ -136,7 +148,7 @@ export const useResultStore = create<ResultState>((set) => ({
   /** WebSocket result:regenerate 이벤트 핸들러 */
   applyRegenerateEvent: (event: { meetingId: string; phase: string; errorMessage?: string }) => {
     const state = useResultStore.getState();
-    if (!state.result || state.result.meetingId !== event.meetingId) return;
+    if (state.result && state.result.meetingId !== event.meetingId) return;
 
     if (event.phase === 'started') {
       set({ isRegenerating: true, error: null });
@@ -195,11 +207,6 @@ export const useResultStore = create<ResultState>((set) => ({
   },
 
   clearResult: () => {
-    set({
-      result: null,
-      error: null,
-      isPending: false,
-      isMissingMeeting: false,
-    });
+    set(store.getInitialState());
   },
 }));

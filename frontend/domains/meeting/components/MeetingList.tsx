@@ -15,7 +15,6 @@ import {
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useResultStore } from '@/domains/result/stores/resultStore';
 import { useMeetings } from '../hooks/useMeeting';
 import { useMeetingStatus } from '../hooks/useMeetingStatus';
 import { MeetingStatus } from '../types/meeting.types';
@@ -113,9 +112,6 @@ export function MeetingList({
         meetingId: message.meetingId,
         status: message.status,
       });
-    },
-    onResultRegenerate: (event) => {
-      useResultStore.getState().applyRegenerateEvent(event);
     },
   });
 

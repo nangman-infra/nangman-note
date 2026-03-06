@@ -52,7 +52,7 @@ describe('validateEnv', () => {
     ).toThrow('In production, DB_ENGINE must be postgres.');
   });
 
-  it('defaults bedrock temperature to 0 when not provided', () => {
+  it('defaults bedrock temperature to 0.2 when not provided', () => {
     const env = validateEnv({
       NODE_ENV: 'development',
       PORT: '9999',
@@ -60,6 +60,16 @@ describe('validateEnv', () => {
     });
 
     expect(env.AWS_BEDROCK_TEMPERATURE).toBe(0.2);
+  });
+
+  it('defaults max speaker labels to 8 when not provided', () => {
+    const env = validateEnv({
+      NODE_ENV: 'development',
+      PORT: '9999',
+      ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+    });
+
+    expect(env.AWS_TRANSCRIBE_MAX_SPEAKER_LABELS).toBe(8);
   });
 
   it('parses bedrock temperature within valid range', () => {
@@ -96,6 +106,19 @@ describe('validateEnv', () => {
       }),
     ).toThrow(
       'Environment variable AWS_BEDROCK_TEMPERATURE must be a number between 0 and 1.',
+    );
+  });
+
+  it('throws when max speaker labels is outside range', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'development',
+        PORT: '9999',
+        ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+        AWS_TRANSCRIBE_MAX_SPEAKER_LABELS: '12',
+      }),
+    ).toThrow(
+      'Environment variable AWS_TRANSCRIBE_MAX_SPEAKER_LABELS must be an integer between 2 and 10.',
     );
   });
 

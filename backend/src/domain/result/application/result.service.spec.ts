@@ -186,6 +186,65 @@ describe('ResultService', () => {
       expect(result.content).toBe('# AI 결과');
     });
 
+    it('preserves short utterances when speaker changes in AI transcript input', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue(null);
+      transcriptRepository.find.mockResolvedValue([
+        {
+          id: 'segment-1',
+          meetingId: 'meeting-1',
+          startTime: 0,
+          endTime: 1,
+          text: '결정은 다음주에 진행합니다',
+          confidence: 0.95,
+          speakerLabel: 'spk_0',
+        } as TranscriptSegmentEntity,
+        {
+          id: 'segment-2',
+          meetingId: 'meeting-1',
+          startTime: 1.1,
+          endTime: 1.2,
+          text: '확인',
+          confidence: 0.95,
+          speakerLabel: 'spk_1',
+        } as TranscriptSegmentEntity,
+        {
+          id: 'segment-3',
+          meetingId: 'meeting-1',
+          startTime: 1.3,
+          endTime: 1.4,
+          text: '확인',
+          confidence: 0.95,
+          speakerLabel: 'spk_0',
+        } as TranscriptSegmentEntity,
+      ]);
+      bedrockService.generateMeetingResult.mockResolvedValue('# AI 결과');
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+
+      await service.findByMeetingId('meeting-1');
+
+      const call = bedrockService.generateMeetingResult.mock.calls[0]?.[0] as
+        | { transcriptText: string }
+        | undefined;
+      expect(call).toBeDefined();
+      if (!call) {
+        throw new Error('Expected BedrockService.generateMeetingResult call');
+      }
+
+      const lines = call.transcriptText.split('\n');
+      expect(lines).toHaveLength(3);
+      expect(lines[0]).toContain('[화자: spk_0] 결정은 다음주에 진행합니다');
+      expect(lines[1]).toContain('[화자: spk_1] 확인');
+      expect(lines[2]).toContain('[화자: spk_0] 확인');
+    });
+
     it('returns existing result when save fails with unique constraint', async () => {
       const existing = buildResult({ content: '# 기존 결과' });
       meetingService.findById.mockResolvedValue(buildMeeting());

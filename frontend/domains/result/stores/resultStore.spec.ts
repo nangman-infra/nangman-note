@@ -57,4 +57,64 @@ describe('useResultStore', () => {
     expect(useResultStore.getState().isMissingMeeting).toBe(false);
     expect(useResultStore.getState().error).toBe('network failed');
   });
+
+  it('restores regeneration state from server result payload', async () => {
+    vi.mocked(resultApi.get).mockResolvedValue({
+      id: 'result-1',
+      meetingId: 'm1',
+      promptId: 'prompt_default_meeting',
+      content: '# 회의록',
+      isRegenerating: true,
+      metadata: {
+        title: '회의',
+        generatedAt: '2026-03-07T00:00:00.000Z',
+        totalDuration: 300,
+        transcriptWordCount: 10,
+        noteLength: 20,
+      },
+      createdAt: '2026-03-07T00:00:00.000Z',
+      updatedAt: '2026-03-07T00:00:00.000Z',
+    });
+
+    await useResultStore.getState().fetchResult('m1');
+
+    expect(useResultStore.getState().result?.isRegenerating).toBe(true);
+    expect(useResultStore.getState().isRegenerating).toBe(true);
+  });
+
+  it('resets transient regeneration state when cleared', () => {
+    useResultStore.setState({
+      result: {
+        id: 'result-1',
+        meetingId: 'm1',
+        promptId: 'prompt_default_meeting',
+        content: '# 회의록',
+        metadata: {
+          title: '회의',
+          generatedAt: '2026-03-07T00:00:00.000Z',
+          totalDuration: 300,
+          transcriptWordCount: 10,
+          noteLength: 20,
+        },
+        createdAt: '2026-03-07T00:00:00.000Z',
+        updatedAt: '2026-03-07T00:00:00.000Z',
+      },
+      isLoading: true,
+      isRegenerating: true,
+      isPending: true,
+      isMissingMeeting: true,
+      error: 'stale error',
+    });
+
+    useResultStore.getState().clearResult();
+
+    expect(useResultStore.getState()).toMatchObject({
+      result: null,
+      isLoading: false,
+      isRegenerating: false,
+      isPending: false,
+      isMissingMeeting: false,
+      error: null,
+    });
+  });
 });

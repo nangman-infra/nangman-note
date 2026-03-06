@@ -3,6 +3,7 @@ import { Socket } from 'socket.io';
 import type { AuthUser } from '../../../shared/auth/auth-user.interface';
 import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
 import { AppEnv } from '../../../shared/config/env.validation';
+import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
 import { MeetingService } from '../application/meeting.service';
 import { MeetingStatusGateway } from './meeting-status.gateway';
 
@@ -19,6 +20,8 @@ describe('MeetingStatusGateway', () => {
     Pick<OidcTokenVerifierService, 'isAuthEnabled' | 'verifyAccessToken'>
   >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
+  let serverEmit: jest.Mock;
+  let serverTo: jest.Mock;
 
   const createSocket = (meetingId?: string): MockSocket =>
     ({
@@ -58,6 +61,17 @@ describe('MeetingStatusGateway', () => {
       tokenVerifier as unknown as OidcTokenVerifierService,
       meetingService as unknown as MeetingService,
     );
+    serverEmit = jest.fn();
+    serverTo = jest.fn().mockReturnValue({ emit: serverEmit });
+    (
+      gateway as unknown as {
+        server: {
+          to: jest.Mock;
+        };
+      }
+    ).server = {
+      to: serverTo,
+    };
   });
 
   it('rejects query token when auth is enabled', async () => {
@@ -88,9 +102,26 @@ describe('MeetingStatusGateway', () => {
 
     expect(tokenVerifier.verifyAccessToken).toHaveBeenCalledWith('auth-token');
     expect(meetingService.findById).toHaveBeenCalledWith('meeting-1', 'user-1');
-    expect(socket.join).toHaveBeenCalledWith('meeting-status:user:user-1');
+    expect(socket.join).toHaveBeenNthCalledWith(1, 'meeting-status:user:user-1');
+    expect(socket.join).toHaveBeenNthCalledWith(
+      2,
+      'meeting-status:meeting:meeting-1',
+    );
     expect(socket.disconnect).not.toHaveBeenCalled();
 
     gateway.handleDisconnect(socket as unknown as Socket);
+  });
+
+  it('broadcasts result regenerate events to the meeting room', () => {
+    gateway.handleResultRegenerate(
+      new ResultRegenerateEvent('meeting-1', 'completed', 'user-1'),
+    );
+
+    expect(serverTo).toHaveBeenCalledWith('meeting-status:meeting:meeting-1');
+    expect(serverEmit).toHaveBeenCalledWith('result:regenerate', {
+      meetingId: 'meeting-1',
+      phase: 'completed',
+      errorMessage: undefined,
+    });
   });
 });

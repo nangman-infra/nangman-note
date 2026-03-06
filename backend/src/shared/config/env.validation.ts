@@ -22,6 +22,7 @@ export interface AppEnv {
   AWS_TRANSCRIBE_LANGUAGE_CODE: string;
   AWS_TRANSCRIBE_OUTPUT_BUCKET: string;
   AWS_TRANSCRIBE_MEDIA_FORMAT: string;
+  AWS_TRANSCRIBE_MAX_SPEAKER_LABELS: number;
   AWS_TRANSCRIBE_VOCABULARY_NAME: string;
   AWS_S3_AUDIO_BUCKET: string;
   AWS_S3_AUDIO_KEY_PREFIX: string;
@@ -74,6 +75,26 @@ function readNumber(
   }
 
   throw new Error(`Environment variable ${key} must be a positive integer.`);
+}
+
+function readIntegerInRange(
+  config: Record<string, unknown>,
+  key: string,
+  options: {
+    fallback: number;
+    min: number;
+    max: number;
+  },
+): number {
+  const value = readNumber(config, key, options.fallback);
+
+  if (value >= options.min && value <= options.max) {
+    return value;
+  }
+
+  throw new Error(
+    `Environment variable ${key} must be an integer between ${options.min} and ${options.max}.`,
+  );
 }
 
 function readFloatInRange(
@@ -284,6 +305,15 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       config,
       'AWS_TRANSCRIBE_MEDIA_FORMAT',
       'webm',
+    ),
+    AWS_TRANSCRIBE_MAX_SPEAKER_LABELS: readIntegerInRange(
+      config,
+      'AWS_TRANSCRIBE_MAX_SPEAKER_LABELS',
+      {
+        fallback: 8,
+        min: 2,
+        max: 10,
+      },
     ),
     AWS_TRANSCRIBE_VOCABULARY_NAME: readString(
       config,

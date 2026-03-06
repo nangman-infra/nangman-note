@@ -56,16 +56,18 @@ export class MeetingStatusGateway
     try {
       const authContext = await this.resolveSocketAuthContext(client);
       const ownerSub = authContext?.ownerSub;
-      await client.join(this.userRoom(ownerSub));
-      this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
-
       const meetingId = this.resolveMeetingId(client);
       if (meetingId) {
         await this.meetingService.findById(meetingId, ownerSub);
       }
+      await client.join(this.userRoom(ownerSub));
+      if (meetingId) {
+        await client.join(this.meetingRoom(meetingId));
+      }
+      this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
 
       this.logger.debug(
-        `Client ${client.id} joined meeting-status room (owner=${ownerSub ?? 'anonymous'})`,
+        `Client ${client.id} joined meeting-status rooms (owner=${ownerSub ?? 'anonymous'}, meeting=${meetingId ?? 'all'})`,
       );
     } catch {
       client.emit('error', {
@@ -103,12 +105,10 @@ export class MeetingStatusGateway
    */
   @OnEvent(ResultRegenerateEvent.EVENT_NAME)
   handleResultRegenerate(event: ResultRegenerateEvent): void {
-    const ownerSub = event.ownerSub;
-
     this.logger.log(
-      `Broadcasting result regenerate: meeting=${event.meetingId}, phase=${event.phase}, owner=${ownerSub ?? 'anonymous'}`,
+      `Broadcasting result regenerate: meeting=${event.meetingId}, phase=${event.phase}, owner=${event.ownerSub ?? 'anonymous'}`,
     );
-    this.server.to(this.userRoom(ownerSub)).emit('result:regenerate', {
+    this.server.to(this.meetingRoom(event.meetingId)).emit('result:regenerate', {
       meetingId: event.meetingId,
       phase: event.phase,
       errorMessage: event.errorMessage,
@@ -151,6 +151,10 @@ export class MeetingStatusGateway
 
   private userRoom(ownerSub?: string): string {
     return `meeting-status:user:${ownerSub ?? 'anonymous'}`;
+  }
+
+  private meetingRoom(meetingId: string): string {
+    return `meeting-status:meeting:${meetingId}`;
   }
 
   private async resolveSocketAuthContext(

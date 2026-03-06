@@ -27,6 +27,12 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
 
 type ExportFormat = 'pdf' | 'docx' | 'md';
+type AiTranscriptSegment = {
+  startTime: number;
+  endTime: number;
+  text: string;
+  speakerLabel?: string;
+};
 
 @Injectable()
 export class ResultService {
@@ -791,12 +797,7 @@ export class ResultService {
    */
   private preprocessTranscriptsForAI(
     segments: TranscriptSegmentEntity[],
-  ): Array<{
-    startTime: number;
-    endTime: number;
-    text: string;
-    speakerLabel?: string;
-  }> {
+  ): AiTranscriptSegment[] {
     if (segments.length === 0) return [];
 
     // 한국어 필러/간투사 정규식 (한국음성학회 담화표지 '아','어','음' 연구 + Quizlet 필러 목록 기반)
@@ -804,49 +805,91 @@ export class ResultService {
     const PUNCTUATION_ONLY_REGEX = /^[.?!,;:…]+$/;
 
     // 1. startTime 기준 정렬 (안전장치)
-    const sorted = [...segments].sort((a, b) => a.startTime - b.startTime);
+    const sorted: AiTranscriptSegment[] = segments
+      .map((segment) => ({
+        startTime: segment.startTime,
+        endTime: segment.endTime,
+        text: segment.text.trim(),
+        speakerLabel: segment.speakerLabel ?? undefined,
+      }))
+      .sort((a, b) => a.startTime - b.startTime);
 
     // 2. 필러 세그먼트 + 구두점만 있는 세그먼트 제거
     const filtered = sorted.filter((seg) => {
-      const trimmed = seg.text?.trim() ?? '';
-      if (trimmed.length === 0) return false;
-      if (trimmed.length <= 4 && FILLER_ONLY_REGEX.test(trimmed)) return false;
-      if (PUNCTUATION_ONLY_REGEX.test(trimmed)) return false;
+      if (seg.text.length === 0) return false;
+      if (seg.text.length <= 4 && FILLER_ONLY_REGEX.test(seg.text)) return false;
+      if (PUNCTUATION_ONLY_REGEX.test(seg.text)) return false;
       return true;
     });
 
-    // 3. 연속 동일 텍스트 중복 제거
-    const deduped = filtered.filter((seg, i) => {
-      if (i === 0) return true;
-      return seg.text.trim() !== filtered[i - 1].text.trim();
-    });
+    // 3. 같은 화자/인접 시간대의 연속 동일 텍스트만 중복 제거
+    const deduped: AiTranscriptSegment[] = [];
+    for (const seg of filtered) {
+      const previous = deduped[deduped.length - 1];
+      if (
+        previous &&
+        this.isConsecutiveDuplicateTranscript(previous, seg)
+      ) {
+        previous.endTime = Math.max(previous.endTime, seg.endTime);
+        continue;
+      }
 
-    // 4. 3자 이하 초단편을 직전 세그먼트에 병합 (순수 데이터 객체로 변환)
-    const result: Array<{
-      startTime: number;
-      endTime: number;
-      text: string;
-      speakerLabel?: string;
-    }> = [];
+      deduped.push({ ...seg });
+    }
+
+    // 4. 3자 이하 초단편은 같은 화자일 때만 직전 세그먼트에 병합
+    const result: AiTranscriptSegment[] = [];
 
     for (const seg of deduped) {
-      const trimmed = seg.text.trim();
-
-      if (trimmed.length <= 3 && result.length > 0) {
+      if (this.canMergeShortTranscript(result[result.length - 1], seg)) {
         const prev = result[result.length - 1];
-        prev.text = `${prev.text} ${trimmed}`;
+        prev.text = `${prev.text} ${seg.text}`;
         prev.endTime = Math.max(prev.endTime, seg.endTime);
       } else {
-        result.push({
-          startTime: seg.startTime,
-          endTime: seg.endTime,
-          text: trimmed,
-          speakerLabel: seg.speakerLabel ?? undefined,
-        });
+        result.push({ ...seg });
       }
     }
 
     return result;
+  }
+
+  private isConsecutiveDuplicateTranscript(
+    previous: AiTranscriptSegment,
+    current: AiTranscriptSegment,
+  ): boolean {
+    return (
+      previous.text === current.text &&
+      this.hasSameSpeaker(previous.speakerLabel, current.speakerLabel) &&
+      this.getSegmentGapSeconds(previous, current) <= 1.5
+    );
+  }
+
+  private canMergeShortTranscript(
+    previous: AiTranscriptSegment | undefined,
+    current: AiTranscriptSegment,
+  ): boolean {
+    if (!previous) {
+      return false;
+    }
+
+    return (
+      current.text.length <= 3 &&
+      this.hasSameSpeaker(previous.speakerLabel, current.speakerLabel) &&
+      this.getSegmentGapSeconds(previous, current) <= 1.5
+    );
+  }
+
+  private hasSameSpeaker(first?: string, second?: string): boolean {
+    const normalizedFirst = first?.trim() ?? '';
+    const normalizedSecond = second?.trim() ?? '';
+    return normalizedFirst === normalizedSecond;
+  }
+
+  private getSegmentGapSeconds(
+    previous: Pick<AiTranscriptSegment, 'endTime'>,
+    current: Pick<AiTranscriptSegment, 'startTime'>,
+  ): number {
+    return Math.max(0, current.startTime - previous.endTime);
   }
 
   private loadPdfFontBytes(): Uint8Array | null {
