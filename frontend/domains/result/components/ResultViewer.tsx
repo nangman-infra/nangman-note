@@ -52,7 +52,6 @@ export function ResultViewer({
     error,
     updateResult,
     regenerateResult,
-    handleResultRegenerate,
     exportPDF,
     exportDOCX,
   } = useResult(meetingId);

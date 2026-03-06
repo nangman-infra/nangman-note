@@ -42,9 +42,13 @@ export const useResultStore = create<ResultState>((set) => ({
       const prev = useResultStore.getState();
       // 폴링 폴백: 재생성 중 결과가 바뀌면 (generatedAt 변경) → isRegenerating 해제
       const wasRegenerating = prev.isRegenerating;
+      const prevGeneratedAt = prev.result?.metadata?.generatedAt ?? null;
+      const nextGeneratedAt = result.metadata?.generatedAt ?? null;
       const generatedAtChanged =
         wasRegenerating &&
-        prev.result?.metadata?.generatedAt !== result.metadata?.generatedAt;
+        prevGeneratedAt !== null &&
+        nextGeneratedAt !== null &&
+        prevGeneratedAt !== nextGeneratedAt;
 
       set({
         result,
