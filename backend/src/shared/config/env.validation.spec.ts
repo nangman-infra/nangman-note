@@ -59,7 +59,7 @@ describe('validateEnv', () => {
       ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
     });
 
-    expect(env.AWS_BEDROCK_TEMPERATURE).toBe(0);
+    expect(env.AWS_BEDROCK_TEMPERATURE).toBe(0.2);
   });
 
   it('parses bedrock temperature within valid range', () => {

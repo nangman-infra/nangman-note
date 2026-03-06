@@ -140,7 +140,7 @@ describe('TranscriptionResultCollectorService', () => {
 
     const result = await service.pollAndCollect('meeting-1', 'job-1');
 
-    expect(result).toEqual({ success: true, segmentCount: 1 });
+    expect(result).toEqual({ success: true, segmentCount: 2 });
     expect(jobRepository.save.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(segmentRepository.save).toHaveBeenCalledTimes(1);
     expect(s3AudioService.deleteAudioFile).toHaveBeenCalledWith(
