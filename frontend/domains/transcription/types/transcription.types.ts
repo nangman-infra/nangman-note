@@ -7,6 +7,7 @@ export interface TranscriptSegment {
   confidence: number; // 0-1
   translatedText?: string;
   detectedLanguage?: string;
+  speakerLabel?: string;
   createdAt: string;
 }
 
@@ -20,6 +21,7 @@ export interface RealtimeTranscriptContentPayload {
   startTime: number;
   endTime: number;
   detectedLanguage?: string;
+  speakerLabel?: string;
 }
 
 export interface RealtimeTranslationPayload {

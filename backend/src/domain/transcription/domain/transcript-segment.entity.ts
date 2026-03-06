@@ -41,6 +41,15 @@ export class TranscriptSegmentEntity {
   })
   detectedLanguage?: string;
 
+  /** Transcribe Speaker Diarization 라벨 (e.g. 'spk_0') */
+  @Column({
+    name: 'speaker_label',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  speakerLabel?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -14,6 +14,8 @@ export interface StreamingTranscriptEvent {
   resultId: string;
   /** 감지된 언어 코드 (IdentifyLanguage 사용 시) */
   detectedLanguage?: string;
+  /** Speaker Diarization 라벨 (e.g. 'spk_0') */
+  speakerLabel?: string;
 }
 
 /**
