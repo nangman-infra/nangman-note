@@ -446,10 +446,12 @@ export class ResultService {
     const preprocessed = this.preprocessTranscriptsForAI(transcripts);
     const transcriptText = preprocessed
       .filter((segment) => segment.text.length > 0)
-      .map(
-        (segment) =>
-          `[${segment.startTime.toFixed(1)}s ~ ${segment.endTime.toFixed(1)}s] ${segment.text}`,
-      )
+      .map((segment) => {
+        const speakerPrefix = segment.speakerLabel
+          ? `[화자: ${segment.speakerLabel}] `
+          : '';
+        return `[${segment.startTime.toFixed(1)}s ~ ${segment.endTime.toFixed(1)}s] ${speakerPrefix}${segment.text}`;
+      })
       .join('\n');
 
     try {
@@ -789,7 +791,12 @@ export class ResultService {
    */
   private preprocessTranscriptsForAI(
     segments: TranscriptSegmentEntity[],
-  ): Array<{ startTime: number; endTime: number; text: string }> {
+  ): Array<{
+    startTime: number;
+    endTime: number;
+    text: string;
+    speakerLabel?: string;
+  }> {
     if (segments.length === 0) return [];
 
     // 한국어 필러/간투사 정규식 (한국음성학회 담화표지 '아','어','음' 연구 + Quizlet 필러 목록 기반)
@@ -815,8 +822,12 @@ export class ResultService {
     });
 
     // 4. 3자 이하 초단편을 직전 세그먼트에 병합 (순수 데이터 객체로 변환)
-    const result: Array<{ startTime: number; endTime: number; text: string }> =
-      [];
+    const result: Array<{
+      startTime: number;
+      endTime: number;
+      text: string;
+      speakerLabel?: string;
+    }> = [];
 
     for (const seg of deduped) {
       const trimmed = seg.text.trim();
@@ -830,6 +841,7 @@ export class ResultService {
           startTime: seg.startTime,
           endTime: seg.endTime,
           text: trimmed,
+          speakerLabel: seg.speakerLabel ?? undefined,
         });
       }
     }

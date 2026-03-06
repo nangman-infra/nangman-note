@@ -27,12 +27,28 @@ interface TranscribeResultItem {
     content?: string;
   }>;
   type?: string;
+  speaker_label?: string;
+}
+
+interface TranscribeSpeakerSegmentItem {
+  start_time: string;
+  end_time: string;
+  speaker_label: string;
 }
 
 interface TranscribeResultJson {
   results?: {
     items?: TranscribeResultItem[];
     transcripts?: Array<{ transcript?: string }>;
+    speaker_labels?: {
+      speakers?: number;
+      segments?: Array<{
+        start_time: string;
+        end_time: string;
+        speaker_label: string;
+        items?: TranscribeSpeakerSegmentItem[];
+      }>;
+    };
   };
 }
 
@@ -199,13 +215,38 @@ export class TranscriptionResultCollectorService {
     let currentStartTime = 0;
     let currentEndTime = 0;
     let currentConfidence = 0;
+    let currentSpeaker: string | undefined;
     let wordCount = 0;
+    let lastPunctuationIsSentenceEnd = false;
+
+    const flushSegment = () => {
+      if (currentText.trim().length > 0 && wordCount > 0) {
+        const segment = this.segmentRepository.create({
+          meetingId,
+          startTime: currentStartTime,
+          endTime: currentEndTime,
+          text: currentText.trim(),
+          confidence: currentConfidence / wordCount,
+          speakerLabel: currentSpeaker,
+        });
+        segments.push(segment);
+      }
+      currentText = '';
+      currentConfidence = 0;
+      wordCount = 0;
+      lastPunctuationIsSentenceEnd = false;
+    };
 
     for (const item of items) {
       if (item.type === 'punctuation') {
-        // 구두점은 현재 텍스트에 이어붙이기
         const content = item.alternatives?.[0]?.content ?? '';
         currentText += content;
+        lastPunctuationIsSentenceEnd = /[.?!]/.test(content);
+
+        // 문장 종결 구두점에서 분할 (wordCount > 0이면)
+        if (lastPunctuationIsSentenceEnd && wordCount > 0) {
+          flushSegment();
+        }
         continue;
       }
 
@@ -216,44 +257,39 @@ export class TranscriptionResultCollectorService {
       );
       const startTime = parseFloat(item.start_time ?? '0');
       const endTime = parseFloat(item.end_time ?? '0');
+      const speakerLabel = item.speaker_label ?? undefined;
+
+      // 화자 전환 시 분할
+      if (
+        speakerLabel &&
+        currentSpeaker &&
+        speakerLabel !== currentSpeaker &&
+        wordCount > 0
+      ) {
+        flushSegment();
+      }
 
       if (wordCount === 0) {
         currentStartTime = startTime;
+        currentSpeaker = speakerLabel;
       }
 
       currentText += (currentText.length > 0 ? ' ' : '') + content;
       currentEndTime = endTime;
       currentConfidence += confidence;
+      if (speakerLabel) {
+        currentSpeaker = speakerLabel;
+      }
       wordCount++;
 
-      // 약 15단어 또는 10초마다 세그먼트 구분
-      if (wordCount >= 15 || endTime - currentStartTime >= 10) {
-        const segment = this.segmentRepository.create({
-          meetingId,
-          startTime: currentStartTime,
-          endTime: currentEndTime,
-          text: currentText.trim(),
-          confidence: wordCount > 0 ? currentConfidence / wordCount : 0.9,
-        });
-        segments.push(segment);
-
-        currentText = '';
-        currentConfidence = 0;
-        wordCount = 0;
+      // 폴백: 20단어 또는 15초 (구두점/화자 전환이 없는 긴 발화 대응)
+      if (wordCount >= 20 || endTime - currentStartTime >= 15) {
+        flushSegment();
       }
     }
 
     // 남은 텍스트
-    if (currentText.trim().length > 0 && wordCount > 0) {
-      const segment = this.segmentRepository.create({
-        meetingId,
-        startTime: currentStartTime,
-        endTime: currentEndTime,
-        text: currentText.trim(),
-        confidence: currentConfidence / wordCount,
-      });
-      segments.push(segment);
-    }
+    flushSegment();
 
     return segments;
   }

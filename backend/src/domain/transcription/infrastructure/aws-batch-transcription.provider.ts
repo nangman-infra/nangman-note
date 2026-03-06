@@ -61,6 +61,10 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
       OutputKey: this.outputBucket
         ? `transcribe-output/${input.meetingId}/${providerJobId}.json`
         : undefined,
+      Settings: {
+        ShowSpeakerLabels: true,
+        MaxSpeakerLabels: 8,
+      },
     });
 
     const response = await this.transcribeClient.send(command);
