@@ -36,6 +36,7 @@ export interface RealtimeTranscriptContentPayload {
   startTime: number;
   endTime: number;
   detectedLanguage?: string;
+  speakerLabel?: string;
 }
 
 /** 프론트에 emit할 번역 후행 완료 이벤트 페이로드 */
@@ -288,6 +289,7 @@ export class TranscriptionService {
         startTime: event.startTime,
         endTime: event.endTime,
         detectedLanguage: event.detectedLanguage,
+        speakerLabel: event.speakerLabel,
       });
       return;
     }
@@ -306,6 +308,7 @@ export class TranscriptionService {
       startTime: event.startTime,
       endTime: event.endTime,
       detectedLanguage: event.detectedLanguage,
+      speakerLabel: event.speakerLabel,
     });
 
     // DB 저장
@@ -344,8 +347,9 @@ export class TranscriptionService {
         startTime: event.startTime,
         endTime: event.endTime,
         text: event.text,
-        confidence: 0.95, // Transcribe Streaming은 개별 confidence를 주지 않음
+        confidence: 0.9,
         detectedLanguage: event.detectedLanguage,
+        speakerLabel: event.speakerLabel,
       });
       const saved = await this.transcriptRepository.save(segment);
       return saved.id;

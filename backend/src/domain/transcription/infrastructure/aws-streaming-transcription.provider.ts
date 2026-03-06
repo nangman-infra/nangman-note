@@ -193,8 +193,9 @@ export class AwsStreamingTranscriptionProvider
     };
 
     if (languageCode) {
-      // 특정 언어 지정
+      // 특정 언어 지정 — ShowSpeakerLabel은 LanguageCode 모드에서만 사용 가능
       commandInput.LanguageCode = languageCode as LanguageCode;
+      commandInput.ShowSpeakerLabel = true;
     } else {
       // 자동 언어 감지
       commandInput.IdentifyLanguage = true;
@@ -312,6 +313,28 @@ export class AwsStreamingTranscriptionProvider
               const text = alt.Transcript ?? '';
               if (!text.trim()) continue;
 
+              // Speaker Diarization: Items에서 최다 화자 라벨 추출
+              const items = alt.Items ?? [];
+              const speakerCounts = new Map<string, number>();
+              for (const item of items) {
+                const spk = (item as Record<string, unknown>).Speaker as
+                  | string
+                  | undefined;
+                if (spk) {
+                  speakerCounts.set(spk, (speakerCounts.get(spk) ?? 0) + 1);
+                }
+              }
+              let speakerLabel: string | undefined;
+              if (speakerCounts.size > 0) {
+                let maxCount = 0;
+                for (const [label, count] of speakerCounts) {
+                  if (count > maxCount) {
+                    maxCount = count;
+                    speakerLabel = label;
+                  }
+                }
+              }
+
               const transcriptEvent: StreamingTranscriptEvent = {
                 type: result.IsPartial ? 'partial' : 'final',
                 text,
@@ -319,6 +342,7 @@ export class AwsStreamingTranscriptionProvider
                 endTime: result.EndTime ?? 0,
                 resultId: result.ResultId ?? '',
                 detectedLanguage: result.LanguageCode ?? undefined,
+                speakerLabel,
               };
 
               try {
