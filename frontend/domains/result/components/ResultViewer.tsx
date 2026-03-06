@@ -7,6 +7,7 @@ import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
+import { useMeetingStatus } from '@/domains/meeting/hooks/useMeetingStatus';
 import { useResult } from '../hooks/useResult';
 import {
   resultTabDataApi,
@@ -52,9 +53,16 @@ export function ResultViewer({
     error,
     updateResult,
     regenerateResult,
+    handleResultRegenerate,
     exportPDF,
     exportDOCX,
   } = useResult(meetingId);
+
+  // WebSocket으로 result:regenerate 이벤트 수신
+  useMeetingStatus({
+    onResultRegenerate: handleResultRegenerate,
+    enabled: true,
+  });
   const { pushToast } = useFeedback();
   const [activeTab, setActiveTab] = useState<ResultTab>('result');
   const [isEditing, setIsEditing] = useState(false);
@@ -198,8 +206,9 @@ export function ResultViewer({
     setShowRegenerate(false);
     setRegeneratePromptId('');
     pushToast({
-      title: '새 프롬프트로 회의록을 재생성했습니다',
-      variant: 'success',
+      title: 'AI가 회의록을 재생성하고 있습니다',
+      description: '완료되면 자동으로 결과가 업데이트됩니다.',
+      variant: 'info',
     });
   };
 
@@ -276,7 +285,14 @@ export function ResultViewer({
           </div>
         </div>
 
-        {error ? (
+        {isRegenerating ? (
+          <StatusBanner
+            variant="info"
+            title="AI가 회의록을 재생성하고 있습니다"
+            message="프롬프트를 변경하여 새로운 회의록을 생성 중입니다. 완료되면 자동으로 업데이트됩니다."
+            className="mb-3"
+          />
+        ) : error ? (
           <StatusBanner
             variant="error"
             title="결과 처리 오류"

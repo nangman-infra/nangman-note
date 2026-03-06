@@ -12,6 +12,7 @@ import { PromptEntity } from '../../prompt/domain/prompt.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
 import { ResultEntity } from '../domain/result.entity';
 import { ResultService } from './result.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('ResultService', () => {
   let service: ResultService;
@@ -34,6 +35,7 @@ describe('ResultService', () => {
   let bedrockService: jest.Mocked<
     Pick<BedrockService, 'generateMeetingResult'>
   >;
+  let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
 
   const buildMeeting = (
     overrides: Partial<MeetingEntity> = {},
@@ -108,6 +110,9 @@ describe('ResultService', () => {
     bedrockService = {
       generateMeetingResult: jest.fn(),
     };
+    eventEmitter = {
+      emit: jest.fn(),
+    };
 
     service = new ResultService(
       resultRepository as unknown as Repository<ResultEntity>,
@@ -117,6 +122,7 @@ describe('ResultService', () => {
       meetingSearchDocumentService as unknown as MeetingSearchDocumentService,
       promptService as unknown as PromptService,
       bedrockService as unknown as BedrockService,
+      eventEmitter as unknown as EventEmitter2,
     );
   });
 
@@ -202,7 +208,7 @@ describe('ResultService', () => {
         new QueryFailedError('INSERT INTO result ...', [], {
           code: '23505',
           detail: 'duplicate key value violates unique constraint',
-        }),
+        } as unknown as Error),
       );
 
       const result = await service.findByMeetingId('meeting-1');

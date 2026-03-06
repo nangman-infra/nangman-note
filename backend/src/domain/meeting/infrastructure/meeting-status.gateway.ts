@@ -15,6 +15,7 @@ import {
 } from '../../../shared/config/cors-origin.util';
 import { createWsCorsOriginHandler } from '../../../shared/config/ws-cors.factory';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
+import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
 import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
 import { MeetingService } from '../application/meeting.service';
 
@@ -94,6 +95,23 @@ export class MeetingStatusGateway
       meetingId: event.meetingId,
       status: event.status,
       phase: event.phase,
+    });
+  }
+
+  /**
+   * 회의록 재생성 진행/완료/실패 이벤트를 WebSocket으로 브로드캐스트합니다.
+   */
+  @OnEvent(ResultRegenerateEvent.EVENT_NAME)
+  handleResultRegenerate(event: ResultRegenerateEvent): void {
+    const ownerSub = event.ownerSub;
+
+    this.logger.log(
+      `Broadcasting result regenerate: meeting=${event.meetingId}, phase=${event.phase}, owner=${ownerSub ?? 'anonymous'}`,
+    );
+    this.server.to(this.userRoom(ownerSub)).emit('result:regenerate', {
+      meetingId: event.meetingId,
+      phase: event.phase,
+      errorMessage: event.errorMessage,
     });
   }
 

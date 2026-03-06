@@ -23,12 +23,15 @@ import { RegenerateResultDto } from './dto/regenerate-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 import { ResultEntity } from '../domain/result.entity';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
 
 type ExportFormat = 'pdf' | 'docx' | 'md';
 
 @Injectable()
 export class ResultService {
   private readonly logger = new Logger(ResultService.name);
+  private readonly regeneratingMeetings = new Set<string>();
 
   constructor(
     @InjectRepository(ResultEntity)
@@ -41,7 +44,12 @@ export class ResultService {
     private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
     private readonly promptService: PromptService,
     private readonly bedrockService: BedrockService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  isRegenerating(meetingId: string): boolean {
+    return this.regeneratingMeetings.has(meetingId);
+  }
 
   async findByMeetingId(
     meetingId: string,
@@ -131,6 +139,100 @@ export class ResultService {
     const saved = await this.resultRepository.save(existing);
     await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
     return saved;
+  }
+
+  /**
+   * 비동기 재생성: 즉시 반환하고 백그라운드에서 Bedrock 호출.
+   * 완료/실패 시 EventEmitter로 ResultRegenerateEvent를 발행합니다.
+   */
+  async regenerateAsync(
+    meetingId: string,
+    dto: RegenerateResultDto,
+    ownerSub?: string,
+  ): Promise<void> {
+    if (this.regeneratingMeetings.has(meetingId)) {
+      throw new BadRequestException(
+        `Meeting ${meetingId} is already being regenerated`,
+      );
+    }
+
+    // 프롬프트 존재 확인 + 변경 (동기)
+    await this.promptService.ensureExists(dto.promptId, ownerSub);
+    await this.meetingService.updatePrompt(
+      meetingId,
+      { promptId: dto.promptId },
+      ownerSub,
+    );
+
+    // 기존 result 존재 확인 (동기)
+    await this.findByMeetingId(meetingId, ownerSub);
+
+    // 중복 방지 잠금 + started 이벤트
+    this.regeneratingMeetings.add(meetingId);
+    this.eventEmitter.emit(
+      ResultRegenerateEvent.EVENT_NAME,
+      new ResultRegenerateEvent(meetingId, 'started', ownerSub),
+    );
+
+    // 백그라운드 실행 (fire-and-forget)
+    this.executeRegenerateInBackground(meetingId, dto.promptId, ownerSub);
+  }
+
+  private executeRegenerateInBackground(
+    meetingId: string,
+    promptId: string,
+    ownerSub?: string,
+  ): void {
+    (async () => {
+      try {
+        const existing = await this.resultRepository.findOne({
+          where: { meetingId },
+        });
+        if (!existing) {
+          throw new Error(`Result not found for meeting ${meetingId}`);
+        }
+
+        const generated = await this.generateResultPayload(
+          meetingId,
+          promptId,
+          ownerSub,
+        );
+
+        existing.promptId = generated.promptId;
+        existing.content = generated.content;
+        existing.metadata = generated.metadata;
+
+        await this.resultRepository.save(existing);
+        await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+
+        this.logger.log(
+          `Async regeneration completed for meeting ${meetingId}`,
+        );
+
+        this.eventEmitter.emit(
+          ResultRegenerateEvent.EVENT_NAME,
+          new ResultRegenerateEvent(meetingId, 'completed', ownerSub),
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `Async regeneration failed for meeting ${meetingId}: ${errorMessage}`,
+        );
+
+        this.eventEmitter.emit(
+          ResultRegenerateEvent.EVENT_NAME,
+          new ResultRegenerateEvent(
+            meetingId,
+            'failed',
+            ownerSub,
+            errorMessage,
+          ),
+        );
+      } finally {
+        this.regeneratingMeetings.delete(meetingId);
+      }
+    })();
   }
 
   async exportResult(

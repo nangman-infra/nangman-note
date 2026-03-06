@@ -12,9 +12,16 @@ interface MeetingStatusMessage {
   phase?: 'transcribing' | 'generating' | 'completed';
 }
 
+interface ResultRegenerateMessage {
+  meetingId: string;
+  phase: 'started' | 'completed' | 'failed';
+  errorMessage?: string;
+}
+
 interface UseMeetingStatusOptions {
   meetingId?: string | null;
   onStatusChange?: (message: MeetingStatusMessage) => void;
+  onResultRegenerate?: (message: ResultRegenerateMessage) => void;
   enabled?: boolean;
 }
 
@@ -25,6 +32,7 @@ interface UseMeetingStatusOptions {
 export function useMeetingStatus({
   meetingId,
   onStatusChange,
+  onResultRegenerate,
   enabled = true,
 }: UseMeetingStatusOptions): void {
   const { data: session, status: authStatus } = useSession();
@@ -34,10 +42,15 @@ export function useMeetingStatus({
   const authRecoveryPendingRef = useRef(false);
   const isRecoveringAuthRef = useRef(false);
   const callbackRef = useRef(onStatusChange);
+  const regenerateCallbackRef = useRef(onResultRegenerate);
 
   useEffect(() => {
     callbackRef.current = onStatusChange;
   }, [onStatusChange]);
+
+  useEffect(() => {
+    regenerateCallbackRef.current = onResultRegenerate;
+  }, [onResultRegenerate]);
 
   const cleanup = useCallback(() => {
     if (socketRef.current) {
@@ -128,6 +141,10 @@ export function useMeetingStatus({
         return;
       }
       callbackRef.current?.(message);
+    });
+
+    socket.on('result:regenerate', (message: ResultRegenerateMessage) => {
+      regenerateCallbackRef.current?.(message);
     });
 
     return cleanup;

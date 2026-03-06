@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useResultStore } from '../stores/resultStore';
 
 export function useResult(meetingId: string) {
@@ -12,6 +12,7 @@ export function useResult(meetingId: string) {
     fetchResult,
     updateResult,
     regenerateResult,
+    applyRegenerateEvent,
     exportPDF,
     exportDOCX,
     clearResult,
@@ -41,6 +42,26 @@ export function useResult(meetingId: string) {
     };
   }, [meetingId, isPending, fetchResult]);
 
+  // 재생성 중 폴링 폴백 (WebSocket 미연결 시 안전장치)
+  useEffect(() => {
+    if (!meetingId || !isRegenerating) return;
+
+    const timerId = window.setInterval(() => {
+      void fetchResult(meetingId);
+    }, 5000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [meetingId, isRegenerating, fetchResult]);
+
+  const handleResultRegenerate = useCallback(
+    (event: { meetingId: string; phase: string; errorMessage?: string }) => {
+      applyRegenerateEvent(event);
+    },
+    [applyRegenerateEvent],
+  );
+
   return {
     result,
     isLoading,
@@ -50,6 +71,7 @@ export function useResult(meetingId: string) {
     error,
     updateResult: (content: string) => updateResult(meetingId, content),
     regenerateResult: (promptId: string) => regenerateResult(meetingId, promptId),
+    handleResultRegenerate,
     exportPDF: () => exportPDF(meetingId),
     exportDOCX: () => exportDOCX(meetingId),
   };

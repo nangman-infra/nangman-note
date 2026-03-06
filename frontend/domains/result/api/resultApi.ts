@@ -19,9 +19,9 @@ export const resultApi = {
     return response.data.data;
   },
 
-  // 회의록 재생성 (프롬프트 변경)
-  regenerate: async (meetingId: string, promptId: string): Promise<MeetingResult> => {
-    const response = await apiClient.post<{ data: MeetingResult }>(
+  // 회의록 재생성 (프롬프트 변경) — 202 Accepted, 백그라운드 처리
+  regenerate: async (meetingId: string, promptId: string): Promise<{ meetingId: string; promptId: string; status: string }> => {
+    const response = await apiClient.post<{ data: { meetingId: string; promptId: string; status: string } }>(
       `/api/v1/meetings/${meetingId}/result/regenerate`,
       { promptId }
     );

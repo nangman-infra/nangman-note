@@ -13,6 +13,7 @@ interface ResultState {
   fetchResult: (meetingId: string) => Promise<void>;
   updateResult: (meetingId: string, content: string) => Promise<boolean>;
   regenerateResult: (meetingId: string, promptId: string) => Promise<boolean>;
+  applyRegenerateEvent: (event: { meetingId: string; phase: string; errorMessage?: string }) => void;
   exportPDF: (meetingId: string) => Promise<boolean>;
   exportDOCX: (meetingId: string) => Promise<boolean>;
   clearResult: () => void;
@@ -102,8 +103,9 @@ export const useResultStore = create<ResultState>((set) => ({
   regenerateResult: async (meetingId, promptId) => {
     try {
       set({ isRegenerating: true, error: null });
-      const regenerated = await resultApi.regenerate(meetingId, promptId);
-      set({ result: regenerated, isRegenerating: false });
+      await resultApi.regenerate(meetingId, promptId);
+      // 202 Accepted — 백그라운드에서 처리 중
+      // isRegenerating은 WebSocket result:regenerate completed/failed 이벤트로 해제
       return true;
     } catch (error) {
       set({
@@ -111,6 +113,25 @@ export const useResultStore = create<ResultState>((set) => ({
         isRegenerating: false,
       });
       return false;
+    }
+  },
+
+  /** WebSocket result:regenerate 이벤트 핸들러 */
+  applyRegenerateEvent: (event: { meetingId: string; phase: string; errorMessage?: string }) => {
+    const state = useResultStore.getState();
+    if (!state.result || state.result.meetingId !== event.meetingId) return;
+
+    if (event.phase === 'started') {
+      set({ isRegenerating: true, error: null });
+    } else if (event.phase === 'completed') {
+      set({ isRegenerating: false, error: null });
+      // 완료 시 결과를 다시 fetch
+      void useResultStore.getState().fetchResult(event.meetingId);
+    } else if (event.phase === 'failed') {
+      set({
+        isRegenerating: false,
+        error: event.errorMessage || 'AI 회의록 재생성에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      });
     }
   },
 

@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -38,12 +40,18 @@ export class ResultController {
   }
 
   @Post('regenerate')
+  @HttpCode(HttpStatus.ACCEPTED)
   async regenerate(
     @Param('meetingId') meetingId: string,
     @Body() dto: RegenerateResultDto,
     @CurrentUser() user?: AuthUser,
   ) {
-    return this.resultService.regenerate(meetingId, dto, user?.sub);
+    await this.resultService.regenerateAsync(meetingId, dto, user?.sub);
+    return {
+      meetingId,
+      promptId: dto.promptId,
+      status: 'regenerating',
+    };
   }
 
   @Get('export')
