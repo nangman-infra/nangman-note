@@ -188,7 +188,8 @@ export class TranscriptionResultCollectorService {
       }
 
       const items = parsedUnknown.results?.items ?? [];
-      const segments = this.itemsToSegments(meetingId, items);
+      const speakerLookup = this.buildSpeakerLookup(parsedUnknown);
+      const segments = this.itemsToSegments(meetingId, items, speakerLookup);
 
       if (segments.length > 0) {
         await this.segmentRepository.save(segments);
@@ -206,9 +207,29 @@ export class TranscriptionResultCollectorService {
     }
   }
 
+  /**
+   * speaker_labels.segments[].items[]에서 start_time → speaker_label 룩업 맵 생성.
+   * AWS 배치 결과에서 speaker_label은 items[] 배열이 아닌 별도 speaker_labels 구조에 있음.
+   */
+  private buildSpeakerLookup(
+    parsed: TranscribeResultJson,
+  ): Map<string, string> {
+    const lookup = new Map<string, string>();
+    const speakerSegments = parsed.results?.speaker_labels?.segments ?? [];
+
+    for (const seg of speakerSegments) {
+      for (const item of seg.items ?? []) {
+        lookup.set(item.start_time, item.speaker_label);
+      }
+    }
+
+    return lookup;
+  }
+
   private itemsToSegments(
     meetingId: string,
     items: TranscribeResultItem[],
+    speakerLookup?: Map<string, string>,
   ): TranscriptSegmentEntity[] {
     const segments: TranscriptSegmentEntity[] = [];
     let currentText = '';
@@ -257,7 +278,8 @@ export class TranscriptionResultCollectorService {
       );
       const startTime = parseFloat(item.start_time ?? '0');
       const endTime = parseFloat(item.end_time ?? '0');
-      const speakerLabel = item.speaker_label ?? undefined;
+      const speakerLabel =
+        speakerLookup?.get(item.start_time ?? '') ?? undefined;
 
       // 화자 전환 시 분할
       if (
