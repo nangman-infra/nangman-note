@@ -300,7 +300,7 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       config,
       'AWS_BEDROCK_TEMPERATURE',
       {
-        fallback: 0,
+        fallback: 0.2,
         min: 0,
         max: 1,
       },

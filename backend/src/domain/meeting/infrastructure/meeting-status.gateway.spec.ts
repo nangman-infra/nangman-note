@@ -13,7 +13,8 @@ type MockSocket = Pick<
 
 describe('MeetingStatusGateway', () => {
   let gateway: MeetingStatusGateway;
-  let configService: jest.Mocked<Pick<ConfigService<AppEnv, true>, 'get'>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let configService: any;
   let tokenVerifier: jest.Mocked<
     Pick<OidcTokenVerifierService, 'isAuthEnabled' | 'verifyAccessToken'>
   >;

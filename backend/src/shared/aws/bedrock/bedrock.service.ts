@@ -105,7 +105,7 @@ export class BedrockService {
         inferenceConfig: {
           maxTokens: this.maxTokens,
           temperature: this.temperature,
-          topP: 1,
+          topP: 0.9,
         },
       });
 

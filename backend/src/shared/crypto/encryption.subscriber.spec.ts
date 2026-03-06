@@ -51,12 +51,12 @@ describe('EncryptionSubscriber', () => {
 
     subscriber.beforeUpdate({
       entity,
-    } as UpdateEvent<EncryptableEntity>);
+    } as unknown as UpdateEvent<EncryptableEntity>);
     expect(entity.content).toBe('enc:회의록 본문');
 
     subscriber.afterUpdate({
       entity,
-    } as UpdateEvent<EncryptableEntity>);
+    } as unknown as UpdateEvent<EncryptableEntity>);
     expect(entity.content).toBe('회의록 본문');
   });
 
