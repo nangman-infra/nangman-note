@@ -7,7 +7,6 @@ import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
-import { useMeetingStatus } from '@/domains/meeting/hooks/useMeetingStatus';
 import { useResult } from '../hooks/useResult';
 import {
   resultTabDataApi,
@@ -58,11 +57,6 @@ export function ResultViewer({
     exportDOCX,
   } = useResult(meetingId);
 
-  // WebSocket으로 result:regenerate 이벤트 수신
-  useMeetingStatus({
-    onResultRegenerate: handleResultRegenerate,
-    enabled: true,
-  });
   const { pushToast } = useFeedback();
   const [activeTab, setActiveTab] = useState<ResultTab>('result');
   const [isEditing, setIsEditing] = useState(false);
