@@ -1,4 +1,5 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
+import { PromptDocumentType } from '../../domain/prompt-document-type.enum';
 
 export class CreatePromptDto {
   @IsString()
@@ -10,4 +11,7 @@ export class CreatePromptDto {
   @MinLength(1)
   @MaxLength(12000)
   content: string;
+
+  @IsEnum(PromptDocumentType)
+  documentType: PromptDocumentType;
 }

@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { ResultEntity } from '../../result/domain/result.entity';
+import { PromptDocumentType } from './prompt-document-type.enum';
 
 @Entity('prompt')
 export class PromptEntity {
@@ -22,6 +23,14 @@ export class PromptEntity {
 
   @Column({ type: 'text' })
   content: string;
+
+  @Column({
+    name: 'document_type',
+    type: 'varchar',
+    length: 20,
+    default: PromptDocumentType.MEETING,
+  })
+  documentType: PromptDocumentType;
 
   @Column({ name: 'is_default', type: 'boolean', default: false })
   isDefault: boolean;

@@ -20,7 +20,7 @@ const sections: Array<{
 const tags = [
   { name: '회의록', promptId: 'prompt_default_meeting', color: 'bg-teal-100 text-teal-800' },
   { name: '강의', promptId: 'prompt_default_lecture', color: 'bg-amber-100 text-amber-800' },
-  { name: '세미나', promptId: 'prompt_default_seminar', color: 'bg-sky-100 text-sky-800' },
+  { name: '멘토링', promptId: 'prompt_default_seminar', color: 'bg-sky-100 text-sky-800' },
 ];
 
 interface SidebarProps {

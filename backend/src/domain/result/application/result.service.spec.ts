@@ -8,6 +8,7 @@ import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { NoteEntity } from '../../note/domain/note.entity';
 import { PromptService } from '../../prompt/application/prompt.service';
+import { PromptDocumentType } from '../../prompt/domain/prompt-document-type.enum';
 import { PromptEntity } from '../../prompt/domain/prompt.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
 import { ResultEntity } from '../domain/result.entity';
@@ -33,7 +34,7 @@ describe('ResultService', () => {
     Pick<MeetingSearchDocumentService, 'refreshByMeetingId'>
   >;
   let bedrockService: jest.Mocked<
-    Pick<BedrockService, 'generateMeetingResult'>
+    Pick<BedrockService, 'extractStructuredNotes' | 'generateMeetingResult'>
   >;
   let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
 
@@ -58,6 +59,7 @@ describe('ResultService', () => {
       id: 'prompt_default_meeting',
       name: '기본 프롬프트',
       content: '회의 요약 생성',
+      documentType: PromptDocumentType.MEETING,
       isDefault: true,
       createdAt: new Date('2026-03-01T00:00:00.000Z'),
       updatedAt: new Date('2026-03-01T00:00:00.000Z'),
@@ -108,6 +110,7 @@ describe('ResultService', () => {
       refreshByMeetingId: jest.fn(),
     };
     bedrockService = {
+      extractStructuredNotes: jest.fn(),
       generateMeetingResult: jest.fn(),
     };
     eventEmitter = {
@@ -157,7 +160,31 @@ describe('ResultService', () => {
           confidence: 0.95,
         } as TranscriptSegmentEntity,
       ]);
-      bedrockService.generateMeetingResult.mockResolvedValue('# AI 결과');
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        summary: '안건 공유와 후속 작업을 정리했다.',
+        participants: ['택준'],
+        agendaItems: [
+          {
+            title: '안건 공유',
+            discussionPoints: ['진행 현황을 확인했다'],
+            decisions: ['다음 주까지 정리한다'],
+            actionItems: [
+              {
+                task: '진행 현황 정리',
+                owner: '택준',
+                deadline: '다음 주',
+                priority: 'Medium',
+              },
+            ],
+            unresolved: [],
+          },
+        ],
+        overallDecisions: ['다음 주까지 정리한다'],
+        followUps: ['후속 점검'],
+        keywords: ['안건', '정리'],
+        uncertainties: [],
+      });
       resultRepository.create.mockImplementation(
         (entity) => entity as ResultEntity,
       );
@@ -176,14 +203,17 @@ describe('ResultService', () => {
       }
       expect(createArg.meetingId).toBe('meeting-1');
       expect(createArg.promptId).toBe('prompt_default_meeting');
-      expect(createArg.content).toBe('# AI 결과');
+      expect(createArg.content).toContain('# 테스트 회의');
+      expect(createArg.content).toContain('## 회의 개요');
+      expect(createArg.content).toContain('## 안건별 논의');
+      expect(createArg.content).toContain('작업: 진행 현황 정리');
       expect(createArg.metadata?.totalDuration).toBe(600);
       expect(createArg.metadata?.transcriptWordCount).toBe(2);
       expect(createArg.metadata?.noteLength).toBe(5);
       expect(
         meetingSearchDocumentService.refreshByMeetingId,
       ).toHaveBeenCalledWith('meeting-1');
-      expect(result.content).toBe('# AI 결과');
+      expect(result.content).toContain('안건 공유와 후속 작업을 정리했다.');
     });
 
     it('preserves short utterances when speaker changes in AI transcript input', async () => {
@@ -220,7 +250,16 @@ describe('ResultService', () => {
           speakerLabel: 'spk_0',
         } as TranscriptSegmentEntity,
       ]);
-      bedrockService.generateMeetingResult.mockResolvedValue('# AI 결과');
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        summary: '요약',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      });
       resultRepository.create.mockImplementation(
         (entity) => entity as ResultEntity,
       );
@@ -230,12 +269,12 @@ describe('ResultService', () => {
 
       await service.findByMeetingId('meeting-1');
 
-      const call = bedrockService.generateMeetingResult.mock.calls[0]?.[0] as
+      const call = bedrockService.extractStructuredNotes.mock.calls[0]?.[0] as
         | { transcriptText: string }
         | undefined;
       expect(call).toBeDefined();
       if (!call) {
-        throw new Error('Expected BedrockService.generateMeetingResult call');
+        throw new Error('Expected BedrockService.extractStructuredNotes call');
       }
 
       const lines = call.transcriptText.split('\n');
@@ -259,7 +298,16 @@ describe('ResultService', () => {
         content: '핵심 내용',
       } as NoteEntity);
       transcriptRepository.find.mockResolvedValue([]);
-      bedrockService.generateMeetingResult.mockResolvedValue('# 신규 결과');
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        summary: '요약',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      });
       resultRepository.create.mockImplementation(
         (entity) => entity as ResultEntity,
       );
@@ -284,6 +332,10 @@ describe('ResultService', () => {
       promptService.findById.mockResolvedValue(buildPrompt());
       noteRepository.findOne.mockResolvedValue(null);
       transcriptRepository.find.mockResolvedValue([]);
+      bedrockService.extractStructuredNotes.mockRejectedValue(
+        new Error('structured extraction failed'),
+      );
+      bedrockService.generateMeetingResult.mockResolvedValue('# 폴백 결과');
       resultRepository.create.mockImplementation(
         (entity) => entity as ResultEntity,
       );
@@ -340,6 +392,7 @@ describe('ResultService', () => {
           id: updatedPromptId,
           name: '사용자 프롬프트',
           content: '새로운 포맷으로 정리',
+          documentType: PromptDocumentType.MENTORING,
           isDefault: false,
         }),
       );
@@ -351,7 +404,23 @@ describe('ResultService', () => {
         updatedAt: new Date(),
       } as unknown as NoteEntity);
       transcriptRepository.find.mockResolvedValue([]);
-      bedrockService.generateMeetingResult.mockResolvedValue('재생성 결과');
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MENTORING,
+        summary: '실무 팁과 후속 과제를 정리했다.',
+        topics: [
+          {
+            title: '배포 구조',
+            keyPoints: ['배포 경로를 이해해야 한다'],
+            practicalTips: ['태그 전략을 먼저 정하자'],
+            followUpTasks: ['롤백 절차 문서화'],
+            researchTopics: ['Docker-in-Docker'],
+            cautions: ['근거 없는 태스크 확정 금지'],
+          },
+        ],
+        keyTakeaways: ['타입에 맞는 문서화가 중요하다'],
+        keywords: ['배포', '롤백'],
+        uncertainties: [],
+      });
       resultRepository.save.mockImplementation((entity) =>
         Promise.resolve(entity as ResultEntity),
       );
@@ -372,7 +441,9 @@ describe('ResultService', () => {
         undefined,
       );
       expect(regenerated.promptId).toBe(updatedPromptId);
-      expect(regenerated.content).toBe('재생성 결과');
+      expect(regenerated.content).toContain('## 핵심 주제');
+      expect(regenerated.content).toContain('실무 팁');
+      expect(regenerated.content).toContain('롤백 절차 문서화');
       expect(
         meetingSearchDocumentService.refreshByMeetingId,
       ).toHaveBeenCalledWith('meeting-1');

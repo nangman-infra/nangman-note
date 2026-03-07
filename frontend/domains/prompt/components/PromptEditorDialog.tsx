@@ -2,6 +2,11 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import {
+  PROMPT_DOCUMENT_TYPE_HELP_TEXT,
+  PROMPT_DOCUMENT_TYPE_LABELS,
+  type PromptDocumentType,
+} from '../types/prompt.types';
 
 const PROMPT_CONTENT_MAX_LENGTH = 12_000;
 const PROMPT_NAME_MAX_LENGTH = 100;
@@ -11,8 +16,13 @@ interface PromptEditorDialogProps {
   mode: 'create' | 'edit';
   initialName?: string;
   initialContent?: string;
+  initialDocumentType?: PromptDocumentType;
   isLoading?: boolean;
-  onSave: (name: string, content: string) => void;
+  onSave: (
+    name: string,
+    content: string,
+    documentType: PromptDocumentType,
+  ) => void;
   onCancel: () => void;
 }
 
@@ -21,12 +31,15 @@ export function PromptEditorDialog({
   mode,
   initialName = '',
   initialContent = '',
+  initialDocumentType = 'meeting',
   isLoading = false,
   onSave,
   onCancel,
 }: PromptEditorDialogProps) {
   const [name, setName] = useState(initialName);
   const [content, setContent] = useState(initialContent);
+  const [documentType, setDocumentType] =
+    useState<PromptDocumentType>(initialDocumentType);
 
   if (!open) return null;
 
@@ -35,7 +48,7 @@ export function PromptEditorDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid || isLoading) return;
-    onSave(name.trim(), content.trim());
+    onSave(name.trim(), content.trim(), documentType);
   };
 
   return (
@@ -87,22 +100,44 @@ export function PromptEditorDialog({
         </div>
 
         <div>
+          <label htmlFor="prompt-document-type" className="mb-1 block text-xs font-semibold text-muted">
+            기본 문서 타입
+          </label>
+          <select
+            id="prompt-document-type"
+            value={documentType}
+            onChange={(e) => setDocumentType(e.target.value as PromptDocumentType)}
+            className="input-shell w-full"
+            disabled={isLoading}
+          >
+            {Object.entries(PROMPT_DOCUMENT_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-muted">
+            {PROMPT_DOCUMENT_TYPE_HELP_TEXT[documentType]}
+          </p>
+        </div>
+
+        <div>
           <label htmlFor="prompt-content" className="mb-1 block text-xs font-semibold text-muted">
-            프롬프트 내용
+            추가 강조 지시
           </label>
           <textarea
             id="prompt-content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             maxLength={PROMPT_CONTENT_MAX_LENGTH}
-            placeholder={'# ROLE\n당신은...'}
+            placeholder="예: 실무 팁과 후속 과제를 더 분명하게 정리해줘"
             rows={10}
             className="input-shell w-full resize-y font-mono text-sm"
             disabled={isLoading}
           />
           <div className="mt-1 flex items-center justify-between">
             <p className="text-[11px] text-muted">
-              AI가 회의록을 생성할 때 사용할 지시사항을 작성하세요.
+              기본 타입의 구조는 유지하고, 이 프롬프트는 강조점과 표현 방식만 추가합니다.
             </p>
             <p
               className={`text-[11px] tabular-nums ${

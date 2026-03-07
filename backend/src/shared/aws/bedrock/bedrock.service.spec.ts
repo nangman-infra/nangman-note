@@ -5,6 +5,7 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import { AwsClientFactory } from '../aws-client.factory';
 import { AppEnv } from '../../config/env.validation';
+import { PromptDocumentType } from '../../../domain/prompt/domain/prompt-document-type.enum';
 import { BedrockService } from './bedrock.service';
 
 const buildConfigMap = (): AppEnv =>
@@ -28,9 +29,9 @@ const buildConfigMap = (): AppEnv =>
     CORS_ORIGIN: 'http://localhost:3000',
   }) as AppEnv;
 
-const createService = () => {
+const createService = (outputText = '# result') => {
   const send = jest.fn().mockResolvedValue({
-    output: { message: { content: [{ text: '# result' }] } },
+    output: { message: { content: [{ text: outputText }] } },
     stopReason: 'end_turn',
   });
   const mockClient = { send } as unknown as BedrockRuntimeClient;
@@ -144,5 +145,63 @@ describe('BedrockService', () => {
     expect(userText).toContain(headToken.repeat(1024));
     expect(userText).toContain(tailToken.repeat(1024));
     expect(userText).not.toContain(middleToken.repeat(2048));
+  });
+
+  it('extracts structured notes with type-specific JSON schema and modifier block', async () => {
+    const { service, send } = createService(
+      JSON.stringify({
+        documentType: 'meeting',
+        summary: '핵심 요약',
+        participants: ['택준', '희운'],
+        agendaItems: [
+          {
+            title: '가상화',
+            discussionPoints: ['전가상화와 반가상화를 비교했다'],
+            decisions: [],
+            actionItems: [
+              {
+                task: '추가 조사',
+                owner: '',
+                deadline: '',
+                priority: 'Urgent',
+              },
+            ],
+            unresolved: ['세부 설정은 추가 확인 필요'],
+          },
+        ],
+        overallDecisions: [],
+        followUps: ['추가 실습 진행'],
+        keywords: ['가상화', 'APM', '가상화'],
+        uncertainties: ['정확한 적용 방식은 후속 확인 필요'],
+      }),
+    );
+
+    const result = await service.extractStructuredNotes({
+      documentType: PromptDocumentType.MEETING,
+      promptContent: '실무 팁을 강조해줘',
+      noteContent: '중요 메모',
+      transcriptText: '발화 1\n발화 2',
+      meetingTitle: '주간 회의',
+      meetingAgenda: '가상화 학습',
+    });
+
+    const input = extractConverseInput(send);
+    const systemText = input.system?.[0]?.text ?? '';
+    const userText = input.messages?.[0]?.content?.[0]?.text ?? '';
+    const inferenceConfig = input.inferenceConfig ?? {};
+
+    expect(systemText).toContain('"documentType": "meeting"');
+    expect(userText).toContain('## 추가 강조 지시');
+    expect(userText).toContain('```prompt-modifier');
+    expect(inferenceConfig.temperature).toBe(0.1);
+    expect(result.documentType).toBe(PromptDocumentType.MEETING);
+    expect(result.summary).toBe('핵심 요약');
+    expect(result.keywords).toEqual(['가상화', 'APM']);
+    expect(result.agendaItems[0]?.actionItems[0]).toEqual({
+      task: '추가 조사',
+      owner: '미정',
+      deadline: '미정',
+      priority: 'Medium',
+    });
   });
 });

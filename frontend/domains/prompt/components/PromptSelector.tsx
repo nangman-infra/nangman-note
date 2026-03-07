@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, Edit3, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react';
 import { usePrompt } from '../hooks/usePrompt';
 import { PromptEditorDialog } from './PromptEditorDialog';
+import {
+  PROMPT_DOCUMENT_TYPE_LABELS,
+  type PromptDocumentType,
+} from '../types/prompt.types';
 
 interface PromptSelectorProps {
   onChange?: (promptId: string) => void;
@@ -28,6 +32,8 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
   const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
   const [editorInitialName, setEditorInitialName] = useState('');
   const [editorInitialContent, setEditorInitialContent] = useState('');
+  const [editorInitialDocumentType, setEditorInitialDocumentType] =
+    useState<PromptDocumentType>('meeting');
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -41,24 +47,35 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
     setEditingPromptId(null);
     setEditorInitialName('');
     setEditorInitialContent('');
+    setEditorInitialDocumentType('meeting');
     setEditorOpen(true);
   };
 
-  const openEdit = (prompt: { id: string; name: string; content: string }) => {
+  const openEdit = (prompt: {
+    id: string;
+    name: string;
+    content: string;
+    documentType: PromptDocumentType;
+  }) => {
     setEditorMode('edit');
     setEditingPromptId(prompt.id);
     setEditorInitialName(prompt.name);
     setEditorInitialContent(prompt.content);
+    setEditorInitialDocumentType(prompt.documentType);
     setEditorOpen(true);
   };
 
-  const handleSave = async (name: string, content: string) => {
+  const handleSave = async (
+    name: string,
+    content: string,
+    documentType: PromptDocumentType,
+  ) => {
     setIsSaving(true);
     try {
       if (editorMode === 'create') {
-        await createPrompt({ name, content });
+        await createPrompt({ name, content, documentType });
       } else if (editingPromptId) {
-        await updatePrompt(editingPromptId, { name, content });
+        await updatePrompt(editingPromptId, { name, content, documentType });
       }
       setEditorOpen(false);
     } finally {
@@ -125,6 +142,9 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
                         {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                       </span>
                       <span className="text-sm font-medium">{prompt.name}</span>
+                      <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
+                        {PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       {prompt.isDefault ? (
@@ -187,6 +207,7 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
         mode={editorMode}
         initialName={editorInitialName}
         initialContent={editorInitialContent}
+        initialDocumentType={editorInitialDocumentType}
         isLoading={isSaving}
         onSave={handleSave}
         onCancel={() => setEditorOpen(false)}

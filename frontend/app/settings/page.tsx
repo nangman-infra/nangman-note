@@ -8,6 +8,11 @@ import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types'
 import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
 import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { PromptEditorDialog } from '@/domains/prompt/components/PromptEditorDialog';
+import {
+  PROMPT_DOCUMENT_TYPE_HELP_TEXT,
+  PROMPT_DOCUMENT_TYPE_LABELS,
+  type PromptDocumentType,
+} from '@/domains/prompt/types/prompt.types';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -37,6 +42,8 @@ export default function SettingsPage() {
   const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
   const [editorInitialName, setEditorInitialName] = useState('');
   const [editorInitialContent, setEditorInitialContent] = useState('');
+  const [editorInitialDocumentType, setEditorInitialDocumentType] =
+    useState<PromptDocumentType>('meeting');
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -45,22 +52,33 @@ export default function SettingsPage() {
     setEditingPromptId(null);
     setEditorInitialName('');
     setEditorInitialContent('');
+    setEditorInitialDocumentType('meeting');
     setEditorOpen(true);
   };
 
-  const openEdit = (prompt: { id: string; name: string; content: string }) => {
+  const openEdit = (prompt: {
+    id: string;
+    name: string;
+    content: string;
+    documentType: PromptDocumentType;
+  }) => {
     setEditorMode('edit');
     setEditingPromptId(prompt.id);
     setEditorInitialName(prompt.name);
     setEditorInitialContent(prompt.content);
+    setEditorInitialDocumentType(prompt.documentType);
     setEditorOpen(true);
   };
 
-  const handleSave = async (name: string, content: string) => {
+  const handleSave = async (
+    name: string,
+    content: string,
+    documentType: PromptDocumentType,
+  ) => {
     setIsSaving(true);
     try {
       if (editorMode === 'create') {
-        const success = await createPrompt({ name, content });
+        const success = await createPrompt({ name, content, documentType });
         if (!success) {
           pushToast({
             title: '프롬프트 생성에 실패했습니다',
@@ -71,7 +89,11 @@ export default function SettingsPage() {
         }
         pushToast({ title: '프롬프트가 생성되었습니다', variant: 'success' });
       } else if (editingPromptId) {
-        const success = await updatePrompt(editingPromptId, { name, content });
+        const success = await updatePrompt(editingPromptId, {
+          name,
+          content,
+          documentType,
+        });
         if (!success) {
           pushToast({
             title: '프롬프트 수정에 실패했습니다',
@@ -207,10 +229,15 @@ export default function SettingsPage() {
         {/* 프롬프트 관리 */}
         <section className="glass-surface p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Sparkles className="h-5 w-5 text-brand" />
-              프롬프트 관리
-            </h2>
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <Sparkles className="h-5 w-5 text-brand" />
+                프롬프트 관리
+              </h2>
+              <p className="mt-1 text-[11px] text-muted">
+                기본 타입이 문서 구조를 정하고, 사용자 프롬프트는 추가 강조와 표현 방식만 덧붙입니다.
+              </p>
+            </div>
             <button
               type="button"
               onClick={openCreate}
@@ -231,6 +258,9 @@ export default function SettingsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium">{prompt.name}</p>
+                    <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
+                      {PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}
+                    </span>
                     {prompt.isDefault && (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-muted">
                         기본
@@ -238,6 +268,9 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs text-muted">{prompt.content}</p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {PROMPT_DOCUMENT_TYPE_HELP_TEXT[prompt.documentType]}
+                  </p>
                 </div>
 
                 {!prompt.isDefault && (
@@ -288,6 +321,7 @@ export default function SettingsPage() {
         mode={editorMode}
         initialName={editorInitialName}
         initialContent={editorInitialContent}
+        initialDocumentType={editorInitialDocumentType}
         isLoading={isSaving}
         onSave={handleSave}
         onCancel={() => setEditorOpen(false)}

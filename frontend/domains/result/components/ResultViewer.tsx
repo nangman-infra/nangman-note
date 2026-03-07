@@ -7,6 +7,7 @@ import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
+import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/domains/prompt/types/prompt.types';
 import { useResult } from '../hooks/useResult';
 import {
   resultTabDataApi,
@@ -19,6 +20,7 @@ interface ResultViewerProps {
   promptOptions?: Array<{
     id: string;
     name: string;
+    documentType: 'meeting' | 'lecture' | 'mentoring';
     isDefault?: boolean;
   }>;
 }
@@ -126,7 +128,11 @@ export function ResultViewer({
     onMeetingUnavailable?.(meetingId);
   }, [isMissingMeeting, meetingId, onMeetingUnavailable, pushToast]);
 
-  const resolvedRegeneratePromptId = regeneratePromptId || promptOptions[0]?.id || '';
+  const resolvedRegeneratePromptId =
+    regeneratePromptId || result?.promptId || promptOptions[0]?.id || '';
+  const selectedRegeneratePrompt = promptOptions.find(
+    (prompt) => prompt.id === resolvedRegeneratePromptId,
+  );
   const isCurrentTabData = tabDataMeetingId === meetingId;
   const visibleTranscripts = isCurrentTabData ? transcripts : [];
   const visibleNoteContent = isCurrentTabData ? noteContent : '';
@@ -407,7 +413,7 @@ export function ResultViewer({
                 >
                   {promptOptions.map((prompt) => (
                     <option key={prompt.id} value={prompt.id}>
-                      {prompt.name}
+                      {prompt.name} · {PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}
                       {prompt.isDefault ? ' (기본)' : ''}
                     </option>
                   ))}
@@ -421,6 +427,13 @@ export function ResultViewer({
                   className="input-shell"
                 />
               )}
+              {selectedRegeneratePrompt ? (
+                <p className="text-[11px] text-muted">
+                  기본 타입은{' '}
+                  {PROMPT_DOCUMENT_TYPE_LABELS[selectedRegeneratePrompt.documentType]}
+                  {' '}구조를 사용하고, 사용자 프롬프트는 추가 강조만 반영합니다.
+                </p>
+              ) : null}
               <div className="flex gap-2">
                 <button
                   type="button"

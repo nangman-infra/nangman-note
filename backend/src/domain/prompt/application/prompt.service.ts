@@ -81,6 +81,7 @@ export class PromptService implements OnModuleInit {
       ownerSub: ownerSub?.trim() || undefined,
       name: dto.name.trim(),
       content: dto.content.trim(),
+      documentType: dto.documentType,
       isDefault: false,
     });
 
@@ -104,6 +105,10 @@ export class PromptService implements OnModuleInit {
 
     if (dto.content !== undefined) {
       existing.content = dto.content.trim();
+    }
+
+    if (dto.documentType !== undefined) {
+      existing.documentType = dto.documentType;
     }
 
     return this.promptRepository.save(existing);

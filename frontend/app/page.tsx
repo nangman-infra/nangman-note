@@ -69,6 +69,7 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
             promptOptions={prompts.map((prompt) => ({
               id: prompt.id,
               name: prompt.name,
+              documentType: prompt.documentType,
               isDefault: prompt.isDefault,
             }))}
           />

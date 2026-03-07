@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { DEFAULT_PROMPTS } from '../domain/default-prompts';
+import { PromptDocumentType } from '../domain/prompt-document-type.enum';
 import { PromptEntity } from '../domain/prompt.entity';
 import { PromptService } from './prompt.service';
 
@@ -18,6 +19,7 @@ describe('PromptService', () => {
       id: 'prompt_user_123',
       name: '사용자 프롬프트',
       content: '내용',
+      documentType: PromptDocumentType.MEETING,
       isDefault: false,
       createdAt: new Date('2026-03-01T00:00:00.000Z'),
       updatedAt: new Date('2026-03-01T00:00:00.000Z'),
@@ -71,6 +73,7 @@ describe('PromptService', () => {
     const result = await service.create({
       name: '  trimmed name  ',
       content: '  trimmed content  ',
+      documentType: PromptDocumentType.LECTURE,
     });
 
     expect(promptRepository.create).toHaveBeenCalledTimes(1);
@@ -78,11 +81,13 @@ describe('PromptService', () => {
       id: string;
       name: string;
       content: string;
+      documentType: PromptDocumentType;
       isDefault: boolean;
     };
     expect(createArg.id).toMatch(/^prompt_user_/);
     expect(createArg.name).toBe('trimmed name');
     expect(createArg.content).toBe('trimmed content');
+    expect(createArg.documentType).toBe(PromptDocumentType.LECTURE);
     expect(createArg.isDefault).toBe(false);
     expect(result).toEqual(created);
   });
@@ -113,6 +118,7 @@ describe('PromptService', () => {
     const saved = buildPrompt({
       name: 'updated',
       content: 'updated content',
+      documentType: PromptDocumentType.MENTORING,
     });
     promptRepository.findOne.mockResolvedValue(existing);
     promptRepository.save.mockResolvedValue(saved);
@@ -120,6 +126,7 @@ describe('PromptService', () => {
     const result = await service.update(existing.id, {
       name: '  updated  ',
       content: '  updated content  ',
+      documentType: PromptDocumentType.MENTORING,
     });
 
     expect(promptRepository.save).toHaveBeenCalledWith(
@@ -127,6 +134,7 @@ describe('PromptService', () => {
         id: existing.id,
         name: 'updated',
         content: 'updated content',
+        documentType: PromptDocumentType.MENTORING,
       }),
     );
     expect(result).toEqual(saved);

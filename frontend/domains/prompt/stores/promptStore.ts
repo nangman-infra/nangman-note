@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { promptApi } from '../api/promptApi';
 import type { CreatePromptDto, Prompt } from '../types/prompt.types';
 
+const DEFAULT_MEETING_PROMPT_ID = 'prompt_default_meeting';
+
 interface PromptState {
   prompts: Prompt[];
   selectedPromptId: string;
@@ -19,7 +21,7 @@ export const usePromptStore = create<PromptState>()(
   persist(
     (set) => ({
       prompts: [],
-      selectedPromptId: 'prompt_default_meeting',
+      selectedPromptId: DEFAULT_MEETING_PROMPT_ID,
       isLoading: false,
       error: null,
 
@@ -31,13 +33,15 @@ export const usePromptStore = create<PromptState>()(
             const hasSelected = prompts.some(
               (prompt) => prompt.id === state.selectedPromptId,
             );
-            const defaultPrompt = prompts.find((prompt) => prompt.isDefault);
+            const defaultPrompt =
+              prompts.find((prompt) => prompt.id === DEFAULT_MEETING_PROMPT_ID) ??
+              prompts.find((prompt) => prompt.isDefault);
 
             return {
               prompts,
               selectedPromptId: hasSelected
                 ? state.selectedPromptId
-                : (defaultPrompt?.id ?? 'prompt_default_meeting'),
+                : (defaultPrompt?.id ?? DEFAULT_MEETING_PROMPT_ID),
               isLoading: false,
             };
           });
@@ -95,8 +99,11 @@ export const usePromptStore = create<PromptState>()(
             prompts: state.prompts.filter((prompt) => prompt.id !== id),
             selectedPromptId:
               state.selectedPromptId === id
-                ? (state.prompts.find((prompt) => prompt.isDefault)?.id ??
-                  'prompt_default_meeting')
+                ? (state.prompts.find(
+                    (prompt) => prompt.id === DEFAULT_MEETING_PROMPT_ID,
+                  )?.id ??
+                  state.prompts.find((prompt) => prompt.isDefault)?.id ??
+                  DEFAULT_MEETING_PROMPT_ID)
                 : state.selectedPromptId,
             isLoading: false,
           }));

@@ -18,6 +18,7 @@ import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { NoteEntity } from '../../note/domain/note.entity';
 import { PromptService } from '../../prompt/application/prompt.service';
 import { PromptEntity } from '../../prompt/domain/prompt.entity';
+import { PromptDocumentType } from '../../prompt/domain/prompt-document-type.enum';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
 import { RegenerateResultDto } from './dto/regenerate-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
@@ -25,6 +26,12 @@ import { ResultEntity } from '../domain/result.entity';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
+import type {
+  StructuredLectureExtraction,
+  StructuredMeetingExtraction,
+  StructuredMentoringExtraction,
+  StructuredNoteExtraction,
+} from '../../../shared/aws/bedrock/bedrock.types';
 
 type ExportFormat = 'pdf' | 'docx' | 'md';
 type AiTranscriptSegment = {
@@ -449,8 +456,63 @@ export class ResultService {
   }): Promise<string> {
     const { meeting, prompt, noteContent, transcripts } = params;
 
+    const transcriptText = this.buildTranscriptTextForAI(transcripts);
+
+    try {
+      const extracted = await this.bedrockService.extractStructuredNotes({
+        documentType: prompt.documentType,
+        promptContent: prompt.content.trim(),
+        noteContent: noteContent || '',
+        transcriptText,
+        meetingTitle: meeting.title?.trim(),
+        meetingAgenda: meeting.agenda?.trim(),
+      });
+      const aiContent = this.renderStructuredMarkdown({
+        meeting,
+        documentType: prompt.documentType,
+        extracted,
+      });
+
+      if (aiContent && aiContent.trim().length > 0) {
+        return aiContent;
+      }
+
+      this.logger.warn(
+        `Structured extraction rendered empty content for meeting ${meeting.id}, trying legacy fallback`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Structured extraction failed for meeting ${meeting.id}: ${error instanceof Error ? error.message : 'Unknown error'}. Trying legacy fallback.`,
+      );
+    }
+
+    try {
+      const legacyContent = await this.bedrockService.generateMeetingResult({
+        promptContent: prompt.content.trim(),
+        noteContent: noteContent || '',
+        transcriptText,
+        meetingTitle: meeting.title?.trim(),
+        meetingAgenda: meeting.agenda?.trim(),
+      });
+
+      if (legacyContent && legacyContent.trim().length > 0) {
+        return legacyContent;
+      }
+    } catch (error) {
+      this.logger.error(
+        `Legacy Bedrock generation failed for meeting ${meeting.id}: ${error instanceof Error ? error.message : 'Unknown error'}. Using fallback template.`,
+      );
+    }
+
+    return this.buildFallbackContent(params);
+  }
+
+  private buildTranscriptTextForAI(
+    transcripts: TranscriptSegmentEntity[],
+  ): string {
     const preprocessed = this.preprocessTranscriptsForAI(transcripts);
-    const transcriptText = preprocessed
+
+    return preprocessed
       .filter((segment) => segment.text.length > 0)
       .map((segment) => {
         const speakerPrefix = segment.speakerLabel
@@ -459,30 +521,225 @@ export class ResultService {
         return `[${segment.startTime.toFixed(1)}s ~ ${segment.endTime.toFixed(1)}s] ${speakerPrefix}${segment.text}`;
       })
       .join('\n');
+  }
 
-    try {
-      const aiContent = await this.bedrockService.generateMeetingResult({
-        promptContent: prompt.content.trim(),
-        noteContent: noteContent || '',
-        transcriptText,
-        meetingTitle: meeting.title?.trim(),
-        meetingAgenda: meeting.agenda?.trim(),
-      });
+  private renderStructuredMarkdown(params: {
+    meeting: MeetingEntity;
+    documentType: PromptDocumentType;
+    extracted: StructuredNoteExtraction;
+  }): string {
+    const { meeting, documentType, extracted } = params;
 
-      if (aiContent && aiContent.trim().length > 0) {
-        return aiContent;
-      }
-
-      this.logger.warn(
-        `Bedrock returned empty content for meeting ${meeting.id}, using fallback`,
+    if (documentType === PromptDocumentType.MEETING) {
+      return this.renderMeetingMarkdown(
+        meeting,
+        extracted as StructuredMeetingExtraction,
       );
-      return this.buildFallbackContent(params);
-    } catch (error) {
-      this.logger.error(
-        `Bedrock generation failed for meeting ${meeting.id}: ${error instanceof Error ? error.message : 'Unknown error'}. Using fallback template.`,
-      );
-      return this.buildFallbackContent(params);
     }
+
+    if (documentType === PromptDocumentType.LECTURE) {
+      return this.renderLectureMarkdown(
+        meeting,
+        extracted as StructuredLectureExtraction,
+      );
+    }
+
+    return this.renderMentoringMarkdown(
+      meeting,
+      extracted as StructuredMentoringExtraction,
+    );
+  }
+
+  private renderMeetingMarkdown(
+    meeting: MeetingEntity,
+    extracted: StructuredMeetingExtraction,
+  ): string {
+    const title = meeting.title?.trim() || '제목 없는 회의';
+    const agendaSections =
+      extracted.agendaItems.length > 0
+        ? extracted.agendaItems.flatMap((item, index) => [
+            `### 안건 ${index + 1}: ${item.title}`,
+            '',
+            '**핵심 논의:**',
+            this.renderBulletList(item.discussionPoints, '주요 논의 추출 없음'),
+            '',
+            '**결정사항:**',
+            this.renderBulletList(item.decisions, '확정된 결정 없음'),
+            '',
+            '**액션 아이템:**',
+            this.renderActionItems(item.actionItems),
+            '',
+            '**미해결 사항:**',
+            this.renderBulletList(item.unresolved, '없음'),
+            '',
+          ])
+        : ['- 안건별 논의가 추출되지 않았습니다.', ''];
+
+    const totalActionItems = extracted.agendaItems.reduce(
+      (sum, item) => sum + item.actionItems.length,
+      0,
+    );
+
+    return [
+      `# ${title}`,
+      '',
+      '## 참여자',
+      this.renderBulletList(extracted.participants, '확인 불가'),
+      '',
+      '## 회의 개요',
+      extracted.summary || '_요약 추출 없음_',
+      '',
+      '## 안건별 논의',
+      ...agendaSections,
+      '## 전체 요약',
+      '**주요 결정:**',
+      this.renderBulletList(extracted.overallDecisions, '확정된 결정 없음'),
+      '',
+      `**총 액션 아이템:** ${totalActionItems}개`,
+      '',
+      '**후속 안건:**',
+      this.renderBulletList(extracted.followUps, '없음'),
+      '',
+      '## 핵심 키워드',
+      this.renderKeywordLine(extracted.keywords),
+      '',
+      '## 확인 필요 / 불확실',
+      this.renderBulletList(extracted.uncertainties, '없음'),
+    ].join('\n');
+  }
+
+  private renderLectureMarkdown(
+    meeting: MeetingEntity,
+    extracted: StructuredLectureExtraction,
+  ): string {
+    const title = meeting.title?.trim() || '제목 없는 강의';
+    const concepts =
+      extracted.concepts.length > 0
+        ? extracted.concepts.flatMap((concept, index) => [
+            `### ${index + 1}. ${concept.name}`,
+            `- **정의:** ${concept.definition || '정의 추출 없음'}`,
+            `- **예시:** ${concept.example || '예시 추출 없음'}`,
+            `- **핵심 포인트:** ${this.renderInlineList(concept.keyPoints, '핵심 포인트 추출 없음')}`,
+            '',
+          ])
+        : ['- 핵심 개념 추출 없음', ''];
+
+    return [
+      `# ${title}`,
+      '',
+      '## 강의 요약',
+      extracted.summary || '_요약 추출 없음_',
+      '',
+      '## 핵심 개념',
+      ...concepts,
+      '## 실습 및 적용',
+      this.renderBulletList(extracted.practiceItems, '실습/과제 추출 없음'),
+      '',
+      '## 기억해야 할 5가지',
+      this.renderOrderedList(extracted.keyTakeaways, 5),
+      '',
+      '## 핵심 키워드',
+      this.renderKeywordLine(extracted.keywords),
+      '',
+      '## 확인 필요 / 불확실',
+      this.renderBulletList(extracted.uncertainties, '없음'),
+    ].join('\n');
+  }
+
+  private renderMentoringMarkdown(
+    meeting: MeetingEntity,
+    extracted: StructuredMentoringExtraction,
+  ): string {
+    const title = meeting.title?.trim() || '제목 없는 멘토링';
+    const topicSections =
+      extracted.topics.length > 0
+        ? extracted.topics.flatMap((topic, index) => [
+            `### 주제 ${index + 1}: ${topic.title}`,
+            '',
+            '**핵심 포인트:**',
+            this.renderBulletList(topic.keyPoints, '핵심 포인트 추출 없음'),
+            '',
+            '**실무 팁:**',
+            this.renderBulletList(topic.practicalTips, '실무 팁 추출 없음'),
+            '',
+            '**후속 과제:**',
+            this.renderBulletList(topic.followUpTasks, '후속 과제 없음'),
+            '',
+            '**추가 조사 키워드:**',
+            this.renderBulletList(topic.researchTopics, '추가 조사 항목 없음'),
+            '',
+            '**주의할 점:**',
+            this.renderBulletList(topic.cautions, '없음'),
+            '',
+          ])
+        : ['- 핵심 주제 추출 없음', ''];
+
+    return [
+      `# ${title}`,
+      '',
+      '## 세션 요약',
+      extracted.summary || '_요약 추출 없음_',
+      '',
+      '## 핵심 주제',
+      ...topicSections,
+      '## 오늘 가져갈 것',
+      this.renderBulletList(extracted.keyTakeaways, '핵심 정리 없음'),
+      '',
+      '## 핵심 키워드',
+      this.renderKeywordLine(extracted.keywords),
+      '',
+      '## 팩트체크 필요 / 불확실',
+      this.renderBulletList(extracted.uncertainties, '없음'),
+    ].join('\n');
+  }
+
+  private renderBulletList(items: string[], emptyText: string): string {
+    if (items.length === 0) {
+      return `- ${emptyText}`;
+    }
+
+    return items.map((item) => `- ${item}`).join('\n');
+  }
+
+  private renderOrderedList(items: string[], limit: number): string {
+    const source = items.slice(0, limit);
+    if (source.length === 0) {
+      return Array.from({ length: limit }, (_, index) => `${index + 1}. ...`).join(
+        '\n',
+      );
+    }
+
+    return source
+      .map((item, index) => `${index + 1}. ${item}`)
+      .concat(
+        Array.from({ length: Math.max(0, limit - source.length) }, (_, index) =>
+          `${source.length + index + 1}. ...`,
+        ),
+      )
+      .join('\n');
+  }
+
+  private renderActionItems(
+    items: StructuredMeetingExtraction['agendaItems'][number]['actionItems'],
+  ): string {
+    if (items.length === 0) {
+      return '- 작업: 없음 / 담당: 미정 / 마감: 미정 / 우선순위: Medium';
+    }
+
+    return items
+      .map(
+        (item) =>
+          `- 작업: ${item.task} / 담당: ${item.owner} / 마감: ${item.deadline} / 우선순위: ${item.priority}`,
+      )
+      .join('\n');
+  }
+
+  private renderKeywordLine(keywords: string[]): string {
+    return keywords.length > 0 ? keywords.join(', ') : '_핵심 키워드 추출 없음_';
+  }
+
+  private renderInlineList(items: string[], emptyText: string): string {
+    return items.length > 0 ? items.join('; ') : emptyText;
   }
 
   private buildEmptyContentNotice(meeting: MeetingEntity): string {

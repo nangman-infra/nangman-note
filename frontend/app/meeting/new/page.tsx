@@ -19,6 +19,10 @@ import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types'
 import { usePromptStore } from '@/domains/prompt/stores/promptStore';
 import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
+import {
+  PROMPT_DOCUMENT_TYPE_HELP_TEXT,
+  PROMPT_DOCUMENT_TYPE_LABELS,
+} from '@/domains/prompt/types/prompt.types';
 
 export default function NewMeetingPage() {
   const router = useRouter();
@@ -181,12 +185,16 @@ export default function NewMeetingPage() {
                 >
                   {prompts.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name}{p.isDefault ? ' (기본)' : ''}
+                      {p.name} · {PROMPT_DOCUMENT_TYPE_LABELS[p.documentType]}
+                      {p.isDefault ? ' (기본)' : ''}
                     </option>
                   ))}
                 </select>
                 <p className="mt-1 text-[11px] text-muted">
-                  현재: {selectedPrompt?.name || '회의록'}
+                  현재: {selectedPrompt?.name || '회의'}
+                  {selectedPrompt
+                    ? ` · ${PROMPT_DOCUMENT_TYPE_LABELS[selectedPrompt.documentType]}`
+                    : ''}
                   {' · '}
                   <button
                     type="button"
@@ -195,6 +203,11 @@ export default function NewMeetingPage() {
                   >
                     프롬프트 관리
                   </button>
+                </p>
+                <p className="mt-1 text-[11px] text-muted">
+                  {selectedPrompt
+                    ? `${PROMPT_DOCUMENT_TYPE_HELP_TEXT[selectedPrompt.documentType]} 사용자 프롬프트는 이 기본 구조 위에 추가 강조만 적용됩니다.`
+                    : '기본 문서 타입이 결과 구조를 정하고, 사용자 프롬프트는 추가 강조만 적용됩니다.'}
                 </p>
               </div>
 

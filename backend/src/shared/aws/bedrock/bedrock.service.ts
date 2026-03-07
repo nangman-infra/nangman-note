@@ -8,6 +8,17 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import { AwsClientFactory } from '../aws-client.factory';
 import { AppEnv } from '../../config/env.validation';
+import { PromptDocumentType } from '../../../domain/prompt/domain/prompt-document-type.enum';
+import type {
+  StructuredActionItem,
+  StructuredLectureConcept,
+  StructuredLectureExtraction,
+  StructuredMeetingAgendaItem,
+  StructuredMeetingExtraction,
+  StructuredMentoringExtraction,
+  StructuredMentoringTopic,
+  StructuredNoteExtraction,
+} from './bedrock.types';
 
 const MAX_TRANSCRIPT_CHARS = 200_000;
 const TRANSCRIPT_HEAD_CHARS = 110_000;
@@ -37,7 +48,8 @@ export class BedrockService {
   }
 
   /**
-   * 프롬프트 + 노트 + 전사 텍스트를 Nova Pro에 보내 회의록을 생성합니다.
+   * 레거시 단일 단계 생성 경로.
+   * 구조화 추출에 실패했을 때만 최후의 폴백으로 사용합니다.
    */
   async generateMeetingResult(params: {
     promptContent: string;
@@ -57,10 +69,10 @@ export class BedrockService {
     const systemPrompt: SystemContentBlock[] = [
       {
         text: [
-          '당신은 숙련된 회의록·강의노트·세미나 리포트 작성 전문 AI입니다.',
+          '당신은 숙련된 회의록·강의노트·멘토링 노트 작성 전문 AI입니다.',
           '',
           '## 맥락',
-          '- 음성 회의/강의/세미나의 전사 데이터와 사용자 노트가 제공됩니다.',
+          '- 음성 회의/강의/멘토링 세션의 전사 데이터와 사용자 노트가 제공됩니다.',
           '- 전사에는 음성 인식 오류, 필러(어, 음, 아), 잡담이 포함될 수 있습니다.',
           '',
           '## 목표',
@@ -88,7 +100,7 @@ export class BedrockService {
       },
     ];
 
-    const userContent = this.buildUserContent({
+    const userContent = this.buildLegacyGenerationUserContent({
       promptContent,
       noteContent,
       transcriptText,
@@ -141,7 +153,74 @@ export class BedrockService {
     }
   }
 
-  private buildUserContent(params: {
+  async extractStructuredNotes(params: {
+    documentType: PromptDocumentType;
+    promptContent: string;
+    noteContent: string;
+    transcriptText: string;
+    meetingTitle?: string;
+    meetingAgenda?: string;
+  }): Promise<StructuredNoteExtraction> {
+    const {
+      documentType,
+      promptContent,
+      noteContent,
+      transcriptText,
+      meetingTitle,
+      meetingAgenda,
+    } = params;
+
+    const systemPrompt: SystemContentBlock[] = [
+      {
+        text: this.buildExtractionSystemPrompt(documentType),
+      },
+    ];
+
+    const userContent = this.buildExtractionUserContent({
+      promptContent,
+      noteContent,
+      transcriptText,
+      meetingTitle,
+      meetingAgenda,
+    });
+
+    const messages: Message[] = [
+      {
+        role: 'user',
+        content: [{ text: userContent }],
+      },
+    ];
+
+    const command = new ConverseCommand({
+      modelId: this.modelId,
+      system: systemPrompt,
+      messages,
+      inferenceConfig: {
+        maxTokens: this.maxTokens,
+        temperature: 0.1,
+        topP: 0.9,
+      },
+    });
+
+    const response = await this.client.send(command);
+    const outputText = response.output?.message?.content?.[0]?.text ?? '';
+
+    if (!outputText.trim()) {
+      throw new Error('Bedrock returned empty structured extraction response');
+    }
+
+    const parsed = this.parseJsonObject(outputText);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Bedrock structured extraction did not return valid JSON');
+    }
+
+    return this.normalizeStructuredNotes(
+      parsed as Record<string, unknown>,
+      documentType,
+    );
+  }
+
+  private buildLegacyGenerationUserContent(params: {
     promptContent: string;
     noteContent: string;
     transcriptText: string;
@@ -156,21 +235,12 @@ export class BedrockService {
       meetingAgenda,
     } = params;
 
-    const sections: string[] = [];
-
-    if (meetingTitle) {
-      sections.push(`## 회의 제목\n${meetingTitle}`);
-    }
-
-    if (meetingAgenda) {
-      sections.push(
-        `## 회의 아젠다\n${meetingAgenda}\n\n> 위 아젠다를 안건 분리의 기준으로 활용하세요. 아젠다에 없는 추가 논의가 있으면 별도 안건으로 추가하세요.`,
-      );
-    } else {
-      sections.push(
-        '## 회의 아젠다\n_아젠다가 제공되지 않았습니다._\n\n> 전사 데이터에서 주제 전환 지점을 자율적으로 파악하여 안건을 분리하세요.',
-      );
-    }
+    const sections = this.buildSourceSections({
+      noteContent,
+      transcriptText,
+      meetingTitle,
+      meetingAgenda,
+    });
 
     sections.push(
       [
@@ -180,6 +250,61 @@ export class BedrockService {
         '```',
       ].join('\n'),
     );
+
+    sections.push(
+      '위 정보를 기반으로 프롬프트 지시에 따라 구조화된 회의록을 Markdown으로 작성하세요.',
+    );
+
+    return sections.join('\n\n');
+  }
+
+  private buildExtractionUserContent(params: {
+    promptContent: string;
+    noteContent: string;
+    transcriptText: string;
+    meetingTitle?: string;
+    meetingAgenda?: string;
+  }): string {
+    const sections = this.buildSourceSections(params);
+
+    sections.push(
+      [
+        '## 추가 강조 지시',
+        '```prompt-modifier',
+        params.promptContent.trim() || '_추가 지시 없음_',
+        '```',
+      ].join('\n'),
+    );
+
+    sections.push(
+      '위 정보를 바탕으로 시스템 프롬프트에 정의된 JSON 스키마만 출력하세요. Markdown이나 설명 문장은 절대 출력하지 마세요.',
+    );
+
+    return sections.join('\n\n');
+  }
+
+  private buildSourceSections(params: {
+    noteContent: string;
+    transcriptText: string;
+    meetingTitle?: string;
+    meetingAgenda?: string;
+  }): string[] {
+    const { noteContent, transcriptText, meetingTitle, meetingAgenda } = params;
+    const sections: string[] = [];
+
+    if (meetingTitle) {
+      sections.push(`## 회의 제목\n${meetingTitle}`);
+    }
+
+    if (meetingAgenda) {
+      sections.push(
+        `## 회의 아젠다\n${meetingAgenda}\n\n> 위 아젠다를 문맥 파악의 참고 정보로 활용하세요. 아젠다에 없는 논의가 있으면 별도 주제로 분리하세요.`,
+      );
+    } else {
+      sections.push(
+        '## 회의 아젠다\n_아젠다가 제공되지 않았습니다._\n\n> 전사 데이터에서 주제 전환 지점을 자율적으로 파악하세요.',
+      );
+    }
 
     if (noteContent.trim()) {
       sections.push(
@@ -212,17 +337,13 @@ export class BedrockService {
         [
           '## 전사 데이터',
           '```transcript-data',
-          '_수집된 전사 데이터가 없습니다. 노트 기반으로만 회의록을 생성하세요._',
+          '_수집된 전사 데이터가 없습니다. 노트 기반으로만 추출하세요._',
           '```',
         ].join('\n'),
       );
     }
 
-    sections.push(
-      '위 정보를 기반으로 프롬프트 지시에 따라 구조화된 회의록을 Markdown으로 작성하세요.',
-    );
-
-    return sections.join('\n\n');
+    return sections;
   }
 
   private trimTranscriptForPrompt(transcriptText: string): string {
@@ -243,5 +364,356 @@ export class BedrockService {
       '',
       '... (전사 텍스트가 길어 앞/뒤 핵심 구간만 포함되었습니다)',
     ].join('\n');
+  }
+
+  private buildExtractionSystemPrompt(
+    documentType: PromptDocumentType,
+  ): string {
+    const sharedRules = [
+      '당신은 음성 전사와 사용자 노트에서 사실만 추출하는 구조화 분석기입니다.',
+      '- 반드시 JSON 객체 하나만 출력합니다. Markdown, 설명, 코드블록, 주석을 출력하지 않습니다.',
+      '- 전사/노트에 근거가 없는 정보는 추정하지 않습니다.',
+      '- 애매한 내용은 빈 배열로 두거나 uncertainties에 넣습니다.',
+      '- 담당자, 마감, 결정사항은 명시적 근거가 있을 때만 기록합니다.',
+      '- 화자의 설명, 예시, 농담, 질문, 브레인스토밍을 확정 사항으로 바꾸지 않습니다.',
+      '- 배열 값은 중복 없이 짧고 명확한 한국어 문장으로 작성합니다.',
+      '- actionItems.owner, actionItems.deadline은 불명확하면 "미정"으로 둡니다.',
+      '- actionItems.priority는 High, Medium, Low 중 하나만 사용합니다.',
+    ];
+
+    if (documentType === PromptDocumentType.MEETING) {
+      return [
+        ...sharedRules,
+        '- 회의 타입에서는 주제별 논의, 결정사항, 액션 아이템, 미해결 사항을 우선 추출합니다.',
+        '- 설명성 발화나 조사 권고를 액션 아이템으로 오인하지 않습니다.',
+        '아래 JSON 스키마만 사용하세요:',
+        '{',
+        '  "documentType": "meeting",',
+        '  "summary": "string",',
+        '  "participants": ["string"],',
+        '  "agendaItems": [',
+        '    {',
+        '      "title": "string",',
+        '      "discussionPoints": ["string"],',
+        '      "decisions": ["string"],',
+        '      "actionItems": [',
+        '        {',
+        '          "task": "string",',
+        '          "owner": "string",',
+        '          "deadline": "string",',
+        '          "priority": "High"',
+        '        }',
+        '      ],',
+        '      "unresolved": ["string"]',
+        '    }',
+        '  ],',
+        '  "overallDecisions": ["string"],',
+        '  "followUps": ["string"],',
+        '  "keywords": ["string"],',
+        '  "uncertainties": ["string"]',
+        '}',
+      ].join('\n');
+    }
+
+    if (documentType === PromptDocumentType.LECTURE) {
+      return [
+        ...sharedRules,
+        '- 강의 타입에서는 개념, 정의, 예시, 복습 포인트, 실제 실습/과제를 우선 추출합니다.',
+        '- 강의형 설명을 업무 태스크로 바꾸지 않습니다.',
+        '아래 JSON 스키마만 사용하세요:',
+        '{',
+        '  "documentType": "lecture",',
+        '  "summary": "string",',
+        '  "concepts": [',
+        '    {',
+        '      "name": "string",',
+        '      "definition": "string",',
+        '      "example": "string",',
+        '      "keyPoints": ["string"]',
+        '    }',
+        '  ],',
+        '  "practiceItems": ["string"],',
+        '  "keyTakeaways": ["string"],',
+        '  "keywords": ["string"],',
+        '  "uncertainties": ["string"]',
+        '}',
+      ].join('\n');
+    }
+
+    return [
+      ...sharedRules,
+      '- 멘토링 타입에서는 실무 팁, 후속 과제, 추가 조사 키워드, 주의사항을 우선 추출합니다.',
+      '- 설명과 코칭을 공식 결정사항으로 오인하지 않습니다.',
+      '- 실제로 명시된 다음 행동만 followUpTasks에 넣습니다.',
+      '아래 JSON 스키마만 사용하세요:',
+      '{',
+      '  "documentType": "mentoring",',
+      '  "summary": "string",',
+      '  "topics": [',
+      '    {',
+      '      "title": "string",',
+      '      "keyPoints": ["string"],',
+      '      "practicalTips": ["string"],',
+      '      "followUpTasks": ["string"],',
+      '      "researchTopics": ["string"],',
+      '      "cautions": ["string"]',
+      '    }',
+      '  ],',
+      '  "keyTakeaways": ["string"],',
+      '  "keywords": ["string"],',
+      '  "uncertainties": ["string"]',
+      '}',
+    ].join('\n');
+  }
+
+  private parseJsonObject(text: string): unknown {
+    const candidates = [
+      text.trim(),
+      ...this.extractCodeBlockCandidates(text),
+      ...this.extractBraceCandidates(text),
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  private extractCodeBlockCandidates(text: string): string[] {
+    const matches = [...text.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)];
+    return matches
+      .map((match) => match[1]?.trim() ?? '')
+      .filter((candidate) => candidate.length > 0);
+  }
+
+  private extractBraceCandidates(text: string): string[] {
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
+      return [];
+    }
+    return [text.slice(firstBrace, lastBrace + 1).trim()];
+  }
+
+  private normalizeStructuredNotes(
+    raw: Record<string, unknown>,
+    documentType: PromptDocumentType,
+  ): StructuredNoteExtraction {
+    if (documentType === PromptDocumentType.MEETING) {
+      return {
+        documentType: PromptDocumentType.MEETING,
+        summary: this.normalizeString(raw.summary),
+        participants: this.normalizeStringArray(raw.participants, 12),
+        agendaItems: this.normalizeMeetingAgendaItems(raw.agendaItems),
+        overallDecisions: this.normalizeStringArray(raw.overallDecisions, 12),
+        followUps: this.normalizeStringArray(raw.followUps, 12),
+        keywords: this.normalizeStringArray(raw.keywords, 20),
+        uncertainties: this.normalizeStringArray(raw.uncertainties, 12),
+      };
+    }
+
+    if (documentType === PromptDocumentType.LECTURE) {
+      return {
+        documentType: PromptDocumentType.LECTURE,
+        summary: this.normalizeString(raw.summary),
+        concepts: this.normalizeLectureConcepts(raw.concepts),
+        practiceItems: this.normalizeStringArray(raw.practiceItems, 12),
+        keyTakeaways: this.normalizeStringArray(raw.keyTakeaways, 12),
+        keywords: this.normalizeStringArray(raw.keywords, 20),
+        uncertainties: this.normalizeStringArray(raw.uncertainties, 12),
+      };
+    }
+
+    return {
+      documentType: PromptDocumentType.MENTORING,
+      summary: this.normalizeString(raw.summary),
+      topics: this.normalizeMentoringTopics(raw.topics),
+      keyTakeaways: this.normalizeStringArray(raw.keyTakeaways, 12),
+      keywords: this.normalizeStringArray(raw.keywords, 20),
+      uncertainties: this.normalizeStringArray(raw.uncertainties, 12),
+    };
+  }
+
+  private normalizeMeetingAgendaItems(value: unknown): StructuredMeetingAgendaItem[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const title = this.normalizeString(record.title);
+        const discussionPoints = this.normalizeStringArray(
+          record.discussionPoints,
+          8,
+        );
+        const decisions = this.normalizeStringArray(record.decisions, 6);
+        const actionItems = this.normalizeActionItems(record.actionItems);
+        const unresolved = this.normalizeStringArray(record.unresolved, 6);
+
+        if (
+          !title &&
+          discussionPoints.length === 0 &&
+          decisions.length === 0 &&
+          actionItems.length === 0 &&
+          unresolved.length === 0
+        ) {
+          return null;
+        }
+
+        return {
+          title: title || '제목 없는 안건',
+          discussionPoints,
+          decisions,
+          actionItems,
+          unresolved,
+        };
+      })
+      .filter((item): item is StructuredMeetingAgendaItem => item !== null)
+      .slice(0, 8);
+  }
+
+  private normalizeActionItems(value: unknown): StructuredActionItem[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const task = this.normalizeString(record.task);
+        if (!task) {
+          return null;
+        }
+
+        return {
+          task,
+          owner: this.normalizeString(record.owner) || '미정',
+          deadline: this.normalizeString(record.deadline) || '미정',
+          priority: this.normalizePriority(record.priority),
+        };
+      })
+      .filter((item): item is StructuredActionItem => item !== null)
+      .slice(0, 20);
+  }
+
+  private normalizeLectureConcepts(value: unknown): StructuredLectureConcept[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const name = this.normalizeString(record.name);
+        const definition = this.normalizeString(record.definition);
+        const example = this.normalizeString(record.example);
+        const keyPoints = this.normalizeStringArray(record.keyPoints, 5);
+
+        if (!name && !definition && !example && keyPoints.length === 0) {
+          return null;
+        }
+
+        return {
+          name: name || '핵심 개념',
+          definition,
+          example,
+          keyPoints,
+        };
+      })
+      .filter((item): item is StructuredLectureConcept => item !== null)
+      .slice(0, 8);
+  }
+
+  private normalizeMentoringTopics(value: unknown): StructuredMentoringTopic[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+        const record = item as Record<string, unknown>;
+        const title = this.normalizeString(record.title);
+        const keyPoints = this.normalizeStringArray(record.keyPoints, 8);
+        const practicalTips = this.normalizeStringArray(record.practicalTips, 8);
+        const followUpTasks = this.normalizeStringArray(record.followUpTasks, 8);
+        const researchTopics = this.normalizeStringArray(record.researchTopics, 8);
+        const cautions = this.normalizeStringArray(record.cautions, 8);
+
+        if (
+          !title &&
+          keyPoints.length === 0 &&
+          practicalTips.length === 0 &&
+          followUpTasks.length === 0 &&
+          researchTopics.length === 0 &&
+          cautions.length === 0
+        ) {
+          return null;
+        }
+
+        return {
+          title: title || '핵심 주제',
+          keyPoints,
+          practicalTips,
+          followUpTasks,
+          researchTopics,
+          cautions,
+        };
+      })
+      .filter((item): item is StructuredMentoringTopic => item !== null)
+      .slice(0, 8);
+  }
+
+  private normalizeStringArray(value: unknown, limit: number): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+
+    for (const item of value) {
+      const text = this.normalizeString(item);
+      if (!text) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      normalized.push(text);
+      if (normalized.length >= limit) {
+        break;
+      }
+    }
+
+    return normalized;
+  }
+
+  private normalizeString(value: unknown): string {
+    if (typeof value !== 'string') {
+      return '';
+    }
+
+    return value.replace(/\s+/g, ' ').trim();
+  }
+
+  private normalizePriority(value: unknown): StructuredActionItem['priority'] {
+    return value === 'High' || value === 'Low' ? value : 'Medium';
   }
 }
