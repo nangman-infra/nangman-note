@@ -24,6 +24,7 @@ describe('TranscriptionGateway', () => {
       | 'feedRealtimeAudio'
       | 'isRealtimeSessionReady'
       | 'stopRealtimeSession'
+      | 'clearRealtimeTimeOffset'
     >
   >;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +60,7 @@ describe('TranscriptionGateway', () => {
       feedRealtimeAudio: jest.fn().mockReturnValue(true),
       isRealtimeSessionReady: jest.fn().mockReturnValue(true),
       stopRealtimeSession: jest.fn().mockResolvedValue(undefined),
+      clearRealtimeTimeOffset: jest.fn(),
     };
 
     configService = {
@@ -220,5 +222,44 @@ describe('TranscriptionGateway', () => {
     expect(meetingService.findById).toHaveBeenCalledWith('meeting-1', 'user-1');
     expect(socket.join).toHaveBeenCalledWith('meeting-1');
     expect(socket.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('stops active realtime session and clears in-memory offset on explicit stop', async () => {
+    const response = await gateway.handleStopSession(
+      createSocket('meeting-1') as unknown as Socket,
+    );
+
+    expect(response).toEqual({ ok: true });
+    expect(meetingService.findById).toHaveBeenCalledWith(
+      'meeting-1',
+      undefined,
+    );
+    expect(transcriptionService.stopRealtimeSession).toHaveBeenCalledWith(
+      'meeting-1',
+    );
+    expect(transcriptionService.clearRealtimeTimeOffset).toHaveBeenCalledWith(
+      'meeting-1',
+    );
+    expect(serverEmit).toHaveBeenCalledWith('connected', {
+      meetingId: 'meeting-1',
+      hasActiveSession: false,
+    });
+    expect(serverEmit).toHaveBeenCalledWith('transcript:session-ended', {
+      meetingId: 'meeting-1',
+    });
+  });
+
+  it('clears in-memory offset even when there is no active realtime session', async () => {
+    transcriptionService.hasActiveRealtimeSession.mockReturnValue(false);
+
+    const response = await gateway.handleStopSession(
+      createSocket('meeting-1') as unknown as Socket,
+    );
+
+    expect(response).toEqual({ ok: true });
+    expect(transcriptionService.stopRealtimeSession).not.toHaveBeenCalled();
+    expect(transcriptionService.clearRealtimeTimeOffset).toHaveBeenCalledWith(
+      'meeting-1',
+    );
   });
 });
