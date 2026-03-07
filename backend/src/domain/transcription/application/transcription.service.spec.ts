@@ -12,6 +12,7 @@ import type { BatchTranscriptionProvider } from './ports/batch-transcription-pro
 import type { StreamingTranscriptionProvider } from './ports/streaming-transcription-provider.port';
 import type { TranslationProvider } from './ports/translation-provider.port';
 import {
+  type RealtimeTranscriptContentPayload,
   type RealtimeTranscriptPayload,
   TranscriptionService,
 } from './transcription.service';
@@ -315,6 +316,101 @@ describe('TranscriptionService', () => {
           translatedText: 'hello team',
         }),
       );
+    });
+  });
+
+  describe('realtime session reconnect offset', () => {
+    it('applies DB offset on first session start and in-memory offset on reconnect', async () => {
+      const payloads: RealtimeTranscriptPayload[] = [];
+
+      let onTranscriptHandler:
+        | ((event: {
+            type: 'partial' | 'final';
+            resultId: string;
+            text: string;
+            startTime: number;
+            endTime: number;
+          }) => void)
+        | undefined;
+
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({
+          transcriptionMode: MeetingTranscriptionMode.REALTIME,
+        }),
+      );
+
+      streamingProvider.startSession.mockImplementation((options) => {
+        onTranscriptHandler = options.onTranscript;
+        return Promise.resolve();
+      });
+
+      transcriptRepository.create.mockImplementation(
+        (entity) => entity as TranscriptSegmentEntity,
+      );
+      transcriptRepository.save.mockImplementation((entity) =>
+        Promise.resolve({ id: 'seg-1', ...entity } as TranscriptSegmentEntity),
+      );
+
+      // 첫 세션: DB에 이전 세그먼트가 endTime=120으로 있음
+      transcriptRepository.findOne.mockResolvedValueOnce({
+        endTime: 120,
+      } as TranscriptSegmentEntity);
+
+      await service.startRealtimeSession(
+        'meeting-1',
+        (payload) => payloads.push(payload),
+        jest.fn(),
+        jest.fn(),
+      );
+
+      // final 이벤트: startTime=5, endTime=10 → 오프셋 120 적용 → 125, 130
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r1',
+        text: '첫 세션 발화',
+        startTime: 5,
+        endTime: 10,
+      });
+
+      const finalPayload = payloads.find(
+        (p) => p.type === 'final' && 'startTime' in p,
+      ) as RealtimeTranscriptContentPayload | undefined;
+      expect(finalPayload?.startTime).toBe(125);
+      expect(finalPayload?.endTime).toBe(130);
+
+      // DB 저장도 보정된 값으로 호출됐는지 확인
+      expect(transcriptRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          startTime: 125,
+          endTime: 130,
+        }),
+      );
+
+      // 세션 재연결: DB 조회 없이 인메모리 오프셋(130) 사용
+      payloads.length = 0;
+      transcriptRepository.findOne.mockResolvedValueOnce(null); // DB 조회 안 됨 (인메모리 우선)
+
+      await service.startRealtimeSession(
+        'meeting-1',
+        (payload) => payloads.push(payload),
+        jest.fn(),
+        jest.fn(),
+      );
+
+      // 새 세션 final: startTime=2, endTime=8 → 오프셋 130 적용 → 132, 138
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r2',
+        text: '재연결 후 발화',
+        startTime: 2,
+        endTime: 8,
+      });
+
+      const reconnectPayload = payloads.find(
+        (p) => p.type === 'final' && 'startTime' in p,
+      ) as RealtimeTranscriptContentPayload | undefined;
+      expect(reconnectPayload?.startTime).toBe(132);
+      expect(reconnectPayload?.endTime).toBe(138);
     });
   });
 

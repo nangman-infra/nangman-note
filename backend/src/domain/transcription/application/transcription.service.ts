@@ -107,19 +107,23 @@ export class TranscriptionService {
       );
     }
 
-    // 세션 재시작 시: DB에서 이 회의의 마지막 세그먼트 endTime을 조회하여 오프셋 갱신
+    // 세션 재시작 시: 인메모리 오프셋이 있으면 우선 사용, 없으면 DB에서 복구
     if (!this.realtimeTimeOffsets.has(meetingId)) {
-      this.realtimeTimeOffsets.set(meetingId, 0);
-    }
-    const lastSegment = await this.transcriptRepository.findOne({
-      where: { meetingId },
-      order: { createdAt: 'DESC' },
-      select: ['endTime'],
-    });
-    if (lastSegment && lastSegment.endTime > 0) {
-      this.realtimeTimeOffsets.set(meetingId, lastSegment.endTime);
+      const lastSegment = await this.transcriptRepository.findOne({
+        where: { meetingId },
+        order: { createdAt: 'DESC' },
+        select: ['endTime'],
+      });
+      const dbOffset = lastSegment?.endTime ?? 0;
+      this.realtimeTimeOffsets.set(meetingId, dbOffset);
+      if (dbOffset > 0) {
+        this.logger.debug(
+          `Realtime time offset restored from DB for meeting ${meetingId}: ${dbOffset}s`,
+        );
+      }
+    } else {
       this.logger.debug(
-        `Realtime time offset for meeting ${meetingId}: ${lastSegment.endTime}s`,
+        `Realtime time offset from memory for meeting ${meetingId}: ${this.realtimeTimeOffsets.get(meetingId)}s`,
       );
     }
 
@@ -350,6 +354,10 @@ export class TranscriptionService {
       meetingId,
       adjustedEvent,
     );
+
+    // 인메모리 오프셋을 즉시 갱신 — DB 저장 완료를 기다리지 않으므로
+    // 빠른 재연결에서도 최신 endTime이 반영됨
+    this.realtimeTimeOffsets.set(meetingId, adjustedEndTime);
 
     // 번역이 필요한 경우 fire-and-forget으로 후행 처리
     if (needsTranslation && translateTarget) {
