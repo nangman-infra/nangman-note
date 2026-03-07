@@ -1,0 +1,125 @@
+/* ─── 랜딩 페이지 전용 스타일 ─── */
+
+/* 한국어/영어 혼용 텍스트 잘림 방지 */
+.landing-shell {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-image: linear-gradient(
+      to right,
+      rgba(18, 33, 43, 0.03) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgba(18, 33, 43, 0.03) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 30%, #000 40%, transparent 80%);
+}
+
+/* 헤드라인 orphan 방지 */
+.landing-shell h1,
+.landing-shell h2,
+.landing-shell h3 {
+  text-wrap: balance;
+}
+
+/* 그라데이션 텍스트 */
+.landing-gradient-text {
+  background: linear-gradient(135deg, var(--brand) 0%, #0e7490 50%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 섹션 구분선 */
+.landing-section-divider {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.landing-section-divider::after {
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--line-soft), transparent);
+}
+
+/* 초기 로드 애니메이션 (히어로 등 above-the-fold) */
+.landing-rise {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: landing-rise-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.landing-rise-d1 { animation-delay: 0.08s; }
+.landing-rise-d2 { animation-delay: 0.16s; }
+.landing-rise-d3 { animation-delay: 0.24s; }
+.landing-rise-d4 { animation-delay: 0.36s; }
+
+@keyframes landing-rise-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 스크롤 리빌 애니메이션 (below-the-fold) */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise,
+  .landing-rise-d1,
+  .landing-rise-d2,
+  .landing-rise-d3,
+  .landing-rise-d4 {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .landing-tab-fade {
+    animation: none;
+  }
+}
+
+/* 탭 콘텐츠 전환 페이드 */
+.landing-tab-fade {
+  animation: landing-fade-in 0.3s ease-out;
+}
+
+@keyframes landing-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
