@@ -90,7 +90,7 @@ describe('BedrockService', () => {
     expect(input.modelId).toBe('amazon.nova-pro-v1:0');
     expect(inferenceConfig.maxTokens).toBe(4096);
     expect(inferenceConfig.temperature).toBe(0);
-    expect(inferenceConfig.topP).toBe(0.9);
+    expect(inferenceConfig.topP).toBeUndefined();
   });
 
   it('wraps prompt/note/transcript in explicit data blocks and adds safety rules', async () => {
