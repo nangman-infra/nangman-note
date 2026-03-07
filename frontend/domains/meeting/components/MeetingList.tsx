@@ -16,7 +16,7 @@ import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMeetings } from '../hooks/useMeeting';
-import { useMeetingStatus } from '../hooks/useMeetingStatus';
+import { useMeetingStatus } from '@/hooks/useMeetingStatus';
 import { MeetingStatus } from '../types/meeting.types';
 import {
   MeetingActionDialog,

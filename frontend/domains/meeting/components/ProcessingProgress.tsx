@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
 import { meetingApi } from '../api/meetingApi';
-import { useMeetingStatus } from '../hooks/useMeetingStatus';
+import { useMeetingStatus } from '@/hooks/useMeetingStatus';
 import { MeetingStatus } from '../types/meeting.types';
 
 type UploadState =

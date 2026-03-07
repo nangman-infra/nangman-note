@@ -2,6 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { ShieldCheck, Sparkles, Lock } from 'lucide-react';
 
 export default function SignInPage() {
@@ -60,11 +61,22 @@ export default function SignInPage() {
           </div>
         </div>
 
-        {/* 하단 기능 소개 */}
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <FeatureChip emoji="🎙️" label="실시간 전사" />
-          <FeatureChip emoji="📝" label="노트 동기화" />
-          <FeatureChip emoji="🤖" label="AI 회의록" />
+        {/* 랜딩 링크 */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Link href="/landing" className="glass-surface flex items-center gap-2.5 px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-[var(--line-strong)]">
+            <span className="text-lg">🎙️</span>
+            <div>
+              <p className="text-xs font-semibold">서비스 소개</p>
+              <p className="text-[10px] text-muted">TransNote가 뭔가요?</p>
+            </div>
+          </Link>
+          <Link href="/landing/guide" className="glass-surface flex items-center gap-2.5 px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-[var(--line-strong)]">
+            <span className="text-lg">📖</span>
+            <div>
+              <p className="text-xs font-semibold">사용 가이드</p>
+              <p className="text-[10px] text-muted">7단계로 배우기</p>
+            </div>
+          </Link>
         </div>
 
         {/* 푸터 */}
@@ -76,14 +88,6 @@ export default function SignInPage() {
   );
 }
 
-function FeatureChip({ emoji, label }: { emoji: string; label: string }) {
-  return (
-    <div className="glass-surface flex flex-col items-center gap-1 px-2 py-2.5 text-center">
-      <span className="text-lg">{emoji}</span>
-      <span className="text-[10px] font-medium text-muted">{label}</span>
-    </div>
-  );
-}
 
 function normalizeCallbackUrl(rawValue: string | null): string {
   if (!rawValue) {

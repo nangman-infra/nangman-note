@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useMeetingStatus } from '@/domains/meeting/hooks/useMeetingStatus';
+import { useMeetingStatus } from '@/hooks/useMeetingStatus';
 import { useResultStore } from '../stores/resultStore';
 
 /** 재생성 폴링 폴백 최대 대기 시간 (2분) */

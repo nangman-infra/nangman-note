@@ -8,7 +8,7 @@ import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
-import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/domains/prompt/types/prompt.types';
+import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/lib/constants';
 import { useResult } from '../hooks/useResult';
 import {
   resultTabDataApi,

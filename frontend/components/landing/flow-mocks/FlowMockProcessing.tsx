@@ -16,7 +16,7 @@ export function FlowMockProcessing() {
       <p className="mb-4 text-center text-xs font-semibold">회의록을 만들고 있습니다</p>
 
       <div className="space-y-3">
-        {steps.map((step, i) => (
+        {steps.map((step) => (
           <div key={step.label} className="flex items-center gap-3">
             <div
               className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${

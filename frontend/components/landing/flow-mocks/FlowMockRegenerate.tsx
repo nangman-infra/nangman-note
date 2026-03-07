@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, RefreshCw, Sparkles } from 'lucide-react';
+import { ChevronDown, RefreshCw } from 'lucide-react';
 
 /** 프롬프트 변경 후 재생성 목업 */
 export function FlowMockRegenerate() {
