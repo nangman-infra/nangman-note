@@ -688,7 +688,7 @@ export class ResultService {
       '## 핵심 키워드',
       this.renderKeywordLine(extracted.keywords),
       '',
-      '## 팩트체크 필요 / 불확실',
+      '## 확인 필요 / 불확실',
       this.renderBulletList(extracted.uncertainties, '없음'),
     ].join('\n');
   }
