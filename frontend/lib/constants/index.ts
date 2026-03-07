@@ -26,5 +26,5 @@ export const DEFAULT_PROMPT_ID = 'prompt_default_meeting';
 export const PROMPT_IDS = {
   MEETING: 'prompt_default_meeting',
   LECTURE: 'prompt_default_lecture',
-  MENTORING: 'prompt_default_seminar',
+  MENTORING: 'prompt_default_seminar', // DB 레거시 ID — 실제 documentType은 'mentoring'
 } as const;

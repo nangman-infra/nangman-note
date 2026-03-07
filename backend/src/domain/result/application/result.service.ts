@@ -188,7 +188,7 @@ export class ResultService {
     );
 
     // 백그라운드 실행 (fire-and-forget)
-    this.executeRegenerateInBackground(meetingId, dto.promptId, ownerSub);
+    void this.executeRegenerateInBackground(meetingId, dto.promptId, ownerSub);
   }
 
   private executeRegenerateInBackground(
@@ -196,7 +196,7 @@ export class ResultService {
     promptId: string,
     ownerSub?: string,
   ): void {
-    (async () => {
+    void (async () => {
       try {
         const existing = await this.resultRepository.findOne({
           where: { meetingId },
@@ -704,19 +704,10 @@ export class ResultService {
   private renderOrderedList(items: string[], limit: number): string {
     const source = items.slice(0, limit);
     if (source.length === 0) {
-      return Array.from({ length: limit }, (_, index) => `${index + 1}. ...`).join(
-        '\n',
-      );
+      return '- 핵심 정리 추출 없음';
     }
 
-    return source
-      .map((item, index) => `${index + 1}. ${item}`)
-      .concat(
-        Array.from({ length: Math.max(0, limit - source.length) }, (_, index) =>
-          `${source.length + index + 1}. ...`,
-        ),
-      )
-      .join('\n');
+    return source.map((item, index) => `${index + 1}. ${item}`).join('\n');
   }
 
   private renderActionItems(
@@ -735,7 +726,9 @@ export class ResultService {
   }
 
   private renderKeywordLine(keywords: string[]): string {
-    return keywords.length > 0 ? keywords.join(', ') : '_핵심 키워드 추출 없음_';
+    return keywords.length > 0
+      ? keywords.join(', ')
+      : '_핵심 키워드 추출 없음_';
   }
 
   private renderInlineList(items: string[], emptyText: string): string {
@@ -1074,7 +1067,8 @@ export class ResultService {
     // 2. 필러 세그먼트 + 구두점만 있는 세그먼트 제거
     const filtered = sorted.filter((seg) => {
       if (seg.text.length === 0) return false;
-      if (seg.text.length <= 4 && FILLER_ONLY_REGEX.test(seg.text)) return false;
+      if (seg.text.length <= 4 && FILLER_ONLY_REGEX.test(seg.text))
+        return false;
       if (PUNCTUATION_ONLY_REGEX.test(seg.text)) return false;
       return true;
     });
@@ -1083,10 +1077,7 @@ export class ResultService {
     const deduped: AiTranscriptSegment[] = [];
     for (const seg of filtered) {
       const previous = deduped[deduped.length - 1];
-      if (
-        previous &&
-        this.isConsecutiveDuplicateTranscript(previous, seg)
-      ) {
+      if (previous && this.isConsecutiveDuplicateTranscript(previous, seg)) {
         previous.endTime = Math.max(previous.endTime, seg.endTime);
         continue;
       }
@@ -1152,7 +1143,16 @@ export class ResultService {
   private loadPdfFontBytes(): Uint8Array | null {
     const candidates = [
       // Docker 컨테이너 (Pretendard TTF, font stage에서 복사)
-      join(__dirname, '..', '..', '..', '..', 'assets', 'fonts', 'KoreanFont.ttf'),
+      join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        '..',
+        'assets',
+        'fonts',
+        'KoreanFont.ttf',
+      ),
       '/app/assets/fonts/KoreanFont.ttf',
       // macOS 시스템 폰트 (개발 환경 폴백)
       '/System/Library/Fonts/Supplemental/AppleGothic.ttf',

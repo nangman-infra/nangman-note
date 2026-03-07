@@ -5,6 +5,9 @@
 # Infrastructure (ECS task definitions - local only)
 infra/
 
+# Scripts (local deployment/utility scripts)
+scripts/
+
 # Dependencies
 node_modules/
 

@@ -47,7 +47,7 @@ export const DEFAULT_PROMPTS: ReadonlyArray<
     documentType: PromptDocumentType.LECTURE,
   },
   {
-    id: 'prompt_default_seminar',
+    id: 'prompt_default_seminar', // 레거시 ID — DB 기존 데이터 호환을 위해 유지 (실제 타입은 mentoring)
     name: '멘토링',
     content: MENTORING_PROMPT_CONTENT,
     documentType: PromptDocumentType.MENTORING,
