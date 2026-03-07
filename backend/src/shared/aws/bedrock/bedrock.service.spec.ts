@@ -7,6 +7,7 @@ import { AwsClientFactory } from '../aws-client.factory';
 import { AppEnv } from '../../config/env.validation';
 import { PromptDocumentType } from '../../../domain/prompt/domain/prompt-document-type.enum';
 import { BedrockService } from './bedrock.service';
+import type { StructuredMeetingExtraction } from './bedrock.types';
 
 const buildConfigMap = (): AppEnv =>
   ({
@@ -152,7 +153,7 @@ describe('BedrockService', () => {
       JSON.stringify({
         documentType: 'meeting',
         summary: '핵심 요약',
-        participants: ['택준', '희운'],
+        participants: ['택준', '희훈'],
         agendaItems: [
           {
             title: '가상화',
@@ -197,7 +198,8 @@ describe('BedrockService', () => {
     expect(result.documentType).toBe(PromptDocumentType.MEETING);
     expect(result.summary).toBe('핵심 요약');
     expect(result.keywords).toEqual(['가상화', 'APM']);
-    expect(result.agendaItems[0]?.actionItems[0]).toEqual({
+    const meetingResult = result as StructuredMeetingExtraction;
+    expect(meetingResult.agendaItems[0]?.actionItems[0]).toEqual({
       task: '추가 조사',
       owner: '미정',
       deadline: '미정',

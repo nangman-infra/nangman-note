@@ -15,7 +15,9 @@ describe('ResultController', () => {
       isRegenerating: jest.fn(),
     };
 
-    controller = new ResultController(resultService as unknown as ResultService);
+    controller = new ResultController(
+      resultService as unknown as ResultService,
+    );
   });
 
   it('includes regeneration state in result responses', async () => {

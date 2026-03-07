@@ -21,7 +21,9 @@ describe('TranscriptionResultCollectorService', () => {
   let batchProvider: jest.Mocked<
     Pick<BatchTranscriptionProvider, 'getJobStatus'>
   >;
-  let meetingService: jest.Mocked<Pick<MeetingService, 'findById' | 'updateStatus'>>;
+  let meetingService: jest.Mocked<
+    Pick<MeetingService, 'findById' | 'updateStatus'>
+  >;
   let resultService: jest.Mocked<Pick<ResultService, 'generateForPipeline'>>;
   let s3AudioService: jest.Mocked<
     Pick<S3AudioService, 'getObjectAsStringFromBucket' | 'deleteAudioFile'>
@@ -210,7 +212,9 @@ describe('TranscriptionResultCollectorService', () => {
   });
 
   it('still marks meeting completed when result generation fails on generating phase', async () => {
-    resultService.generateForPipeline.mockRejectedValue(new Error('generation failed'));
+    resultService.generateForPipeline.mockRejectedValue(
+      new Error('generation failed'),
+    );
     meetingService.updateStatus.mockResolvedValue({} as never);
 
     await service.handleGeneratingPhase({

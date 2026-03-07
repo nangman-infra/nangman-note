@@ -20,7 +20,10 @@ import {
 describe('TranscriptionService', () => {
   let service: TranscriptionService;
   let transcriptRepository: jest.Mocked<
-    Pick<Repository<TranscriptSegmentEntity>, 'find' | 'findOne' | 'create' | 'save'>
+    Pick<
+      Repository<TranscriptSegmentEntity>,
+      'find' | 'findOne' | 'create' | 'save'
+    >
   >;
   let transcriptionJobRepository: jest.Mocked<
     Pick<Repository<TranscriptionJobEntity>, 'find' | 'create' | 'save'>
@@ -488,7 +491,7 @@ describe('TranscriptionService', () => {
         (p) => p.type === 'final' && 'startTime' in p,
       ) as RealtimeTranscriptContentPayload | undefined;
       expect(afterStopPayload?.startTime).toBe(53); // 3 + 50
-      expect(afterStopPayload?.endTime).toBe(57);   // 7 + 50
+      expect(afterStopPayload?.endTime).toBe(57); // 7 + 50
 
       // 명시적 clearRealtimeTimeOffset (회의 종료) 후에는 오프셋 삭제
       service.clearRealtimeTimeOffset('meeting-1');

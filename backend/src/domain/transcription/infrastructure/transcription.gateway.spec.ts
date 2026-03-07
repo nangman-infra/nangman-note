@@ -27,7 +27,7 @@ describe('TranscriptionGateway', () => {
       | 'clearRealtimeTimeOffset'
     >
   >;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   let configService: any;
   let tokenVerifier: jest.Mocked<
     Pick<OidcTokenVerifierService, 'isAuthEnabled' | 'verifyAccessToken'>

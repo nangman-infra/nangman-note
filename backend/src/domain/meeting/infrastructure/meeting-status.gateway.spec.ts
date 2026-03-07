@@ -14,7 +14,7 @@ type MockSocket = Pick<
 
 describe('MeetingStatusGateway', () => {
   let gateway: MeetingStatusGateway;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   let configService: any;
   let tokenVerifier: jest.Mocked<
     Pick<OidcTokenVerifierService, 'isAuthEnabled' | 'verifyAccessToken'>
@@ -102,7 +102,10 @@ describe('MeetingStatusGateway', () => {
 
     expect(tokenVerifier.verifyAccessToken).toHaveBeenCalledWith('auth-token');
     expect(meetingService.findById).toHaveBeenCalledWith('meeting-1', 'user-1');
-    expect(socket.join).toHaveBeenNthCalledWith(1, 'meeting-status:user:user-1');
+    expect(socket.join).toHaveBeenNthCalledWith(
+      1,
+      'meeting-status:user:user-1',
+    );
     expect(socket.join).toHaveBeenNthCalledWith(
       2,
       'meeting-status:meeting:meeting-1',

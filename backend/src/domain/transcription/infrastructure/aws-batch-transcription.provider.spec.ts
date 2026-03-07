@@ -42,7 +42,7 @@ describe('AwsBatchTranscriptionProvider', () => {
       languageCode: 'ko-KR',
     });
 
-    const command = send.mock.calls[0]?.[0] as StartTranscriptionJobCommand;
+    const command = send.mock.calls[0]?.[0] as StartTranscriptionJobCommand; // eslint-disable-line @typescript-eslint/no-unsafe-member-access
     const input = (
       command as unknown as {
         input: {

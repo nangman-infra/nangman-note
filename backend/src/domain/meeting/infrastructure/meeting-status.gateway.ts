@@ -108,11 +108,13 @@ export class MeetingStatusGateway
     this.logger.log(
       `Broadcasting result regenerate: meeting=${event.meetingId}, phase=${event.phase}, owner=${event.ownerSub ?? 'anonymous'}`,
     );
-    this.server.to(this.meetingRoom(event.meetingId)).emit('result:regenerate', {
-      meetingId: event.meetingId,
-      phase: event.phase,
-      errorMessage: event.errorMessage,
-    });
+    this.server
+      .to(this.meetingRoom(event.meetingId))
+      .emit('result:regenerate', {
+        meetingId: event.meetingId,
+        phase: event.phase,
+        errorMessage: event.errorMessage,
+      });
   }
 
   private resolveMeetingId(client: Socket): string | undefined {

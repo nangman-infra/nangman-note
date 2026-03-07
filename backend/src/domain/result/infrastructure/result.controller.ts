@@ -32,7 +32,10 @@ export class ResultController {
     @Param('meetingId') meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
-    const result = await this.resultService.findByMeetingId(meetingId, user?.sub);
+    const result = await this.resultService.findByMeetingId(
+      meetingId,
+      user?.sub,
+    );
     return this.toResultResponse(result);
   }
 
