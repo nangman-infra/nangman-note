@@ -411,12 +411,21 @@ export function ResultViewer({
                   onChange={(e) => setRegeneratePromptId(e.target.value)}
                   className="input-shell"
                 >
-                  {promptOptions.map((prompt) => (
-                    <option key={prompt.id} value={prompt.id}>
-                      {prompt.name} · {PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}
-                      {prompt.isDefault ? ' (기본)' : ''}
-                    </option>
-                  ))}
+                  {[...promptOptions]
+                    .sort((a, b) => {
+                      // 현재 결과의 프롬프트를 맨 위로
+                      const currentId = result?.promptId;
+                      if (a.id === currentId && b.id !== currentId) return -1;
+                      if (b.id === currentId && a.id !== currentId) return 1;
+                      return 0;
+                    })
+                    .map((prompt) => (
+                      <option key={prompt.id} value={prompt.id}>
+                        {prompt.isDefault
+                          ? `${prompt.name} (기본)`
+                          : `${prompt.name} · ${PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}`}
+                      </option>
+                    ))}
                 </select>
               ) : (
                 <input
