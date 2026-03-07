@@ -285,6 +285,8 @@ export class TranscriptionGateway
       if (this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
         await this.transcriptionService.stopRealtimeSession(meetingId);
       }
+      // 명시적 전사 중지 = 회의 종료 → 인메모리 오프셋 정리
+      this.transcriptionService.clearRealtimeTimeOffset(meetingId);
 
       this.server.to(meetingId).emit('connected', {
         meetingId,

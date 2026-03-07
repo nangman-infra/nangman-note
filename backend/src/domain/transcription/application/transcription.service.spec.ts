@@ -412,6 +412,111 @@ describe('TranscriptionService', () => {
       expect(reconnectPayload?.startTime).toBe(132);
       expect(reconnectPayload?.endTime).toBe(138);
     });
+
+    it('preserves in-memory offset across stop/reconnect but clears on explicit clearRealtimeTimeOffset', async () => {
+      const payloads: RealtimeTranscriptPayload[] = [];
+
+      let onTranscriptHandler:
+        | ((event: {
+            type: 'partial' | 'final';
+            resultId: string;
+            text: string;
+            startTime: number;
+            endTime: number;
+          }) => void)
+        | undefined;
+
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({
+          transcriptionMode: MeetingTranscriptionMode.REALTIME,
+        }),
+      );
+
+      streamingProvider.startSession.mockImplementation((options) => {
+        onTranscriptHandler = options.onTranscript;
+        return Promise.resolve();
+      });
+      streamingProvider.stopSession.mockResolvedValue(undefined);
+
+      transcriptRepository.create.mockImplementation(
+        (entity) => entity as TranscriptSegmentEntity,
+      );
+      transcriptRepository.save.mockImplementation((entity) =>
+        Promise.resolve({ id: 'seg-1', ...entity } as TranscriptSegmentEntity),
+      );
+
+      // 첫 세션: DB에 이전 세그먼트 없음
+      transcriptRepository.findOne.mockResolvedValueOnce(null);
+
+      await service.startRealtimeSession(
+        'meeting-1',
+        (payload) => payloads.push(payload),
+        jest.fn(),
+        jest.fn(),
+      );
+
+      // final 이벤트: endTime=50 → 인메모리 오프셋 50으로 갱신
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r1',
+        text: '발화',
+        startTime: 40,
+        endTime: 50,
+      });
+
+      // stop 세션 — 오프셋은 유지됨 (disconnect 시나리오)
+      await service.stopRealtimeSession('meeting-1');
+
+      // reconnect — 인메모리 오프셋 50이 유지되어야 함
+      payloads.length = 0;
+      await service.startRealtimeSession(
+        'meeting-1',
+        (payload) => payloads.push(payload),
+        jest.fn(),
+        jest.fn(),
+      );
+
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r2',
+        text: '재연결 발화',
+        startTime: 3,
+        endTime: 7,
+      });
+
+      const afterStopPayload = payloads.find(
+        (p) => p.type === 'final' && 'startTime' in p,
+      ) as RealtimeTranscriptContentPayload | undefined;
+      expect(afterStopPayload?.startTime).toBe(53); // 3 + 50
+      expect(afterStopPayload?.endTime).toBe(57);   // 7 + 50
+
+      // 명시적 clearRealtimeTimeOffset (회의 종료) 후에는 오프셋 삭제
+      service.clearRealtimeTimeOffset('meeting-1');
+
+      payloads.length = 0;
+      transcriptRepository.findOne.mockResolvedValueOnce(null); // DB도 비어있다고 가정
+
+      await service.startRealtimeSession(
+        'meeting-1',
+        (payload) => payloads.push(payload),
+        jest.fn(),
+        jest.fn(),
+      );
+
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r3',
+        text: '새 회의 발화',
+        startTime: 1,
+        endTime: 5,
+      });
+
+      const afterClearPayload = payloads.find(
+        (p) => p.type === 'final' && 'startTime' in p,
+      ) as RealtimeTranscriptContentPayload | undefined;
+      expect(afterClearPayload?.startTime).toBe(1); // 오프셋 0
+      expect(afterClearPayload?.endTime).toBe(5);
+    });
   });
 
   describe('listBatchJobsByMeetingId', () => {

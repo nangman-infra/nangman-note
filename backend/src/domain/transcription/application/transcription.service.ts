@@ -159,8 +159,18 @@ export class TranscriptionService {
    */
   async stopRealtimeSession(meetingId: string): Promise<void> {
     await this.streamingProvider.stopSession(meetingId);
-    this.realtimeTimeOffsets.delete(meetingId);
+    // 오프셋은 삭제하지 않음 — 세션 재연결 시 인메모리 오프셋을 유지하기 위해.
+    // 회의 종료(complete) 시 clearRealtimeTimeOffset()으로 명시적으로 정리합니다.
     this.logger.log(`Realtime session stopped for meeting ${meetingId}`);
+  }
+
+  /**
+   * 회의 완전 종료 시 인메모리 오프셋 정리.
+   * 세션 stop/reconnect 사이클에서는 오프셋을 유지해야 하므로,
+   * 이 메서드는 회의가 COMPLETED 상태로 전환될 때만 호출합니다.
+   */
+  clearRealtimeTimeOffset(meetingId: string): void {
+    this.realtimeTimeOffsets.delete(meetingId);
   }
 
   /**
