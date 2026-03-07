@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Copy, Download, Edit3, FileText, RefreshCw, Save, X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
@@ -346,7 +347,7 @@ export function ResultViewer({
           </div>
         ) : activeTab === 'result' ? (
           <article className="result-markdown surface-card p-5">
-            <ReactMarkdown>{result.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
           </article>
         ) : null}
 
@@ -387,7 +388,7 @@ export function ResultViewer({
               />
             ) : visibleNoteContent.trim() ? (
               <article className="result-markdown">
-                <ReactMarkdown>{sanitizeNoteMarkdown(visibleNoteContent)}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{sanitizeNoteMarkdown(visibleNoteContent)}</ReactMarkdown>
               </article>
             ) : (
               <p className="text-center text-sm text-muted">작성된 메모가 없습니다.</p>
