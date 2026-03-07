@@ -55,6 +55,13 @@ export type RealtimeTranscriptPayload =
 export class TranscriptionService {
   private readonly logger = new Logger(TranscriptionService.name);
 
+  /**
+   * 실시간 전사 세션 재연결 시 타임스탬프 보정을 위한 누적 오프셋.
+   * Transcribe Streaming은 세션 시작 기준 상대 타임스탬프를 반환하므로,
+   * 세션이 재시작되면 이전 세션의 마지막 endTime을 오프셋으로 누적합니다.
+   */
+  private readonly realtimeTimeOffsets = new Map<string, number>();
+
   constructor(
     @InjectRepository(TranscriptSegmentEntity)
     private readonly transcriptRepository: Repository<TranscriptSegmentEntity>,
@@ -100,6 +107,22 @@ export class TranscriptionService {
       );
     }
 
+    // 세션 재시작 시: DB에서 이 회의의 마지막 세그먼트 endTime을 조회하여 오프셋 갱신
+    if (!this.realtimeTimeOffsets.has(meetingId)) {
+      this.realtimeTimeOffsets.set(meetingId, 0);
+    }
+    const lastSegment = await this.transcriptRepository.findOne({
+      where: { meetingId },
+      order: { createdAt: 'DESC' },
+      select: ['endTime'],
+    });
+    if (lastSegment && lastSegment.endTime > 0) {
+      this.realtimeTimeOffsets.set(meetingId, lastSegment.endTime);
+      this.logger.debug(
+        `Realtime time offset for meeting ${meetingId}: ${lastSegment.endTime}s`,
+      );
+    }
+
     const translateTarget = meeting.translateTargetLanguage || null;
 
     await this.streamingProvider.startSession({
@@ -132,6 +155,7 @@ export class TranscriptionService {
    */
   async stopRealtimeSession(meetingId: string): Promise<void> {
     await this.streamingProvider.stopSession(meetingId);
+    this.realtimeTimeOffsets.delete(meetingId);
     this.logger.log(`Realtime session stopped for meeting ${meetingId}`);
   }
 
@@ -281,13 +305,18 @@ export class TranscriptionService {
     translateTarget: string | null,
     onPayload: (payload: RealtimeTranscriptPayload) => void,
   ): void {
+    // 세션 재연결 시 누적된 오프셋을 적용하여 절대 타임스탬프로 변환
+    const offset = this.realtimeTimeOffsets.get(meetingId) ?? 0;
+    const adjustedStartTime = event.startTime + offset;
+    const adjustedEndTime = event.endTime + offset;
+
     if (event.type === 'partial') {
       this.emitPayload(onPayload, {
         type: 'partial',
         resultId: event.resultId,
         text: event.text,
-        startTime: event.startTime,
-        endTime: event.endTime,
+        startTime: adjustedStartTime,
+        endTime: adjustedEndTime,
         detectedLanguage: event.detectedLanguage,
         speakerLabel: event.speakerLabel,
       });
@@ -305,14 +334,22 @@ export class TranscriptionService {
       resultId: event.resultId,
       text: event.text,
       translationPending: needsTranslation,
-      startTime: event.startTime,
-      endTime: event.endTime,
+      startTime: adjustedStartTime,
+      endTime: adjustedEndTime,
       detectedLanguage: event.detectedLanguage,
       speakerLabel: event.speakerLabel,
     });
 
-    // DB 저장
-    const savedSegmentIdPromise = this.saveFinalSegment(meetingId, event);
+    // DB 저장 (보정된 타임스탬프 사용)
+    const adjustedEvent: StreamingTranscriptEvent = {
+      ...event,
+      startTime: adjustedStartTime,
+      endTime: adjustedEndTime,
+    };
+    const savedSegmentIdPromise = this.saveFinalSegment(
+      meetingId,
+      adjustedEvent,
+    );
 
     // 번역이 필요한 경우 fire-and-forget으로 후행 처리
     if (needsTranslation && translateTarget) {

@@ -19,7 +19,7 @@ import {
 describe('TranscriptionService', () => {
   let service: TranscriptionService;
   let transcriptRepository: jest.Mocked<
-    Pick<Repository<TranscriptSegmentEntity>, 'find' | 'create' | 'save'>
+    Pick<Repository<TranscriptSegmentEntity>, 'find' | 'findOne' | 'create' | 'save'>
   >;
   let transcriptionJobRepository: jest.Mocked<
     Pick<Repository<TranscriptionJobEntity>, 'find' | 'create' | 'save'>
@@ -66,6 +66,7 @@ describe('TranscriptionService', () => {
   beforeEach(() => {
     transcriptRepository = {
       find: jest.fn(),
+      findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
     };
