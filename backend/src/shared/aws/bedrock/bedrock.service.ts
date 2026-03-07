@@ -12,10 +12,7 @@ import { PromptDocumentType } from '../../../domain/prompt/domain/prompt-documen
 import type {
   StructuredActionItem,
   StructuredLectureConcept,
-  StructuredLectureExtraction,
   StructuredMeetingAgendaItem,
-  StructuredMeetingExtraction,
-  StructuredMentoringExtraction,
   StructuredMentoringTopic,
   StructuredNoteExtraction,
 } from './bedrock.types';
@@ -209,7 +206,9 @@ export class BedrockService {
 
     const parsed = this.parseJsonObject(outputText);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('Bedrock structured extraction did not return valid JSON');
+      throw new Error(
+        'Bedrock structured extraction did not return valid JSON',
+      );
     }
 
     return this.normalizeStructuredNotes(
@@ -559,7 +558,9 @@ export class BedrockService {
     };
   }
 
-  private normalizeMeetingAgendaItems(value: unknown): StructuredMeetingAgendaItem[] {
+  private normalizeMeetingAgendaItems(
+    value: unknown,
+  ): StructuredMeetingAgendaItem[] {
     if (!Array.isArray(value)) {
       return [];
     }
@@ -672,9 +673,18 @@ export class BedrockService {
         const record = item as Record<string, unknown>;
         const title = this.normalizeString(record.title);
         const keyPoints = this.normalizeStringArray(record.keyPoints, 8);
-        const practicalTips = this.normalizeStringArray(record.practicalTips, 8);
-        const followUpTasks = this.normalizeStringArray(record.followUpTasks, 8);
-        const researchTopics = this.normalizeStringArray(record.researchTopics, 8);
+        const practicalTips = this.normalizeStringArray(
+          record.practicalTips,
+          8,
+        );
+        const followUpTasks = this.normalizeStringArray(
+          record.followUpTasks,
+          8,
+        );
+        const researchTopics = this.normalizeStringArray(
+          record.researchTopics,
+          8,
+        );
         const cautions = this.normalizeStringArray(record.cautions, 8);
 
         if (
