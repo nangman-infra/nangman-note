@@ -635,7 +635,9 @@ export class ResultService {
       '## 실습 및 적용',
       this.renderBulletList(extracted.practiceItems, '실습/과제 추출 없음'),
       '',
-      '## 기억해야 할 5가지',
+      extracted.keyTakeaways.length > 0
+        ? `## 기억해야 할 ${Math.min(extracted.keyTakeaways.length, 5)}가지`
+        : '## 핵심 정리',
       this.renderOrderedList(extracted.keyTakeaways, 5),
       '',
       '## 핵심 키워드',
