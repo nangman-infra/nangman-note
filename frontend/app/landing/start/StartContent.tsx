@@ -34,7 +34,7 @@ export function StartContent() {
                   로그인하고 시작하기
                 </Link>
                 <Link
-                  href="/landing/features"
+                  href="/landing/guide"
                   className="btn-neo px-6 py-3.5 text-sm"
                 >
                   기능 더 보기

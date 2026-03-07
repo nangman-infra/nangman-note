@@ -18,7 +18,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
-      url: toAbsoluteUrl('/landing/features'),
+      url: toAbsoluteUrl('/landing/guide'),
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.9,

@@ -48,7 +48,7 @@ export function HeroSection() {
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/landing/features"
+              href="/landing/guide"
               className="btn-neo px-5 py-3 text-sm"
             >
               <Eye className="h-4 w-4" />

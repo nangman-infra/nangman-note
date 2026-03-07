@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { Menu, X, Sparkles } from 'lucide-react';
 
 const navLinks = [
-  { href: '/landing/features', label: '사용 가이드' },
+  { href: '/landing/guide', label: '사용 가이드' },
   { href: '/landing/how-it-works', label: '동작 방식' },
   { href: '/landing/use-cases', label: '사례' },
 ] as const;

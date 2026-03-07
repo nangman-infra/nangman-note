@@ -18,7 +18,7 @@ export function LandingFooter() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-4 text-xs text-muted">
-            <Link href="/landing/features" className="transition hover:text-foreground">
+            <Link href="/landing/guide" className="transition hover:text-foreground">
               사용 가이드
             </Link>
             <Link href="/landing/how-it-works" className="transition hover:text-foreground">

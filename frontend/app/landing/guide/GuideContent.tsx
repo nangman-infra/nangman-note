@@ -96,7 +96,7 @@ const flowSteps = [
   },
 ] as const;
 
-export function FeaturesContent() {
+export function GuideContent() {
   return (
     <div className="landing-shell min-h-dvh">
       <ScrollProgress />
