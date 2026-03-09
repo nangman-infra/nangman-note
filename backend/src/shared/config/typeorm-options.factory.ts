@@ -56,6 +56,9 @@ export function buildTypeOrmDataSourceOptions(
         max: env.DB_POOL_MAX,
         idleTimeoutMillis: env.DB_IDLE_TIMEOUT_MS,
         statement_timeout: env.DB_STATEMENT_TIMEOUT_MS,
+        // RDS가 idle 연결을 끊어도 풀이 자동 감지하도록 TCP keepalive 활성화
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 30_000,
       },
       synchronize: false,
       logging,
@@ -84,5 +87,8 @@ export function buildTypeOrmModuleOptions(
   return {
     ...buildTypeOrmDataSourceOptions(env),
     autoLoadEntities: true,
+    // DB 연결 실패 시 자동 재시도 (ECS 시작 시 RDS가 아직 준비 안 됐을 때 대비)
+    retryAttempts: 5,
+    retryDelay: 3000,
   } as TypeOrmModuleOptions;
 }
