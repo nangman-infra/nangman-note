@@ -35,10 +35,11 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const [timeFilter, setTimeFilter] = useState<SidebarTimeFilter>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [showTrash, setShowTrash] = useState(initialShowTrash);
-  const [meetingsInfo, setMeetingsInfo] = useState<{ total: number; isLoading: boolean; isSearchApplied: boolean }>({
+  const [meetingsInfo, setMeetingsInfo] = useState<{ total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean }>({
     total: -1,
     isLoading: true,
     isSearchApplied: false,
+    showTrash: false,
   });
   const { prompts } = usePrompt();
 
@@ -52,14 +53,14 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   };
 
   const handleMeetingsLoaded = useCallback(
-    (info: { total: number; isLoading: boolean; isSearchApplied: boolean }) => {
+    (info: { total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean }) => {
       setMeetingsInfo(info);
     },
     [],
   );
 
   const showOnboarding =
-    meetingsInfo.total === 0 && !meetingsInfo.isLoading && !meetingsInfo.isSearchApplied;
+    meetingsInfo.total === 0 && !meetingsInfo.isLoading && !meetingsInfo.isSearchApplied && !meetingsInfo.showTrash;
 
   return (
     <ThreeColumnLayout

@@ -54,7 +54,7 @@ interface MeetingListProps {
   tagFilter?: string | null;
   onTimeFilterChange?: (filter: SidebarTimeFilter) => void;
   onTagFilterChange?: (tag: string | null) => void;
-  onMeetingsLoaded?: (info: { total: number; isLoading: boolean; isSearchApplied: boolean }) => void;
+  onMeetingsLoaded?: (info: { total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean }) => void;
 }
 
 const filters: Array<{ key: 'all' | MeetingStatus; label: string }> = [
@@ -255,8 +255,8 @@ export function MeetingList({
 
   // Report meetings count to parent for onboarding logic
   useEffect(() => {
-    onMeetingsLoaded?.({ total: meetings.length, isLoading, isSearchApplied });
-  }, [meetings.length, isLoading, isSearchApplied, onMeetingsLoaded]);
+    onMeetingsLoaded?.({ total: meetings.length, isLoading, isSearchApplied, showTrash });
+  }, [meetings.length, isLoading, isSearchApplied, showTrash, onMeetingsLoaded]);
 
   const searchCandidates = useMemo(() => {
     if (showTrash) {

@@ -11,6 +11,7 @@ import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
 import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/lib/constants';
 import { meetingApi } from '@/domains/meeting/api/meetingApi';
 import { useResult } from '../hooks/useResult';
+import { useResultStore } from '../stores/resultStore';
 import {
   resultTabDataApi,
   type ResultTabTranscriptSegment,
@@ -218,6 +219,16 @@ export function ResultViewer({
     }
     try {
       await meetingApi.update(meetingId, { title: trimmed });
+      // Optimistic local update — patch the result store so the title renders immediately
+      useResultStore.setState((state) => {
+        if (!state.result) return state;
+        return {
+          result: {
+            ...state.result,
+            metadata: { ...state.result.metadata, title: trimmed },
+          },
+        };
+      });
       setIsEditingTitle(false);
       pushToast({ title: '제목이 변경되었습니다', variant: 'success' });
     } catch {
