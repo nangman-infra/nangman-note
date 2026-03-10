@@ -60,7 +60,7 @@ export function LandingNav() {
 
         <Link
           href="/landing/start"
-          className="btn-neo ml-auto border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white"
+          className="btn-neo inline-flex ml-auto border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white"
         >
           무료로 시작하기
         </Link>
@@ -102,7 +102,7 @@ export function LandingNav() {
             <Link
               href="/landing/start"
               onClick={() => setMobileOpen(false)}
-              className="btn-neo mt-2 border-transparent bg-brand text-center text-white hover:bg-brand-strong hover:text-white"
+              className="btn-neo inline-flex mt-2 border-transparent bg-brand text-center text-white hover:bg-brand-strong hover:text-white"
             >
               무료로 시작하기
             </Link>

@@ -29,7 +29,7 @@ export default function NewMeetingPage() {
   const { pushToast } = useFeedback();
   const { startMeeting, isLoading, error } = useMeeting();
   const { selectedPromptId, setSelectedPrompt } = usePromptStore();
-  const { prompts } = usePrompt();
+  const { prompts, isLoading: isPromptsLoading } = usePrompt();
 
   // 글로벌 설정에서 기본값 가져오기
   const {
@@ -47,6 +47,17 @@ export default function NewMeetingPage() {
   const [transcriptionMode, setTranscriptionMode] = useState(defaultTranscriptionMode);
   const [languageCode, setLanguageCode] = useState(defaultLanguageCode);
   const [translateTargetLanguage, setTranslateTargetLanguage] = useState(defaultTranslateTargetLanguage);
+
+  // 프롬프트 개념 설명 (A-3): localStorage로 dismiss 상태 관리
+  const [showPromptHelp, setShowPromptHelp] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return !localStorage.getItem('transnote_prompt_help_dismissed');
+  });
+
+  const dismissPromptHelp = () => {
+    localStorage.setItem('transnote_prompt_help_dismissed', 'true');
+    setShowPromptHelp(false);
+  };
 
   const selectedPrompt = prompts.find((p) => p.id === selectedPromptId);
 
@@ -82,10 +93,10 @@ export default function NewMeetingPage() {
   return (
     <div className="app-shell min-h-dvh p-4 sm:p-6">
       <div className="mx-auto grid min-h-[calc(100dvh-2rem)] w-full max-w-6xl gap-4 lg:grid-cols-[1fr_460px]">
-        {/* 왼쪽: 소개 영역 */}
-        <section className="glass-surface motion-rise flex flex-col justify-between p-6 sm:p-8">
+        {/* 왼쪽: 소개 영역 — 모바일에서 숨김 (1.19) */}
+        <section className="glass-surface motion-rise hidden flex-col justify-between p-6 sm:p-8 lg:flex">
           <div>
-            <button type="button" onClick={() => router.push('/')} className="btn-neo mb-5 text-xs text-muted">
+            <button type="button" onClick={() => router.push('/')} className="btn-neo inline-flex mb-5 text-xs text-muted">
               <ArrowLeft className="h-3.5 w-3.5" />
               워크스페이스로 돌아가기
             </button>
@@ -137,13 +148,11 @@ export default function NewMeetingPage() {
                   className="input-shell"
                   onKeyDown={(e) => {
                     if (e.key !== 'Enter') return;
-                    if (e.nativeEvent.isComposing) return;
                     e.preventDefault();
-                    void handleStart();
                   }}
                 />
                 <p className="mt-1 text-[11px] text-muted">
-                  미입력 시 AI가 회의 내용을 기반으로 자동 생성합니다.
+                  미입력 시 AI가 회의 내용을 기반으로 자동 생성합니다. 완료 후 결과 화면에서 수정할 수 있습니다.
                 </p>
               </div>
 
@@ -182,13 +191,18 @@ export default function NewMeetingPage() {
                   value={selectedPromptId}
                   onChange={(e) => setSelectedPrompt(e.target.value)}
                   className="input-shell w-full text-sm"
+                  disabled={isPromptsLoading}
                 >
-                  {prompts.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} · {PROMPT_DOCUMENT_TYPE_LABELS[p.documentType]}
-                      {p.isDefault ? ' (기본)' : ''}
-                    </option>
-                  ))}
+                  {isPromptsLoading ? (
+                    <option value="" disabled>프롬프트 로딩 중...</option>
+                  ) : (
+                    prompts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} · {PROMPT_DOCUMENT_TYPE_LABELS[p.documentType]}
+                        {p.isDefault ? ' (기본)' : ''}
+                      </option>
+                    ))
+                  )}
                 </select>
                 <p className="mt-1 text-[11px] text-muted">
                   현재: {selectedPrompt?.name || '회의'}
@@ -209,6 +223,23 @@ export default function NewMeetingPage() {
                     ? `${PROMPT_DOCUMENT_TYPE_HELP_TEXT[selectedPrompt.documentType]} 사용자 프롬프트는 이 기본 구조 위에 추가 강조만 적용됩니다.`
                     : '기본 문서 타입이 결과 구조를 정하고, 사용자 프롬프트는 추가 강조만 적용됩니다.'}
                 </p>
+                {showPromptHelp && (
+                  <div className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-[11px] text-sky-800">
+                    <p className="font-semibold">💡 프롬프트란?</p>
+                    <p className="mt-1">
+                      AI가 회의록을 작성할 때 사용하는 템플릿입니다. &ldquo;회의록&rdquo;은
+                      안건·결정사항 중심, &ldquo;강의&rdquo;는 핵심 개념·요약 중심,
+                      &ldquo;멘토링&rdquo;은 조언·액션아이템 중심으로 정리합니다.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={dismissPromptHelp}
+                      className="mt-1 text-sky-600 hover:underline"
+                    >
+                      다시 보지 않기
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* 고급 설정 (접기/펼치기) */}
@@ -218,14 +249,31 @@ export default function NewMeetingPage() {
                   onClick={() => setShowAdvanced((v) => !v)}
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
                 >
-                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
-                    <Settings2 className="h-3.5 w-3.5" />
-                    고급 설정
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
+                      <Settings2 className="h-3.5 w-3.5" />
+                      고급 설정
+                    </span>
+                    {!showAdvanced && (
+                      <p className="mt-1 truncate text-[11px] text-muted/70">
+                        {transcriptionMode === MeetingTranscriptionMode.REALTIME
+                          ? 'Realtime'
+                          : 'Batch'}
+                        {' · '}
+                        {languageCode
+                          ? { 'ko-KR': '한국어', 'en-US': '영어', 'ja-JP': '일본어', 'zh-CN': '중국어', 'de-DE': '독일어', 'fr-FR': '프랑스어', 'es-ES': '스페인어' }[languageCode] ?? languageCode
+                          : '자동 감지'}
+                        {' · '}
+                        {translateTargetLanguage
+                          ? { ko: '한국어 번역', en: '영어 번역', ja: '일본어 번역', zh: '중국어 번역', de: '독일어 번역', fr: '프랑스어 번역', es: '스페인어 번역' }[translateTargetLanguage] ?? `${translateTargetLanguage} 번역`
+                          : '번역 없음'}
+                      </p>
+                    )}
+                  </div>
                   {showAdvanced ? (
-                    <ChevronUp className="h-4 w-4 text-muted" />
+                    <ChevronUp className="h-4 w-4 flex-shrink-0 text-muted" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-muted" />
+                    <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted" />
                   )}
                 </button>
 
@@ -312,7 +360,7 @@ export default function NewMeetingPage() {
               type="button"
               onClick={handleStart}
               disabled={isLoading}
-              className="btn-neo w-full border-transparent bg-brand py-3 text-base text-white hover:bg-brand-strong hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn-neo inline-flex w-full border-transparent bg-brand py-3 text-base text-white hover:bg-brand-strong hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Mic className="h-4 w-4" />
               {isLoading ? '회의를 준비하는 중...' : '회의 시작'}

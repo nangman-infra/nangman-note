@@ -3,6 +3,7 @@ import Script from 'next/script';
 import { IBM_Plex_Mono, Manrope } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/auth/AuthSessionProvider';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
+import { NetworkStatusBanner } from '@/components/feedback/NetworkStatusBanner';
 import { getServerRuntimeVar } from '@/lib/config/env';
 import { getSiteUrl } from '@/lib/seo/site-url';
 import '@toast-ui/editor/dist/toastui-editor.css';
@@ -125,6 +126,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${manrope.variable} ${plexMono.variable} antialiased`}>
+        <NetworkStatusBanner />
         <AuthSessionProvider>
           <FeedbackProvider>{children}</FeedbackProvider>
         </AuthSessionProvider>

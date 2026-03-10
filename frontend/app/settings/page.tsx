@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Edit3, Languages, Mic, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
+import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
 import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
 import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
@@ -46,6 +47,13 @@ export default function SettingsPage() {
     useState<PromptDocumentType>('meeting');
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // 5초 타임아웃 자동 취소 (1.35) — 다른 프롬프트 삭제 클릭 시 cleanup으로 이전 타이머 해제
+  useEffect(() => {
+    if (!deleteConfirmId) return;
+    const timer = setTimeout(() => setDeleteConfirmId(null), 5000);
+    return () => clearTimeout(timer);
+  }, [deleteConfirmId]);
 
   const openCreate = () => {
     setEditorMode('create');
@@ -127,7 +135,7 @@ export default function SettingsPage() {
   return (
     <div className="app-shell min-h-dvh p-4 sm:p-6">
       <div className="mx-auto w-full max-w-3xl">
-        <button type="button" onClick={() => router.push('/')} className="btn-neo mb-5 text-xs text-muted">
+        <button type="button" onClick={() => router.push('/')} className="btn-neo inline-flex mb-5 text-xs text-muted">
           <ArrowLeft className="h-3.5 w-3.5" />
           워크스페이스로 돌아가기
         </button>
@@ -143,7 +151,13 @@ export default function SettingsPage() {
           </p>
         </div>
 
+        {/* 설정 저장 범위 안내 (1.34) */}
+        <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          💡 이 설정은 이 브라우저에만 저장됩니다. 변경 사항은 즉시 적용됩니다.
+        </div>
+
         {/* 전사 기본 설정 */}
+        <ErrorBoundary>
         <section className="glass-surface mb-6 p-6">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
             <Mic className="h-5 w-5 text-brand" />
@@ -225,8 +239,10 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+        </ErrorBoundary>
 
         {/* 프롬프트 관리 */}
+        <ErrorBoundary>
         <section className="glass-surface p-6">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -242,7 +258,7 @@ export default function SettingsPage() {
               type="button"
               onClick={openCreate}
               disabled={isLoading}
-              className="btn-neo text-xs text-brand"
+              className="btn-neo inline-flex text-xs text-brand"
             >
               <Plus className="h-3.5 w-3.5" />
               새 프롬프트
@@ -313,6 +329,7 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+        </ErrorBoundary>
       </div>
 
       <PromptEditorDialog

@@ -6,6 +6,8 @@ import { AlertTriangle, Square, X } from 'lucide-react';
 interface EndMeetingDialogProps {
   open: boolean;
   isLoading?: boolean;
+  recordingTime?: string;
+  noteLength?: number;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -13,6 +15,8 @@ interface EndMeetingDialogProps {
 export function EndMeetingDialog({
   open,
   isLoading = false,
+  recordingTime,
+  noteLength,
   onConfirm,
   onCancel,
 }: EndMeetingDialogProps) {
@@ -79,12 +83,23 @@ export function EndMeetingDialog({
           작성하신 노트는 이미 자동 저장되어 있습니다.
         </p>
 
+        {(recordingTime || (noteLength !== undefined && noteLength > 0)) && (
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            {recordingTime && (
+              <p>🎙️ 녹음 시간: <span className="font-semibold">{recordingTime}</span></p>
+            )}
+            {noteLength !== undefined && noteLength > 0 && (
+              <p className={recordingTime ? 'mt-1' : ''}>📝 노트 길이: <span className="font-semibold">{noteLength.toLocaleString()}자</span></p>
+            )}
+          </div>
+        )}
+
         <div className="mt-6 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="btn-neo px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-neo inline-flex px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             취소
           </button>
@@ -92,7 +107,7 @@ export function EndMeetingDialog({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className="btn-neo border-transparent bg-rose-600 px-4 py-2 text-sm text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-neo inline-flex border-transparent bg-rose-600 px-4 py-2 text-sm text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Square className="h-3.5 w-3.5" />
             {isLoading ? '종료 처리 중...' : '회의 종료'}

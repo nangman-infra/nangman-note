@@ -15,9 +15,10 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE / AI tools
 .idea/
 .vscode/
+.kiro/
 *.sublime-workspace
 *.sublime-project
 .project

@@ -215,7 +215,7 @@ export function TranscriptPanel({
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
-            자동 따라가기 {followLive ? 'ON' : 'OFF'}
+            새 전사 자동 스크롤 {followLive ? 'ON' : 'OFF'}
           </button>
 
           {showJumpToLatest ? (

@@ -21,6 +21,8 @@ interface ProcessingProgressProps {
   uploadProgress: number;
   uploadError: string | null;
   onComplete?: () => void;
+  onRetryUpload?: () => void;
+  onContinueWithoutAudio?: () => void;
 }
 
 export function ProcessingProgress({
@@ -29,6 +31,8 @@ export function ProcessingProgress({
   uploadProgress,
   uploadError,
   onComplete,
+  onRetryUpload,
+  onContinueWithoutAudio,
 }: ProcessingProgressProps) {
   const [backendStep, setBackendStep] = useState<
     'transcribing' | 'generating' | 'completed'
@@ -115,6 +119,23 @@ export function ProcessingProgress({
       ? uploadError || '오디오 업로드에 실패했습니다.'
       : null;
 
+  // 경과 시간 카운터 (1.28)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    setElapsedSeconds(0);
+    if (currentStep === 'completed' || currentStep === 'failed') return;
+    const timer = window.setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [meetingId, currentStep === 'completed', currentStep === 'failed']);
+
+  const formatElapsed = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}분 ${s.toString().padStart(2, '0')}초`;
+  };
+
   const steps: Array<{
     key: ProcessingStep;
     label: string;
@@ -166,9 +187,40 @@ export function ProcessingProgress({
         </p>
       )}
 
+      {currentStep !== 'failed' && currentStep !== 'completed' && (
+        <div className="mt-2 text-xs text-muted">
+          <span>경과 시간: {formatElapsed(elapsedSeconds)}</span>
+          {elapsedSeconds > 300 && (
+            <p className="mt-1 text-amber-600 font-medium">
+              예상보다 오래 걸리고 있습니다. 완료 시 알려드립니다.
+            </p>
+          )}
+        </div>
+      )}
+
       {error && currentStep === 'failed' ? (
         <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           {error}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {onRetryUpload && (
+              <button
+                type="button"
+                onClick={onRetryUpload}
+                className="btn-neo inline-flex border-transparent bg-brand px-3 py-1.5 text-xs text-white hover:bg-brand-strong hover:text-white"
+              >
+                재시도
+              </button>
+            )}
+            {onContinueWithoutAudio && (
+              <button
+                type="button"
+                onClick={onContinueWithoutAudio}
+                className="btn-neo inline-flex px-3 py-1.5 text-xs text-muted"
+              >
+                노트 기반으로 계속
+              </button>
+            )}
+          </div>
         </div>
       ) : null}
 

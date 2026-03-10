@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useNote } from '../hooks/useNote';
@@ -10,6 +12,18 @@ interface NoteEditorProps {
 
 export function NoteEditor({ meetingId }: NoteEditorProps) {
   const { noteContent, isSaving, lastSaved, error, setContent } = useNote(meetingId);
+
+  // 단축키 힌트 (D-2): 첫 사용 시만 표시, localStorage로 dismiss 관리
+  const [showShortcutHint, setShowShortcutHint] = useState(false);
+  useEffect(() => {
+    const dismissed = localStorage.getItem('transnote_editor_shortcuts_dismissed');
+    if (!dismissed) setShowShortcutHint(true);
+  }, []);
+
+  const dismissShortcutHint = () => {
+    localStorage.setItem('transnote_editor_shortcuts_dismissed', 'true');
+    setShowShortcutHint(false);
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -39,6 +53,22 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
           height="100%"
         />
       </div>
+
+      {showShortcutHint && (
+        <div className="flex items-center justify-between border-t border-[var(--line-soft)] bg-slate-50 px-4 py-2">
+          <p className="text-[11px] text-muted">
+            Cmd+Z 실행취소 · Cmd+Y 다시실행 · Cmd+B 굵게
+          </p>
+          <button
+            type="button"
+            onClick={dismissShortcutHint}
+            className="rounded-full p-1 text-muted transition hover:bg-black/5"
+            aria-label="단축키 힌트 닫기"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

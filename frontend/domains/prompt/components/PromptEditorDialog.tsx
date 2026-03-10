@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
   PROMPT_DOCUMENT_TYPE_HELP_TEXT,
@@ -36,12 +36,41 @@ export function PromptEditorDialog({
   onSave,
   onCancel,
 }: PromptEditorDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState(initialName);
   const [content, setContent] = useState(initialContent);
   const [documentType, setDocumentType] =
     useState<PromptDocumentType>(initialDocumentType);
 
-  if (!open) return null;
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (open) {
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+    } else {
+      if (dialog.open) {
+        dialog.close();
+      }
+    }
+  }, [open]);
+
+  // Handle native dialog close (ESC key) by calling onCancel
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const handleClose = () => {
+      if (open) {
+        onCancel();
+      }
+    };
+
+    dialog.addEventListener('close', handleClose);
+    return () => dialog.removeEventListener('close', handleClose);
+  }, [open, onCancel]);
 
   const isValid = name.trim().length > 0 && content.trim().length > 0;
 
@@ -52,10 +81,13 @@ export function PromptEditorDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <dialog
+      ref={dialogRef}
+      className="m-auto w-full max-w-lg rounded-xl bg-transparent p-0 backdrop:bg-black/30"
+    >
       <form
         onSubmit={handleSubmit}
-        className="surface-card w-full max-w-lg space-y-4 p-5 shadow-xl"
+        className="surface-card w-full space-y-4 p-5 shadow-xl"
       >
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">
@@ -156,19 +188,19 @@ export function PromptEditorDialog({
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="btn-neo px-4 py-2 text-xs"
+            className="btn-neo inline-flex px-4 py-2 text-xs"
           >
             취소
           </button>
           <button
             type="submit"
             disabled={!isValid || isLoading}
-            className="btn-neo border-transparent bg-brand px-4 py-2 text-xs text-white disabled:cursor-not-allowed disabled:opacity-45"
+            className="btn-neo inline-flex border-transparent bg-brand px-4 py-2 text-xs text-white disabled:cursor-not-allowed disabled:opacity-45"
           >
             {isLoading ? '저장 중...' : mode === 'create' ? '생성' : '저장'}
           </button>
         </div>
       </form>
-    </div>
+    </dialog>
   );
 }

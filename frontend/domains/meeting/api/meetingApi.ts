@@ -46,6 +46,15 @@ export const meetingApi = {
     return response.data.data;
   },
 
+  // 회의 정보 업데이트 (제목 등)
+  update: async (id: string, data: Partial<Pick<Meeting, 'title'>>): Promise<Meeting> => {
+    const response = await apiClient.patch<{ data: Meeting }>(
+      `/api/v1/meetings/${id}`,
+      data,
+    );
+    return response.data.data;
+  },
+
   // 프롬프트 변경
   updatePrompt: async (id: string, promptId: string): Promise<Meeting> => {
     const response = await apiClient.patch<{ data: Meeting }>(

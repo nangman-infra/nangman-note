@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Download, Edit3, FileText, RefreshCw, Save, X } from 'lucide-react';
+import { Copy, Download, Edit3, FileText, Loader2, MoreVertical, RefreshCw, Save, X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
 import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/lib/constants';
+import { meetingApi } from '@/domains/meeting/api/meetingApi';
 import { useResult } from '../hooks/useResult';
 import {
   resultTabDataApi,
@@ -72,6 +73,13 @@ export function ResultViewer({
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [tabDataMeetingId, setTabDataMeetingId] = useState('');
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [isExporting, setIsExporting] = useState<'pdf' | 'docx' | null>(null);
+  const overflowMenuRef = useRef<HTMLDivElement>(null);
+  const regenerateDialogRef = useRef<HTMLDialogElement>(null);
 
   // 탭 데이터 로드
   useEffect(() => {
@@ -129,6 +137,29 @@ export function ResultViewer({
     onMeetingUnavailable?.(meetingId);
   }, [isMissingMeeting, meetingId, onMeetingUnavailable, pushToast]);
 
+  // Close overflow menu on outside click
+  useEffect(() => {
+    if (!showOverflowMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node)) {
+        setShowOverflowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showOverflowMenu]);
+
+  // Regenerate confirmation dialog open/close
+  useEffect(() => {
+    const dialog = regenerateDialogRef.current;
+    if (!dialog) return;
+    if (showRegenerateConfirm) {
+      dialog.showModal();
+    } else {
+      dialog.close();
+    }
+  }, [showRegenerateConfirm]);
+
   const resolvedRegeneratePromptId =
     regeneratePromptId || result?.promptId || promptOptions[0]?.id || '';
   const selectedRegeneratePrompt = promptOptions.find(
@@ -174,6 +205,26 @@ export function ResultViewer({
     );
   }
 
+  const handleTitleClick = () => {
+    setEditTitle(result.metadata?.title || '');
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleSave = async () => {
+    const trimmed = editTitle.trim();
+    if (!trimmed) {
+      setIsEditingTitle(false);
+      return;
+    }
+    try {
+      await meetingApi.update(meetingId, { title: trimmed });
+      setIsEditingTitle(false);
+      pushToast({ title: '제목이 변경되었습니다', variant: 'success' });
+    } catch {
+      pushToast({ title: '제목 변경에 실패했습니다', variant: 'error' });
+    }
+  };
+
   const handleSave = async () => {
     const success = await updateResult(editContent);
     if (!success) return;
@@ -200,6 +251,7 @@ export function ResultViewer({
 
   const handleRegenerate = async () => {
     if (!resolvedRegeneratePromptId.trim()) return;
+    setShowRegenerateConfirm(false);
     const success = await regenerateResult(resolvedRegeneratePromptId.trim());
     if (!success) return;
 
@@ -212,28 +264,43 @@ export function ResultViewer({
     });
   };
 
+  const handleRegenerateClick = () => {
+    if (!resolvedRegeneratePromptId.trim()) return;
+    setShowRegenerateConfirm(true);
+  };
+
   const openRegeneratePanel = () => {
     setShowRegenerate(true);
   };
 
   const handleExportPDF = async () => {
-    const success = await exportPDF();
-    if (!success) return;
-
-    pushToast({
-      title: 'PDF 다운로드를 시작했습니다',
-      variant: 'info',
-    });
+    setIsExporting('pdf');
+    try {
+      const success = await exportPDF();
+      if (!success) return;
+      pushToast({
+        title: '다운로드 폴더에 저장되었습니다',
+        description: 'PDF 파일이 다운로드되었습니다.',
+        variant: 'success',
+      });
+    } finally {
+      setIsExporting(null);
+    }
   };
 
   const handleExportDOCX = async () => {
-    const success = await exportDOCX();
-    if (!success) return;
-
-    pushToast({
-      title: 'DOCX 다운로드를 시작했습니다',
-      variant: 'info',
-    });
+    setIsExporting('docx');
+    try {
+      const success = await exportDOCX();
+      if (!success) return;
+      pushToast({
+        title: '다운로드 폴더에 저장되었습니다',
+        description: 'DOCX 파일이 다운로드되었습니다.',
+        variant: 'success',
+      });
+    } finally {
+      setIsExporting(null);
+    }
   };
 
   return (
@@ -242,40 +309,93 @@ export function ResultViewer({
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold tracking-wide text-muted">RESULT</p>
-            <h2 className="text-xl font-semibold leading-tight">{result.metadata?.title || '회의록'}</h2>
+            {isEditingTitle ? (
+              <input
+                autoFocus
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onBlur={() => void handleTitleSave()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleTitleSave();
+                  if (e.key === 'Escape') setIsEditingTitle(false);
+                }}
+                className="input-shell text-xl font-semibold"
+              />
+            ) : (
+              <h2
+                onClick={handleTitleClick}
+                className="text-xl font-semibold leading-tight cursor-pointer hover:text-brand transition"
+                title="클릭하여 제목 편집"
+              >
+                {result.metadata?.title || '회의록'}
+              </h2>
+            )}
             <p className="mt-1 text-xs text-muted">생성 시각: {new Date(result.createdAt).toLocaleString()}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {!isEditing ? (
               <>
-                <button type="button" onClick={handleStartEdit} className="btn-neo">
+                <button type="button" onClick={handleStartEdit} className="btn-neo inline-flex">
                   <Edit3 className="h-4 w-4" />
                   편집
                 </button>
-                <button type="button" onClick={handleCopy} className="btn-neo">
+                <button type="button" onClick={handleCopy} className="btn-neo inline-flex">
                   <Copy className="h-4 w-4" />
                   복사
                 </button>
-                <button type="button" onClick={handleExportPDF} className="btn-neo">
-                  <Download className="h-4 w-4" />
+                <button type="button" onClick={handleExportPDF} disabled={isExporting !== null} className="btn-neo hidden sm:inline-flex">
+                  {isExporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   PDF
                 </button>
-                <button type="button" onClick={handleExportDOCX} className="btn-neo">
-                  <FileText className="h-4 w-4" />
+                <button type="button" onClick={handleExportDOCX} disabled={isExporting !== null} className="btn-neo hidden sm:inline-flex">
+                  {isExporting === 'docx' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                   DOCX
                 </button>
+                {/* Mobile overflow menu for PDF/DOCX */}
+                <div ref={overflowMenuRef} className="relative sm:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowOverflowMenu((v) => !v)}
+                    className="btn-neo inline-flex"
+                    aria-label="더보기"
+                    aria-expanded={showOverflowMenu}
+                    aria-haspopup="true"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                  {showOverflowMenu && (
+                    <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-lg border border-[var(--line-soft)] bg-white py-1 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => { void handleExportPDF(); setShowOverflowMenu(false); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                      >
+                        <Download className="h-4 w-4" />
+                        PDF 내보내기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { void handleExportDOCX(); setShowOverflowMenu(false); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                      >
+                        <FileText className="h-4 w-4" />
+                        DOCX 내보내기
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <>
-                <button type="button" onClick={() => setIsEditing(false)} className="btn-neo">
+                <button type="button" onClick={() => setIsEditing(false)} className="btn-neo inline-flex">
                   <X className="h-4 w-4" />
                   취소
                 </button>
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="btn-neo border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white"
+                  className="btn-neo inline-flex border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white"
                 >
                   <Save className="h-4 w-4" />
                   저장
@@ -337,7 +457,7 @@ export function ResultViewer({
       <section className="scroll-muted flex-1 overflow-y-auto px-6 py-5">
         {/* 회의록 탭 */}
         {activeTab === 'result' && isEditing ? (
-          <div className="surface-card h-[min(64vh,760px)] min-h-[360px] overflow-hidden">
+          <div className="surface-card h-full min-h-[360px] overflow-hidden">
             <MarkdownWysiwygEditor
               value={editContent}
               onChange={setEditContent}
@@ -400,7 +520,7 @@ export function ResultViewer({
       {!isEditing && activeTab === 'result' && (
         <footer className="border-t border-[var(--line-soft)] px-6 py-4">
           {!showRegenerate ? (
-            <button type="button" onClick={openRegeneratePanel} className="btn-neo">
+            <button type="button" onClick={openRegeneratePanel} className="btn-neo inline-flex">
               <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
               프롬프트 변경 후 재생성
             </button>
@@ -448,15 +568,15 @@ export function ResultViewer({
                 <button
                   type="button"
                   onClick={() => setShowRegenerate(false)}
-                  className="btn-neo whitespace-nowrap px-4 py-2 text-sm"
+                  className="btn-neo inline-flex whitespace-nowrap px-4 py-2 text-sm"
                 >
                   취소
                 </button>
                 <button
                   type="button"
-                  onClick={handleRegenerate}
+                  onClick={handleRegenerateClick}
                   disabled={isRegenerating || !resolvedRegeneratePromptId.trim()}
-                  className="btn-neo whitespace-nowrap border-transparent bg-brand px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn-neo inline-flex whitespace-nowrap border-transparent bg-brand px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {isRegenerating ? '재생성 중...' : '재생성 실행'}
                 </button>
@@ -465,6 +585,33 @@ export function ResultViewer({
           )}
         </footer>
       )}
+      {/* 재생성 확인 다이얼로그 */}
+      <dialog
+        ref={regenerateDialogRef}
+        onClose={() => setShowRegenerateConfirm(false)}
+        className="rounded-xl border border-[var(--line-soft)] bg-white p-6 shadow-xl backdrop:bg-black/40"
+      >
+        <h3 className="text-base font-semibold">재생성 확인</h3>
+        <p className="mt-2 text-sm text-muted">
+          현재 회의록이 새 결과로 대체됩니다. 계속하시겠습니까?
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setShowRegenerateConfirm(false)}
+            className="btn-neo inline-flex px-4 py-2 text-sm"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={handleRegenerate}
+            className="btn-neo inline-flex border-transparent bg-brand px-4 py-2 text-sm text-white hover:bg-brand-strong hover:text-white"
+          >
+            계속
+          </button>
+        </div>
+      </dialog>
     </div>
   );
 }

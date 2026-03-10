@@ -27,13 +27,13 @@ export function BottomCta({ nextHref, nextLabel }: BottomCtaProps) {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/landing/start"
-              className="btn-neo border-transparent bg-brand px-6 py-3 text-sm text-white hover:bg-brand-strong hover:text-white"
+              className="btn-neo inline-flex border-transparent bg-brand px-6 py-3 text-sm text-white hover:bg-brand-strong hover:text-white"
             >
               무료로 시작하기
               <ArrowRight className="h-4 w-4" />
             </Link>
             {nextHref && nextLabel && (
-              <Link href={nextHref} className="btn-neo px-6 py-3 text-sm">
+              <Link href={nextHref} className="btn-neo inline-flex px-6 py-3 text-sm">
                 {nextLabel}
                 <ArrowRight className="h-4 w-4" />
               </Link>

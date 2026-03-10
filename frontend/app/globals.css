@@ -93,23 +93,23 @@ a {
   border-radius: 18px;
 }
 
-.btn-neo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: 12px;
-  border: 1px solid var(--line-soft);
-  padding: 0.6rem 0.9rem;
-  font-size: 0.87rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
+@layer components {
+  .btn-neo {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--line-soft);
+    padding: 0.6rem 0.9rem;
+    font-size: 0.87rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
 
-.btn-neo:hover {
-  transform: translateY(-1px);
-  border-color: var(--line-strong);
-
+  .btn-neo:hover {
+    transform: translateY(-1px);
+    border-color: var(--line-strong);
+  }
 }
 
 .btn-neo:focus-visible,

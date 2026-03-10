@@ -23,19 +23,38 @@ import {
   type MeetingActionType,
 } from './MeetingActionDialog';
 import { MeetingCard } from './MeetingCard';
+import { MeetingCardSkeleton } from './MeetingCardSkeleton';
 import type { SidebarTimeFilter } from '@/components/layout/Sidebar';
 import {
   areAllVisibleMeetingsSelected,
   pruneSelectionToVisible,
 } from './meetingSelection';
 
+/** Maps known promptId values to human-readable tag labels. */
+const TAG_LABEL_MAP: Record<string, string> = {
+  prompt_default_meeting: '회의록',
+  prompt_default_lecture: '강의',
+  prompt_default_seminar: '멘토링',
+};
+
+const TIME_FILTER_LABEL: Record<SidebarTimeFilter, string> = {
+  today: '오늘',
+  recent: '최근 7일',
+  all: '전체',
+};
+
 interface MeetingListProps {
   initialShowTrash?: boolean;
+  showTrash?: boolean;
+  onShowTrashChange?: (showTrash: boolean) => void;
   refreshToken?: number;
   onSelectMeeting?: (meetingId: string | null) => void;
   selectedMeetingId?: string;
   timeFilter?: SidebarTimeFilter;
   tagFilter?: string | null;
+  onTimeFilterChange?: (filter: SidebarTimeFilter) => void;
+  onTagFilterChange?: (tag: string | null) => void;
+  onMeetingsLoaded?: (info: { total: number; isLoading: boolean; isSearchApplied: boolean }) => void;
 }
 
 const filters: Array<{ key: 'all' | MeetingStatus; label: string }> = [
@@ -62,11 +81,16 @@ function isMeetingStatus(value: string): value is MeetingStatus {
 
 export function MeetingList({
   initialShowTrash = false,
+  showTrash: controlledShowTrash,
+  onShowTrashChange,
   refreshToken = 0,
   onSelectMeeting,
   selectedMeetingId,
   timeFilter = 'all',
   tagFilter = null,
+  onTimeFilterChange,
+  onTagFilterChange,
+  onMeetingsLoaded,
 }: MeetingListProps) {
   const {
     meetings,
@@ -88,8 +112,19 @@ export function MeetingList({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchApplied, setIsSearchApplied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | MeetingStatus>('all');
-  const [showTrash, setShowTrash] = useState(initialShowTrash);
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'longest'>('newest');
+  const [internalShowTrash, setInternalShowTrash] = useState(initialShowTrash);
+  const isControlled = controlledShowTrash !== undefined;
+  const showTrash = isControlled ? controlledShowTrash : internalShowTrash;
+  const setShowTrash = (value: boolean | ((prev: boolean) => boolean)) => {
+    const nextValue = typeof value === 'function' ? value(showTrash) : value;
+    if (!isControlled) {
+      setInternalShowTrash(nextValue);
+    }
+    onShowTrashChange?.(nextValue);
+  };
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+  const [activeDescendantIndex, setActiveDescendantIndex] = useState(-1);
   const [recentSearches, setRecentSearches] = useLocalStorage<string[]>('transnote_recent_meeting_searches', []);
   const [pendingAction, setPendingAction] = useState<{
     type: MeetingActionType;
@@ -128,22 +163,37 @@ export function MeetingList({
       return;
     }
 
-    const timerId = window.setInterval(() => {
+    const poll = () => {
+      if (document.visibilityState === 'hidden') return;
       if (showTrash) {
         void fetchTrashMeetings({ silent: true });
-        return;
+      } else {
+        void fetchMeetings({ silent: true });
       }
-      void fetchMeetings({ silent: true });
-    }, POLL_INTERVAL_MS);
+    };
+
+    const timerId = window.setInterval(poll, POLL_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        poll();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.clearInterval(timerId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [fetchMeetings, fetchTrashMeetings, isSearchApplied, showTrash]);
 
+  // Sync controlled prop → internal state
   useEffect(() => {
-    setShowTrash(initialShowTrash);
-  }, [initialShowTrash]);
+    if (!isControlled) {
+      setInternalShowTrash(initialShowTrash); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+  }, [initialShowTrash, isControlled]);
 
   useEffect(() => {
     if (!error) return;
@@ -188,15 +238,25 @@ export function MeetingList({
   // 선택 모드 해제 시 선택 초기화
   useEffect(() => {
     if (!selectionMode) {
-      setSelectedIds(new Set());
+      setSelectedIds(new Set()); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [selectionMode]);
 
   // 뷰 전환 시 선택 모드 해제
   useEffect(() => {
-    setSelectionMode(false);
+    setSelectionMode(false); // eslint-disable-line react-hooks/set-state-in-effect
     setSelectedIds(new Set());
   }, [showTrash]);
+
+  // Reset active descendant when dropdown closes
+  useEffect(() => {
+    setActiveDescendantIndex(-1); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [isSuggestionOpen]);
+
+  // Report meetings count to parent for onboarding logic
+  useEffect(() => {
+    onMeetingsLoaded?.({ total: meetings.length, isLoading, isSearchApplied });
+  }, [meetings.length, isLoading, isSearchApplied, onMeetingsLoaded]);
 
   const searchCandidates = useMemo(() => {
     if (showTrash) {
@@ -252,17 +312,30 @@ export function MeetingList({
     return result;
   }, [activeFilter, meetings, isSearchApplied, showTrash, tagFilter, timeFilter, trashMeetings]);
 
+  // 정렬 적용 (B-3)
+  const sortedMeetings = useMemo(() => {
+    const sorted = [...filteredMeetings];
+    if (sortBy === 'oldest') {
+      sorted.reverse();
+    } else if (sortBy === 'longest') {
+      sorted.sort((a, b) => {
+        const dA = a.endedAt ? new Date(a.endedAt).getTime() - new Date(a.startedAt).getTime() : 0;
+        const dB = b.endedAt ? new Date(b.endedAt).getTime() - new Date(b.startedAt).getTime() : 0;
+        return dB - dA;
+      });
+    }
+    return sorted;
+  }, [filteredMeetings, sortBy]);
+
   const visibleMeetingIds = useMemo(
-    () => filteredMeetings.map((meeting) => meeting.id),
-    [filteredMeetings],
+    () => sortedMeetings.map((meeting) => meeting.id),
+    [sortedMeetings],
   );
 
+  // Prune selection to visible meetings
   useEffect(() => {
-    if (!selectionMode) {
-      return;
-    }
-
-    setSelectedIds((prev) => pruneSelectionToVisible(prev, visibleMeetingIds));
+    if (!selectionMode) return;
+    setSelectedIds((prev) => pruneSelectionToVisible(prev, visibleMeetingIds)); // eslint-disable-line react-hooks/set-state-in-effect -- sync derived state
   }, [selectionMode, visibleMeetingIds]);
 
   // ── 다중 선택 핸들러 ──
@@ -375,6 +448,46 @@ export function MeetingList({
     blurTimerRef.current = window.setTimeout(() => {
       setIsSuggestionOpen(false);
     }, 140);
+  };
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isSuggestionOpen || suggestions.length === 0) {
+      if (event.key === 'Escape') {
+        setIsSuggestionOpen(false);
+        inputRef.current?.blur();
+      }
+      return;
+    }
+
+    switch (event.key) {
+      case 'ArrowDown': {
+        event.preventDefault();
+        setActiveDescendantIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : 0,
+        );
+        break;
+      }
+      case 'ArrowUp': {
+        event.preventDefault();
+        setActiveDescendantIndex((prev) =>
+          prev > 0 ? prev - 1 : suggestions.length - 1,
+        );
+        break;
+      }
+      case 'Enter': {
+        if (activeDescendantIndex >= 0 && activeDescendantIndex < suggestions.length) {
+          event.preventDefault();
+          runSearch(suggestions[activeDescendantIndex]);
+        }
+        break;
+      }
+      case 'Escape': {
+        event.preventDefault();
+        setIsSuggestionOpen(false);
+        setActiveDescendantIndex(-1);
+        break;
+      }
+    }
   };
 
   const clearSearch = () => {
@@ -567,7 +680,7 @@ export function MeetingList({
             </h2>
           </div>
           <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-muted">
-            {filteredMeetings.length}개
+            {sortedMeetings.length}개
           </span>
         </div>
 
@@ -598,8 +711,23 @@ export function MeetingList({
               onChange={(event) => setSearchQuery(event.target.value)}
               onFocus={handleSearchFocus}
               onBlur={handleSearchBlur}
+              onKeyDown={handleSearchKeyDown}
               placeholder="회의 제목 또는 내용 검색"
-              className="input-shell h-11 rounded-2xl bg-white/95 !pl-11 !pr-28 shadow-[0_8px_20px_rgba(18,33,43,0.08)]"
+              role="combobox"
+              aria-expanded={isSuggestionOpen && suggestions.length > 0}
+              aria-controls="meeting-search-listbox"
+              aria-activedescendant={
+                activeDescendantIndex >= 0
+                  ? `meeting-search-option-${activeDescendantIndex}`
+                  : undefined
+              }
+              aria-autocomplete="list"
+              aria-haspopup="listbox"
+              className={`input-shell h-11 rounded-2xl !pl-11 !pr-28 shadow-[0_8px_20px_rgba(18,33,43,0.08)] ${
+                showTrash
+                  ? 'bg-slate-100 opacity-60 cursor-not-allowed'
+                  : 'bg-white/95'
+              }`}
               disabled={showTrash}
             />
 
@@ -616,14 +744,19 @@ export function MeetingList({
 
             <button
               type="submit"
-              className="btn-neo absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl px-2.5 py-1 text-xs"
+              className="btn-neo inline-flex absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl px-2.5 py-1 text-xs"
               disabled={showTrash}
             >
               검색
             </button>
 
             {isSuggestionOpen && suggestions.length > 0 ? (
-              <div className="surface-card absolute z-30 mt-2 w-full overflow-hidden border bg-white/95 p-1.5 shadow-[0_14px_28px_rgba(18,33,43,0.15)]">
+              <div
+                id="meeting-search-listbox"
+                role="listbox"
+                aria-label="추천 검색어"
+                className="surface-card absolute z-30 mt-2 w-full overflow-hidden border bg-white/95 p-1.5 shadow-[0_14px_28px_rgba(18,33,43,0.15)]"
+              >
                 <div className="mb-1 flex items-center justify-between px-2 py-1">
                   <p className="text-[11px] font-semibold tracking-wide text-muted">추천 검색어</p>
                   {recentSearches.length > 0 ? (
@@ -638,15 +771,23 @@ export function MeetingList({
                   ) : null}
                 </div>
                 <ul className="space-y-0.5">
-                  {suggestions.map((suggestion) => {
+                  {suggestions.map((suggestion, index) => {
                     const isRecent = recentSearches.includes(suggestion);
+                    const isActive = index === activeDescendantIndex;
                     return (
-                      <li key={suggestion}>
+                      <li
+                        key={suggestion}
+                        id={`meeting-search-option-${index}`}
+                        role="option"
+                        aria-selected={isActive}
+                      >
                         <button
                           type="button"
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => runSearch(suggestion)}
-                          className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition hover:bg-brand/10"
+                          className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition hover:bg-brand/10 ${
+                            isActive ? 'bg-brand/10' : ''
+                          }`}
                         >
                           {isRecent ? (
                             <History className="h-3.5 w-3.5 text-muted" />
@@ -708,7 +849,7 @@ export function MeetingList({
           </button>
 
           {/* 선택 모드 토글 버튼 */}
-          {filteredMeetings.length > 0 ? (
+          {sortedMeetings.length > 0 ? (
             <button
               type="button"
               onClick={toggleSelectionMode}
@@ -723,6 +864,82 @@ export function MeetingList({
             </button>
           ) : null}
         </div>
+
+        {/* ── 활성 필터 칩 ── */}
+        {!showTrash && (timeFilter !== 'all' || tagFilter || activeFilter !== 'all' || isSearchApplied) ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted">적용 중:</span>
+            {timeFilter !== 'all' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
+                {TIME_FILTER_LABEL[timeFilter]}
+                <button
+                  type="button"
+                  aria-label={`${TIME_FILTER_LABEL[timeFilter]} 필터 해제`}
+                  onClick={() => onTimeFilterChange?.('all')}
+                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-indigo-200/60"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : null}
+            {tagFilter ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700">
+                {TAG_LABEL_MAP[tagFilter] ?? tagFilter}
+                <button
+                  type="button"
+                  aria-label={`${TAG_LABEL_MAP[tagFilter] ?? tagFilter} 태그 해제`}
+                  onClick={() => onTagFilterChange?.(null)}
+                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-teal-200/60"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : null}
+            {activeFilter !== 'all' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                {filters.find((f) => f.key === activeFilter)?.label ?? activeFilter}
+                <button
+                  type="button"
+                  aria-label={`${filters.find((f) => f.key === activeFilter)?.label ?? activeFilter} 상태 필터 해제`}
+                  onClick={() => setActiveFilter('all')}
+                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-amber-200/60"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : null}
+            {isSearchApplied && searchQuery ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
+                &ldquo;{searchQuery}&rdquo;
+                <button
+                  type="button"
+                  aria-label="검색어 필터 해제"
+                  onClick={clearSearch}
+                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-violet-200/60"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* 정렬 옵션 (B-3) */}
+        {!showTrash && (
+          <div className="mt-2 flex items-center gap-2">
+            <label htmlFor="meeting-sort" className="text-[11px] text-muted">정렬:</label>
+            <select
+              id="meeting-sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'longest')}
+              className="rounded-lg border border-[var(--line-soft)] bg-white px-2 py-1 text-[11px] font-semibold text-muted"
+            >
+              <option value="newest">최신순</option>
+              <option value="oldest">오래된순</option>
+              <option value="longest">길이순</option>
+            </select>
+          </div>
+        )}
       </header>
 
       {/* ── 선택 모드 툴바 ── */}
@@ -753,7 +970,7 @@ export function MeetingList({
                   type="button"
                   onClick={handleBulkRestore}
                   disabled={selectedIds.size === 0}
-                  className="btn-neo whitespace-nowrap px-2.5 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-neo inline-flex whitespace-nowrap px-2.5 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <RotateCcw className="h-3 w-3" />
                   복구
@@ -762,7 +979,7 @@ export function MeetingList({
                   type="button"
                   onClick={handleBulkPurge}
                   disabled={selectedIds.size === 0}
-                  className="btn-neo whitespace-nowrap border-transparent bg-rose-600 px-2.5 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-neo inline-flex whitespace-nowrap border-transparent bg-rose-600 px-2.5 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2 className="h-3 w-3" />
                   삭제
@@ -773,7 +990,7 @@ export function MeetingList({
                 type="button"
                 onClick={handleBulkDelete}
                 disabled={selectedIds.size === 0}
-                className="btn-neo whitespace-nowrap border-transparent bg-rose-600 px-2.5 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-neo inline-flex whitespace-nowrap border-transparent bg-rose-600 px-2.5 py-1.5 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Trash2 className="h-3 w-3" />
                 삭제
@@ -785,20 +1002,65 @@ export function MeetingList({
 
       <div className="scroll-muted flex-1 space-y-2 overflow-y-auto px-4 py-4">
         {isLoading ? (
-          <div className="surface-card p-6 text-center text-sm text-muted">회의를 불러오는 중입니다...</div>
-        ) : filteredMeetings.length === 0 ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }, (_, i) => (
+              <MeetingCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : sortedMeetings.length === 0 ? (
           <div className="surface-card p-6 text-center">
-            <p className="mb-1 text-sm font-semibold">
-              {showTrash ? '휴지통이 비어 있습니다' : '표시할 회의가 없습니다'}
-            </p>
-            <p className="text-xs text-muted">
-              {showTrash
-                ? '삭제한 회의가 있으면 이곳에서 복구하거나 영구 삭제할 수 있습니다.'
-                : '검색어를 비우거나 다른 필터를 선택해보세요.'}
-            </p>
+            {showTrash ? (
+              <>
+                <p className="mb-1 text-sm font-semibold">휴지통이 비어 있습니다</p>
+                <p className="text-xs text-muted">
+                  삭제한 회의가 있으면 이곳에서 복구하거나 영구 삭제할 수 있습니다.
+                </p>
+              </>
+            ) : (
+              <>
+                <Search className="mx-auto mb-3 h-8 w-8 text-muted/40" />
+                <p className="mb-1 text-sm font-semibold">검색 결과가 없습니다</p>
+                {isSearchApplied && searchQuery ? (
+                  <p className="mb-3 text-xs text-muted">
+                    &ldquo;<span className="font-medium text-foreground">{searchQuery}</span>&rdquo;에 대한 결과를 찾을 수 없습니다.
+                  </p>
+                ) : (
+                  <p className="mb-3 text-xs text-muted">
+                    현재 필터 조건에 맞는 회의가 없습니다.
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {isSearchApplied ? (
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="btn-neo inline-flex rounded-xl px-3 py-1.5 text-xs"
+                    >
+                      <X className="h-3 w-3" />
+                      검색어 초기화
+                    </button>
+                  ) : null}
+                  {(activeFilter !== 'all' || timeFilter !== 'all' || tagFilter) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveFilter('all');
+                      }}
+                      className="btn-neo inline-flex rounded-xl px-3 py-1.5 text-xs"
+                    >
+                      <SlidersHorizontal className="h-3 w-3" />
+                      필터 초기화
+                    </button>
+                  ) : null}
+                </div>
+                <p className="mt-3 text-[11px] text-muted">
+                  다른 검색어를 입력하거나 필터를 변경해보세요.
+                </p>
+              </>
+            )}
           </div>
         ) : (
-          filteredMeetings.map((meeting, index) => (
+          sortedMeetings.map((meeting, index) => (
             <div key={meeting.id} className={index < 3 ? 'motion-rise' : ''}>
               <MeetingCard
                 meeting={meeting}

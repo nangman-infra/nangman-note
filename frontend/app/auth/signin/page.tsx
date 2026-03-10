@@ -1,12 +1,45 @@
 'use client';
 
+import { Suspense } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ShieldCheck, Sparkles, Lock } from 'lucide-react';
+import { ShieldCheck, Sparkles, Lock, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 
-export default function SignInPage() {
+function getErrorInfo(errorCode: string | null): { title: string; description: string } | null {
+  if (!errorCode) return null;
+
+  switch (errorCode) {
+    case 'OAuthSignin':
+    case 'OAuthCallback':
+    case 'OAuthCreateAccount':
+    case 'Callback':
+      return {
+        title: '인증 처리 중 오류가 발생했습니다',
+        description: '서버와의 통신 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
+      };
+    case 'AccessDenied':
+      return {
+        title: '접근이 거부되었습니다',
+        description: '이 서비스에 대한 접근 권한이 없습니다. 낭만 인프라 소속 계정인지 확인해주세요.',
+      };
+    case 'Configuration':
+    case 'OAuthAccountNotLinked':
+      return {
+        title: '서버 설정 오류가 발생했습니다',
+        description: '인증 서버 설정에 문제가 있습니다. 관리자에게 문의해주세요.',
+      };
+    default:
+      return {
+        title: '로그인에 실패했습니다',
+        description: '알 수 없는 오류가 발생했습니다. 다시 시도해주세요.',
+      };
+  }
+}
+
+function SignInContent() {
   const searchParams = useSearchParams();
+  const errorInfo = getErrorInfo(searchParams.get('error'));
 
   const handleSignIn = () => {
     const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'));
@@ -34,11 +67,36 @@ export default function SignInPage() {
             </p>
           </div>
 
+          {/* SSO 에러 피드백 */}
+          {errorInfo && (
+            <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3" role="alert">
+              <div className="flex gap-2.5">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-600" />
+                <div>
+                  <p className="text-xs font-semibold text-rose-800">
+                    {errorInfo.title}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-rose-700">
+                    {errorInfo.description}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSignIn}
+                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                다시 시도
+              </button>
+            </div>
+          )}
+
           {/* 로그인 버튼 */}
           <button
             type="button"
             onClick={handleSignIn}
-            className="btn-neo w-full border-transparent bg-brand py-3.5 text-base font-semibold text-white hover:bg-brand-strong hover:text-white"
+            className="btn-neo inline-flex w-full border-transparent bg-brand py-3.5 text-base font-semibold text-white hover:bg-brand-strong hover:text-white"
           >
             <Lock className="h-4 w-4" />
             낭만 계정으로 로그인
@@ -88,6 +146,21 @@ export default function SignInPage() {
   );
 }
 
+function SignInFallback() {
+  return (
+    <div className="app-shell flex min-h-dvh items-center justify-center p-4">
+      <Loader2 className="h-6 w-6 animate-spin text-muted" />
+    </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<SignInFallback />}>
+      <SignInContent />
+    </Suspense>
+  );
+}
 
 function normalizeCallbackUrl(rawValue: string | null): string {
   if (!rawValue) {

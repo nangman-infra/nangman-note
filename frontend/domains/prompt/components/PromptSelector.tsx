@@ -194,7 +194,7 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
             type="button"
             onClick={openCreate}
             disabled={isLoading}
-            className="btn-neo w-full justify-center border-dashed text-xs text-brand"
+            className="btn-neo inline-flex w-full justify-center border-dashed text-xs text-brand"
           >
             <Plus className="h-3.5 w-3.5" />
             새 프롬프트 만들기

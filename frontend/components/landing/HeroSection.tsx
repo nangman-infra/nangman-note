@@ -42,14 +42,14 @@ export function HeroSection() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/landing/start"
-              className="btn-neo border-transparent bg-brand px-6 py-3.5 text-sm text-white shadow-[0_2px_16px_rgba(15,118,110,0.35)] hover:bg-brand-strong hover:text-white hover:shadow-[0_4px_24px_rgba(15,118,110,0.45)]"
+              className="btn-neo inline-flex border-transparent bg-brand px-6 py-3.5 text-sm text-white shadow-[0_2px_16px_rgba(15,118,110,0.35)] hover:bg-brand-strong hover:text-white hover:shadow-[0_4px_24px_rgba(15,118,110,0.45)]"
             >
               무료로 시작하기
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/landing/guide"
-              className="btn-neo px-5 py-3 text-sm"
+              className="btn-neo inline-flex px-5 py-3 text-sm"
             >
               <Eye className="h-4 w-4" />
               어떻게 사용하나요?

@@ -134,7 +134,7 @@ export function MeetingActionDialog({
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="btn-neo px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-neo inline-flex px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
             취소
           </button>
@@ -142,7 +142,7 @@ export function MeetingActionDialog({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`btn-neo border-transparent px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`btn-neo inline-flex border-transparent px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50 ${
               isRestore
                 ? 'bg-brand hover:bg-brand/90 hover:text-white'
                 : 'bg-rose-600 hover:bg-rose-700 hover:text-white'
