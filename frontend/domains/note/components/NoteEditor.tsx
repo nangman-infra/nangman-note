@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
@@ -14,11 +14,10 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
   const { noteContent, isSaving, lastSaved, error, setContent } = useNote(meetingId);
 
   // 단축키 힌트 (D-2): 첫 사용 시만 표시, localStorage로 dismiss 관리
-  const [showShortcutHint, setShowShortcutHint] = useState(false);
-  useEffect(() => {
-    const dismissed = localStorage.getItem('transnote_editor_shortcuts_dismissed');
-    if (!dismissed) setShowShortcutHint(true);
-  }, []);
+  const [showShortcutHint, setShowShortcutHint] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return !localStorage.getItem('transnote_editor_shortcuts_dismissed');
+  });
 
   const dismissShortcutHint = () => {
     localStorage.setItem('transnote_editor_shortcuts_dismissed', 'true');

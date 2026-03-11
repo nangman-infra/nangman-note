@@ -128,7 +128,7 @@ export function ProcessingProgress({
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [meetingId, currentStep === 'completed', currentStep === 'failed']);
+  }, [meetingId, currentStep]);
 
   const formatElapsed = (seconds: number) => {
     const m = Math.floor(seconds / 60);

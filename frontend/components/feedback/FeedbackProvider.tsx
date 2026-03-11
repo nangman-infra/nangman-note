@@ -155,7 +155,10 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       const timerId = window.setTimeout(() => {
         const cb = expireCallbackMapRef.current.get(id);
         dismissToast(id);
-        cb?.();
+        // Guard: only call expire if the toast wasn't already dismissed (e.g., by undo or unmount)
+        if (cb) {
+          cb();
+        }
       }, durationMs);
       timeoutMapRef.current.set(id, timerId);
 
@@ -176,12 +179,13 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const timeoutMap = timeoutMapRef.current;
     const countdownMap = countdownMapRef.current;
+    const expireMap = expireCallbackMapRef.current;
     return () => {
       timeoutMap.forEach((timerId) => window.clearTimeout(timerId));
       timeoutMap.clear();
       countdownMap.forEach((id) => window.clearInterval(id));
       countdownMap.clear();
-      expireCallbackMapRef.current.clear();
+      expireMap.clear();
     };
   }, []);
 
