@@ -4,6 +4,10 @@ import { MeetingTranscriptionMode } from '../../domain/meeting-transcription-mod
 export class UpdateMeetingDto {
   @IsOptional()
   @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
   promptId?: string;
 
   @IsOptional()

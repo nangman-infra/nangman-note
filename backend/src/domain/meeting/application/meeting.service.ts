@@ -226,13 +226,18 @@ export class MeetingService {
     ownerSub?: string,
   ): Promise<MeetingEntity> {
     const meeting = await this.findById(id, ownerSub);
+    const hasTitle = typeof dto.title === 'string';
     const hasPromptId = typeof dto.promptId === 'string';
     const hasTranscriptionMode = typeof dto.transcriptionMode === 'string';
 
-    if (!hasPromptId && !hasTranscriptionMode) {
+    if (!hasTitle && !hasPromptId && !hasTranscriptionMode) {
       throw new BadRequestException(
-        'Either promptId or transcriptionMode must be provided',
+        'At least one of title, promptId, or transcriptionMode must be provided',
       );
+    }
+
+    if (hasTitle) {
+      meeting.title = (dto.title as string).trim() || meeting.title;
     }
 
     if (hasPromptId) {
