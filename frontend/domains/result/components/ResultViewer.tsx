@@ -10,6 +10,7 @@ import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
 import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/lib/constants';
 import { meetingApi } from '@/domains/meeting/api/meetingApi';
+import { useMeetingStore } from '@/domains/meeting/stores/meetingStore';
 import { useResult } from '../hooks/useResult';
 import { useResultStore } from '../stores/resultStore';
 import {
@@ -229,6 +230,12 @@ export function ResultViewer({
           },
         };
       });
+      // Also patch the meeting list store so the sidebar title updates immediately
+      useMeetingStore.setState((state) => ({
+        meetings: state.meetings.map((m) =>
+          m.id === meetingId ? { ...m, title: trimmed } : m,
+        ),
+      }));
       setIsEditingTitle(false);
       pushToast({ title: '제목이 변경되었습니다', variant: 'success' });
     } catch {

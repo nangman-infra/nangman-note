@@ -19,6 +19,7 @@ import {
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
+import { ResultEntity } from '../../result/domain/result.entity';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { ListMeetingsQueryDto } from './dto/list-meetings-query.dto';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
@@ -46,6 +47,8 @@ export class MeetingService {
   constructor(
     @InjectRepository(MeetingEntity)
     private readonly meetingRepository: Repository<MeetingEntity>,
+    @InjectRepository(ResultEntity)
+    private readonly resultRepository: Repository<ResultEntity>,
     private readonly promptService: PromptService,
     private readonly eventEmitter: EventEmitter2,
     private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
@@ -250,7 +253,18 @@ export class MeetingService {
         dto.transcriptionMode as MeetingTranscriptionMode;
     }
 
-    return this.meetingRepository.save(meeting);
+    const saved = await this.meetingRepository.save(meeting);
+
+    // Sync title to result.metadata if title was changed and a result exists
+    if (hasTitle) {
+      const result = await this.resultRepository.findOne({ where: { meetingId: id } });
+      if (result && result.metadata?.title !== saved.title) {
+        result.metadata = { ...result.metadata, title: saved.title };
+        await this.resultRepository.save(result);
+      }
+    }
+
+    return saved;
   }
 
   async complete(
