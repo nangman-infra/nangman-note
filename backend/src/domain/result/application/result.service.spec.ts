@@ -520,6 +520,56 @@ describe('ResultService', () => {
       expect(result.content).toBe('# 레거시 결과');
     });
 
+    it('rejects extracted content when meeting target language mismatches the summary script', async () => {
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({ translateTargetLanguage: 'English' }),
+      );
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue(null);
+      transcriptRepository.find.mockResolvedValue([
+        {
+          id: 'segment-1',
+          meetingId: 'meeting-1',
+          startTime: 0,
+          endTime: 4,
+          text: '한국어 회의 내용을 정리합니다',
+          confidence: 0.95,
+        } as TranscriptSegmentEntity,
+      ]);
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        summary: '한국어로 작성된 회의 요약입니다.',
+        participants: ['택준'],
+        agendaItems: [
+          {
+            title: '안건',
+            discussionPoints: ['핵심 내용을 공유했다'],
+            decisions: ['다음 단계로 진행한다'],
+            actionItems: [],
+            unresolved: [],
+          },
+        ],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      });
+      bedrockService.generateMeetingResult.mockResolvedValue('# 레거시 결과');
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+
+      const result = await service.findByMeetingId('meeting-1');
+
+      expect(bedrockService.extractStructuredNotes).toHaveBeenCalledTimes(3);
+      expect(bedrockService.generateMeetingResult).toHaveBeenCalledTimes(1);
+      expect(result.content).toBe('# 레거시 결과');
+    });
+
     it('returns fallback template when both extraction and legacy fail', async () => {
       meetingService.findById.mockResolvedValue(buildMeeting());
       resultRepository.findOne.mockResolvedValue(null);

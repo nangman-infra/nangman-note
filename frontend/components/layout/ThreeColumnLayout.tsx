@@ -83,13 +83,13 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
             style={{ transform: `translateX(-${columnIndex * 100}%)` }}
           >
             <div className="w-full flex-shrink-0 overflow-hidden">
-              <ErrorBoundary>{activeColumn === 'sidebar' || activeColumn === 'list' ? sidebar : <div className="h-full" />}</ErrorBoundary>
+              <ErrorBoundary>{sidebar}</ErrorBoundary>
             </div>
             <div className="w-full flex-shrink-0 overflow-hidden">
               <ErrorBoundary>{list}</ErrorBoundary>
             </div>
             <div className="w-full flex-shrink-0 overflow-hidden">
-              <ErrorBoundary>{activeColumn === 'viewer' || activeColumn === 'list' ? viewer : <div className="h-full" />}</ErrorBoundary>
+              <ErrorBoundary>{viewer}</ErrorBoundary>
             </div>
           </div>
         </div>

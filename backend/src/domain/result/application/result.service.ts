@@ -479,6 +479,8 @@ export class ResultService {
           extracted,
           documentType: prompt.documentType,
           transcriptText,
+          translateTargetLanguage: meeting.translateTargetLanguage?.trim(),
+          languageCode: meeting.languageCode?.trim(),
         });
 
         if (validation.valid) {
