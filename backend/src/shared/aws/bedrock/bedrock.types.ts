@@ -11,6 +11,7 @@ export interface StructuredActionItem {
 
 export interface StructuredMeetingAgendaItem {
   title: string;
+  context?: string;
   discussionPoints: string[];
   decisions: string[];
   actionItems: StructuredActionItem[];
@@ -30,6 +31,7 @@ export interface StructuredMeetingExtraction {
 
 export interface StructuredLectureConcept {
   name: string;
+  context?: string;
   definition: string;
   example: string;
   keyPoints: string[];
@@ -47,6 +49,7 @@ export interface StructuredLectureExtraction {
 
 export interface StructuredMentoringTopic {
   title: string;
+  context?: string;
   keyPoints: string[];
   practicalTips: string[];
   followUpTasks: string[];

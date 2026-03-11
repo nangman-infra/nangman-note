@@ -41,6 +41,12 @@ type AiTranscriptSegment = {
   speakerLabel?: string;
 };
 
+interface ValidationResult {
+  valid: boolean;
+  stage: 'structural' | 'quality' | 'consistency';
+  reason: string;
+}
+
 @Injectable()
 export class ResultService {
   private readonly logger = new Logger(ResultService.name);
@@ -455,37 +461,53 @@ export class ResultService {
     transcripts: TranscriptSegmentEntity[];
   }): Promise<string> {
     const { meeting, prompt, noteContent, transcripts } = params;
-
     const transcriptText = this.buildTranscriptTextForAI(transcripts);
+    const maxAttempts = 3; // original + 2 retries
 
-    try {
-      const extracted = await this.bedrockService.extractStructuredNotes({
-        documentType: prompt.documentType,
-        promptContent: prompt.content.trim(),
-        noteContent: noteContent || '',
-        transcriptText,
-        meetingTitle: meeting.title?.trim(),
-        meetingAgenda: meeting.agenda?.trim(),
-      });
-      const aiContent = this.renderStructuredMarkdown({
-        meeting,
-        documentType: prompt.documentType,
-        extracted,
-      });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const extracted = await this.bedrockService.extractStructuredNotes({
+          documentType: prompt.documentType,
+          promptContent: prompt.content.trim(),
+          noteContent: noteContent || '',
+          transcriptText,
+          meetingTitle: meeting.title?.trim(),
+          meetingAgenda: meeting.agenda?.trim(),
+        });
 
-      if (aiContent && aiContent.trim().length > 0) {
-        return aiContent;
+        const validation = this.validateExtraction({
+          extracted,
+          documentType: prompt.documentType,
+          transcriptText,
+        });
+
+        if (validation.valid) {
+          const aiContent = this.renderStructuredMarkdown({
+            meeting,
+            documentType: prompt.documentType,
+            extracted,
+          });
+
+          if (aiContent && aiContent.trim().length > 0) {
+            return aiContent;
+          }
+
+          this.logger.warn(
+            `Structured extraction rendered empty content for meeting ${meeting.id} (attempt ${attempt}/${maxAttempts})`,
+          );
+        } else {
+          this.logger.warn(
+            `Validation failed for meeting ${meeting.id} (attempt ${attempt}/${maxAttempts}, stage: ${validation.stage}): ${validation.reason}`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Structured extraction failed for meeting ${meeting.id} (attempt ${attempt}/${maxAttempts}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
-
-      this.logger.warn(
-        `Structured extraction rendered empty content for meeting ${meeting.id}, trying legacy fallback`,
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Structured extraction failed for meeting ${meeting.id}: ${error instanceof Error ? error.message : 'Unknown error'}. Trying legacy fallback.`,
-      );
     }
 
+    // Legacy Fallback
     try {
       const legacyContent = await this.bedrockService.generateMeetingResult({
         promptContent: prompt.content.trim(),
@@ -557,22 +579,31 @@ export class ResultService {
     const title = meeting.title?.trim() || '제목 없는 회의';
     const agendaSections =
       extracted.agendaItems.length > 0
-        ? extracted.agendaItems.flatMap((item, index) => [
-            `### 안건 ${index + 1}: ${item.title}`,
-            '',
-            '**핵심 논의:**',
-            this.renderBulletList(item.discussionPoints, '주요 논의 추출 없음'),
-            '',
-            '**결정사항:**',
-            this.renderBulletList(item.decisions, '확정된 결정 없음'),
-            '',
-            '**액션 아이템:**',
-            this.renderActionItems(item.actionItems),
-            '',
-            '**미해결 사항:**',
-            this.renderBulletList(item.unresolved, '없음'),
-            '',
-          ])
+        ? extracted.agendaItems.flatMap((item, index) => {
+            const contextParagraph = this.renderContextParagraph(
+              item.context as string | undefined,
+            );
+            return [
+              `### 안건 ${index + 1}: ${item.title}`,
+              '',
+              ...(contextParagraph ? [contextParagraph] : []),
+              '**핵심 논의:**',
+              this.renderNumberedList(
+                item.discussionPoints,
+                '주요 논의 추출 없음',
+              ),
+              '',
+              '**결정사항:**',
+              this.renderNumberedList(item.decisions, '확정된 결정 없음'),
+              '',
+              '**액션 아이템:**',
+              this.renderActionItemTable(item.actionItems),
+              '',
+              '**미해결 사항:**',
+              this.renderBulletList(item.unresolved, '없음'),
+              '',
+            ];
+          })
         : ['- 안건별 논의가 추출되지 않았습니다.', ''];
 
     const totalActionItems = extracted.agendaItems.reduce(
@@ -580,11 +611,16 @@ export class ResultService {
       0,
     );
 
+    const participantsLine =
+      extracted.participants.length > 0
+        ? extracted.participants.join(', ')
+        : '확인 불가';
+
     return [
       `# ${title}`,
       '',
       '## 참여자',
-      this.renderBulletList(extracted.participants, '확인 불가'),
+      participantsLine,
       '',
       '## 회의 개요',
       extracted.summary || '_요약 추출 없음_',
@@ -593,7 +629,7 @@ export class ResultService {
       ...agendaSections,
       '## 전체 요약',
       '**주요 결정:**',
-      this.renderBulletList(extracted.overallDecisions, '확정된 결정 없음'),
+      this.renderNumberedList(extracted.overallDecisions, '확정된 결정 없음'),
       '',
       `**총 액션 아이템:** ${totalActionItems}개`,
       '',
@@ -615,14 +651,31 @@ export class ResultService {
     const title = meeting.title?.trim() || '제목 없는 강의';
     const concepts =
       extracted.concepts.length > 0
-        ? extracted.concepts.flatMap((concept, index) => [
-            `### ${index + 1}. ${concept.name}`,
-            `- **정의:** ${concept.definition || '정의 추출 없음'}`,
-            `- **예시:** ${concept.example || '예시 추출 없음'}`,
-            `- **핵심 포인트:** ${this.renderInlineList(concept.keyPoints, '핵심 포인트 추출 없음')}`,
-            '',
-          ])
-        : ['- 핵심 개념 추출 없음', ''];
+        ? extracted.concepts.flatMap((concept, index) => {
+            const contextParagraph = this.renderContextParagraph(
+              concept.context as string | undefined,
+            );
+            return [
+              `### ${index + 1}. ${concept.name}`,
+              '',
+              ...(contextParagraph ? [contextParagraph] : []),
+              '**정의:**',
+              concept.definition || '_정의 추출 없음_',
+              '',
+              '**예시:**',
+              concept.example
+                ? this.renderBlockquoteList([concept.example], '예시 추출 없음')
+                : '_예시 추출 없음_',
+              '',
+              '**핵심 포인트:**',
+              this.renderNumberedList(
+                concept.keyPoints,
+                '핵심 포인트 추출 없음',
+              ),
+              '',
+            ];
+          })
+        : ['_핵심 개념 추출 없음_', ''];
 
     return [
       `# ${title}`,
@@ -633,7 +686,7 @@ export class ResultService {
       '## 핵심 개념',
       ...concepts,
       '## 실습 및 적용',
-      this.renderBulletList(extracted.practiceItems, '실습/과제 추출 없음'),
+      this.renderChecklist(extracted.practiceItems, '실습/과제 추출 없음'),
       '',
       extracted.keyTakeaways.length > 0
         ? `## 기억해야 할 ${Math.min(extracted.keyTakeaways.length, 5)}가지`
@@ -655,26 +708,38 @@ export class ResultService {
     const title = meeting.title?.trim() || '제목 없는 멘토링';
     const topicSections =
       extracted.topics.length > 0
-        ? extracted.topics.flatMap((topic, index) => [
-            `### 주제 ${index + 1}: ${topic.title}`,
-            '',
-            '**핵심 포인트:**',
-            this.renderBulletList(topic.keyPoints, '핵심 포인트 추출 없음'),
-            '',
-            '**실무 팁:**',
-            this.renderBulletList(topic.practicalTips, '실무 팁 추출 없음'),
-            '',
-            '**후속 과제:**',
-            this.renderBulletList(topic.followUpTasks, '후속 과제 없음'),
-            '',
-            '**추가 조사 키워드:**',
-            this.renderBulletList(topic.researchTopics, '추가 조사 항목 없음'),
-            '',
-            '**주의할 점:**',
-            this.renderBulletList(topic.cautions, '없음'),
-            '',
-          ])
-        : ['- 핵심 주제 추출 없음', ''];
+        ? extracted.topics.flatMap((topic, index) => {
+            const contextParagraph = this.renderContextParagraph(
+              topic.context as string | undefined,
+            );
+            return [
+              `### 주제 ${index + 1}: ${topic.title}`,
+              '',
+              ...(contextParagraph ? [contextParagraph] : []),
+              '**핵심 포인트:**',
+              this.renderNumberedList(topic.keyPoints, '핵심 포인트 추출 없음'),
+              '',
+              '**실무 팁:**',
+              this.renderBlockquoteList(
+                topic.practicalTips,
+                '_실무 팁 추출 없음_',
+              ),
+              '',
+              '**후속 과제:**',
+              this.renderChecklist(topic.followUpTasks, '후속 과제 없음'),
+              '',
+              '**추가 조사 키워드:**',
+              this.renderBulletList(
+                topic.researchTopics,
+                '추가 조사 항목 없음',
+              ),
+              '',
+              '**주의할 점:**',
+              this.renderBlockquoteList(topic.cautions, '_없음_'),
+              '',
+            ];
+          })
+        : ['_핵심 주제 추출 없음_', ''];
 
     return [
       `# ${title}`,
@@ -685,7 +750,7 @@ export class ResultService {
       '## 핵심 주제',
       ...topicSections,
       '## 오늘 가져갈 것',
-      this.renderBulletList(extracted.keyTakeaways, '핵심 정리 없음'),
+      this.renderNumberedList(extracted.keyTakeaways, '핵심 정리 없음'),
       '',
       '## 핵심 키워드',
       this.renderKeywordLine(extracted.keywords),
@@ -731,6 +796,48 @@ export class ResultService {
     return keywords.length > 0
       ? keywords.join(', ')
       : '_핵심 키워드 추출 없음_';
+  }
+  private renderBlockquoteList(items: string[], emptyText: string): string {
+    if (items.length === 0) {
+      return emptyText;
+    }
+    return items.map((item) => `> ${item}`).join('\n\n');
+  }
+
+  private renderChecklist(items: string[], emptyText: string): string {
+    if (items.length === 0) {
+      return `- ${emptyText}`;
+    }
+    return items.map((item) => `- [ ] ${item}`).join('\n');
+  }
+
+  private renderActionItemTable(
+    items: StructuredMeetingExtraction['agendaItems'][number]['actionItems'],
+  ): string {
+    if (items.length === 0) {
+      return '_액션 아이템 없음_';
+    }
+    const header = '| 작업 | 담당 | 마감 | 우선순위 |';
+    const separator = '| --- | --- | --- | --- |';
+    const rows = items.map(
+      (item) =>
+        `| ${item.task} | ${item.owner} | ${item.deadline} | ${item.priority} |`,
+    );
+    return [header, separator, ...rows].join('\n');
+  }
+
+  private renderContextParagraph(context?: string): string {
+    if (!context || context.trim().length === 0) {
+      return '';
+    }
+    return `${context.trim()}\n`;
+  }
+
+  private renderNumberedList(items: string[], emptyText: string): string {
+    if (items.length === 0) {
+      return `- ${emptyText}`;
+    }
+    return items.map((item, index) => `${index + 1}. ${item}`).join('\n');
   }
 
   private renderInlineList(items: string[], emptyText: string): string {
@@ -939,6 +1046,18 @@ export class ResultService {
         continue;
       }
 
+      // Markdown table: convert pipe-delimited rows to readable format
+      const tableRowMatch = rawLine.match(/^\s*\|(.+)\|\s*$/);
+      if (tableRowMatch) {
+        const cells = tableRowMatch[1].split('|').map((c) => c.trim());
+        // Skip separator rows (e.g., | --- | --- |)
+        if (cells.every((c) => /^[-:]+$/.test(c))) {
+          continue;
+        }
+        lines.push(cells.filter((c) => c.length > 0).join(' | '));
+        continue;
+      }
+
       lines.push(this.stripMarkdownInline(rawLine).trim());
     }
 
@@ -1140,6 +1259,270 @@ export class ResultService {
     current: Pick<AiTranscriptSegment, 'startTime'>,
   ): number {
     return Math.max(0, current.startTime - previous.endTime);
+  }
+
+  // ── Validation Layer ──
+
+  private validateExtraction(params: {
+    extracted: StructuredNoteExtraction;
+    documentType: PromptDocumentType;
+    transcriptText: string;
+    translateTargetLanguage?: string;
+    languageCode?: string;
+  }): ValidationResult {
+    const {
+      extracted,
+      documentType,
+      transcriptText,
+      translateTargetLanguage,
+      languageCode,
+    } = params;
+
+    const structureResult = this.validateStructure(extracted, documentType);
+    if (!structureResult.valid) return structureResult;
+
+    const qualityResult = this.validateQuality(extracted, transcriptText);
+    if (!qualityResult.valid) return qualityResult;
+
+    const consistencyResult = this.validateConsistency(extracted, {
+      translateTargetLanguage,
+      languageCode,
+    });
+    if (!consistencyResult.valid) return consistencyResult;
+
+    return { valid: true, stage: 'consistency', reason: '' };
+  }
+
+  private validateStructure(
+    extracted: StructuredNoteExtraction,
+    documentType: PromptDocumentType,
+  ): ValidationResult {
+    const fail = (reason: string): ValidationResult => ({
+      valid: false,
+      stage: 'structural',
+      reason,
+    });
+
+    if (!extracted || typeof extracted !== 'object') {
+      return fail('Extraction result is not an object');
+    }
+
+    if (!('documentType' in extracted) || !extracted.documentType) {
+      return fail('Missing documentType field');
+    }
+
+    if (extracted.documentType !== documentType) {
+      return fail(
+        `documentType mismatch: expected ${documentType}, got ${extracted.documentType}`,
+      );
+    }
+
+    if (typeof extracted.summary !== 'string') {
+      return fail('summary field is not a string');
+    }
+
+    if (documentType === PromptDocumentType.MEETING) {
+      const meeting = extracted as StructuredMeetingExtraction;
+      if (!Array.isArray(meeting.agendaItems)) {
+        return fail('Missing or invalid agendaItems array');
+      }
+    } else if (documentType === PromptDocumentType.LECTURE) {
+      const lecture = extracted as StructuredLectureExtraction;
+      if (!Array.isArray(lecture.concepts)) {
+        return fail('Missing or invalid concepts array');
+      }
+    } else {
+      const mentoring = extracted as StructuredMentoringExtraction;
+      if (!Array.isArray(mentoring.topics)) {
+        return fail('Missing or invalid topics array');
+      }
+    }
+
+    return { valid: true, stage: 'structural', reason: '' };
+  }
+
+  private validateQuality(
+    extracted: StructuredNoteExtraction,
+    transcriptText: string,
+  ): ValidationResult {
+    const fail = (reason: string): ValidationResult => ({
+      valid: false,
+      stage: 'quality',
+      reason,
+    });
+
+    if (!extracted.summary || extracted.summary.length < 10) {
+      return fail(
+        `Summary too short: ${extracted.summary?.length ?? 0} chars (minimum 10)`,
+      );
+    }
+
+    const primaryArray = this.getPrimaryArray(extracted);
+    const hasTranscriptContent = transcriptText.trim().length > 0;
+
+    if (primaryArray.length === 0 && hasTranscriptContent) {
+      return fail(
+        'Primary array is empty despite transcript content being available',
+      );
+    }
+
+    if (primaryArray.length > 0) {
+      const emptyRatio = this.calculateEmptySubFieldRatio(extracted);
+      if (emptyRatio > 0.5) {
+        return fail(
+          `Too many empty sub-fields: ${(emptyRatio * 100).toFixed(0)}% empty (maximum 50%)`,
+        );
+      }
+    }
+
+    return { valid: true, stage: 'quality', reason: '' };
+  }
+
+  private getPrimaryArray(extracted: StructuredNoteExtraction): unknown[] {
+    if ('agendaItems' in extracted) return extracted.agendaItems;
+    if ('concepts' in extracted) return extracted.concepts;
+    if ('topics' in extracted) return extracted.topics;
+    return [];
+  }
+
+  private calculateEmptySubFieldRatio(
+    extracted: StructuredNoteExtraction,
+  ): number {
+    let totalArrayFields = 0;
+    let emptyArrayFields = 0;
+
+    const checkArrayFields = (obj: Record<string, unknown>) => {
+      for (const [key, value] of Object.entries(obj)) {
+        if (key === 'context' || key === 'documentType') continue;
+        if (Array.isArray(value)) {
+          totalArrayFields++;
+          if (value.length === 0) emptyArrayFields++;
+        }
+      }
+    };
+
+    const primaryArray = this.getPrimaryArray(extracted);
+    for (const item of primaryArray) {
+      if (item && typeof item === 'object') {
+        checkArrayFields(item as Record<string, unknown>);
+      }
+    }
+
+    return totalArrayFields === 0 ? 0 : emptyArrayFields / totalArrayFields;
+  }
+
+  private validateConsistency(
+    extracted: StructuredNoteExtraction,
+    params: { translateTargetLanguage?: string; languageCode?: string },
+  ): ValidationResult {
+    const fail = (reason: string): ValidationResult => ({
+      valid: false,
+      stage: 'consistency',
+      reason,
+    });
+
+    const { translateTargetLanguage, languageCode } = params;
+
+    if (!translateTargetLanguage && !languageCode) {
+      return { valid: true, stage: 'consistency', reason: '' };
+    }
+
+    const expectedScript = translateTargetLanguage
+      ? this.languageToScript(translateTargetLanguage)
+      : this.languageCodeToScript(languageCode!);
+
+    if (!expectedScript) {
+      return { valid: true, stage: 'consistency', reason: '' };
+    }
+
+    const dominantScript = this.detectDominantScript(extracted.summary);
+
+    if (dominantScript === 'unknown') {
+      return { valid: true, stage: 'consistency', reason: '' };
+    }
+
+    if (dominantScript !== expectedScript) {
+      return fail(
+        `Language mismatch: expected ${expectedScript}, detected ${dominantScript} in summary`,
+      );
+    }
+
+    return { valid: true, stage: 'consistency', reason: '' };
+  }
+
+  private detectDominantScript(
+    text: string,
+  ): 'ko' | 'ja' | 'zh' | 'latin' | 'unknown' {
+    // Remove spaces, digits, punctuation, symbols
+    const cleaned = text.replace(/[\s\d\p{P}\p{S}]/gu, '');
+    if (cleaned.length === 0) return 'unknown';
+
+    const koRegex = /[\uAC00-\uD7AF\u3131-\u3163]/g;
+    const jaRegex = /[\u3040-\u309F\u30A0-\u30FF]/g;
+    const zhRegex = /[\u4E00-\u9FFF]/g;
+    const latinRegex = /[A-Za-z]/g;
+
+    const koCount = (cleaned.match(koRegex) || []).length;
+    const jaCount = (cleaned.match(jaRegex) || []).length;
+    const zhCount = (cleaned.match(zhRegex) || []).length;
+    const latinCount = (cleaned.match(latinRegex) || []).length;
+
+    const total = cleaned.length;
+    const threshold = 0.5;
+
+    // Korean and Japanese take priority over Chinese (CJK overlap)
+    if (koCount / total >= threshold) return 'ko';
+    if (jaCount / total >= threshold) return 'ja';
+    if (zhCount / total >= threshold) return 'zh';
+    if (latinCount / total >= threshold) return 'latin';
+
+    return 'unknown';
+  }
+
+  private languageToScript(
+    language: string,
+  ): 'ko' | 'ja' | 'zh' | 'latin' | null {
+    const lower = language.toLowerCase();
+    if (lower.includes('korean') || lower.includes('한국어') || lower === 'ko')
+      return 'ko';
+    if (
+      lower.includes('japanese') ||
+      lower.includes('일본어') ||
+      lower === 'ja'
+    )
+      return 'ja';
+    if (lower.includes('chinese') || lower.includes('중국어') || lower === 'zh')
+      return 'zh';
+    if (lower.includes('english') || lower.includes('영어') || lower === 'en')
+      return 'latin';
+    if (
+      lower.includes('french') ||
+      lower.includes('german') ||
+      lower.includes('spanish') ||
+      lower.includes('portuguese') ||
+      lower.includes('italian')
+    )
+      return 'latin';
+    return null;
+  }
+
+  private languageCodeToScript(
+    code: string,
+  ): 'ko' | 'ja' | 'zh' | 'latin' | null {
+    const prefix = code.split('-')[0]?.toLowerCase();
+    if (prefix === 'ko') return 'ko';
+    if (prefix === 'ja') return 'ja';
+    if (prefix === 'zh') return 'zh';
+    if (
+      prefix === 'en' ||
+      prefix === 'fr' ||
+      prefix === 'de' ||
+      prefix === 'es' ||
+      prefix === 'pt' ||
+      prefix === 'it'
+    )
+      return 'latin';
+    return null;
   }
 
   private loadPdfFontBytes(): Uint8Array | null {

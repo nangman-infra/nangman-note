@@ -7,6 +7,7 @@ import { AwsClientFactory } from '../aws-client.factory';
 import { AppEnv } from '../../config/env.validation';
 import { PromptDocumentType } from '../../../domain/prompt/domain/prompt-document-type.enum';
 import { BedrockService } from './bedrock.service';
+
 import type { StructuredMeetingExtraction } from './bedrock.types';
 
 const buildConfigMap = (): AppEnv =>
@@ -205,5 +206,182 @@ describe('BedrockService', () => {
       deadline: '미정',
       priority: 'Medium',
     });
+  });
+
+  it('system prompt contains narrative summary instruction', async () => {
+    const { service, send } = createService(
+      JSON.stringify({
+        documentType: 'meeting',
+        summary: '테스트 요약',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      }),
+    );
+
+    await service.extractStructuredNotes({
+      documentType: PromptDocumentType.MEETING,
+      promptContent: '',
+      noteContent: '',
+      transcriptText: '테스트',
+    });
+
+    const input = extractConverseInput(send);
+    const systemText = input.system?.[0]?.text ?? '';
+
+    expect(systemText).toContain('서술형 문단');
+  });
+
+  it('system prompt contains emoji prohibition', async () => {
+    const { service, send } = createService(
+      JSON.stringify({
+        documentType: 'meeting',
+        summary: '테스트 요약',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      }),
+    );
+
+    await service.extractStructuredNotes({
+      documentType: PromptDocumentType.MEETING,
+      promptContent: '',
+      noteContent: '',
+      transcriptText: '테스트',
+    });
+
+    const input = extractConverseInput(send);
+    const systemText = input.system?.[0]?.text ?? '';
+
+    expect(systemText).toContain('이모지');
+  });
+
+  it('system prompt contains language matching instruction', async () => {
+    const { service, send } = createService(
+      JSON.stringify({
+        documentType: 'meeting',
+        summary: '테스트 요약',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      }),
+    );
+
+    await service.extractStructuredNotes({
+      documentType: PromptDocumentType.MEETING,
+      promptContent: '',
+      noteContent: '',
+      transcriptText: '테스트',
+    });
+
+    const input = extractConverseInput(send);
+    const systemText = input.system?.[0]?.text ?? '';
+
+    expect(systemText).toContain('주요 언어');
+  });
+
+  it('JSON schema in system prompt contains context field', async () => {
+    const { service, send } = createService(
+      JSON.stringify({
+        documentType: 'meeting',
+        summary: '테스트 요약',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      }),
+    );
+
+    await service.extractStructuredNotes({
+      documentType: PromptDocumentType.MEETING,
+      promptContent: '',
+      noteContent: '',
+      transcriptText: '테스트',
+    });
+
+    const input = extractConverseInput(send);
+    const systemText = input.system?.[0]?.text ?? '';
+
+    expect(systemText).toContain('"context"');
+  });
+
+  it('system prompt contains target language instruction when translateTargetLanguage is provided', async () => {
+    const { service, send } = createService(
+      JSON.stringify({
+        documentType: 'meeting',
+        summary: 'Test summary',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      }),
+    );
+
+    await service.extractStructuredNotes({
+      documentType: PromptDocumentType.MEETING,
+      promptContent: '',
+      noteContent: '',
+      transcriptText: '테스트',
+      translateTargetLanguage: 'English',
+    });
+
+    const input = extractConverseInput(send);
+    const systemText = input.system?.[0]?.text ?? '';
+
+    expect(systemText).toContain('English');
+  });
+
+  // Feature: ai-output-quality, Property 13: translateTargetLanguage가 제공되면 시스템 프롬프트에 해당 언어 지시가 포함된다
+  // **Validates: Requirements 2.4**
+  it('Property 13: translateTargetLanguage is included in system prompt when provided', async () => {
+    const languages = [
+      'English',
+      'Korean',
+      '한국어',
+      'Japanese',
+      'French',
+      'Chinese',
+    ];
+
+    for (const lang of languages) {
+      const { service, send } = createService(
+        JSON.stringify({
+          documentType: 'meeting',
+          summary: '테스트 요약',
+          participants: [],
+          agendaItems: [],
+          overallDecisions: [],
+          followUps: [],
+          keywords: [],
+          uncertainties: [],
+        }),
+      );
+
+      await service.extractStructuredNotes({
+        documentType: PromptDocumentType.MEETING,
+        promptContent: '',
+        noteContent: '',
+        transcriptText: '테스트',
+        translateTargetLanguage: lang,
+      });
+
+      const input = extractConverseInput(send);
+      const systemText = input.system?.[0]?.text ?? '';
+
+      expect(systemText).toContain(lang);
+    }
   });
 });

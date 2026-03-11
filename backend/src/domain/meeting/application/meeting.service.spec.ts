@@ -8,12 +8,16 @@ import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
+import { ResultEntity } from '../../result/domain/result.entity';
 import { MeetingService } from './meeting.service';
 
 describe('MeetingService', () => {
   let service: MeetingService;
   let meetingRepository: jest.Mocked<
     Pick<Repository<MeetingEntity>, 'create' | 'findOne' | 'save'>
+  >;
+  let resultRepository: jest.Mocked<
+    Pick<Repository<ResultEntity>, 'findOne' | 'save'>
   >;
   let promptService: jest.Mocked<Pick<PromptService, 'ensureExists'>>;
   let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
@@ -44,6 +48,10 @@ describe('MeetingService', () => {
       findOne: jest.fn(),
       save: jest.fn(),
     };
+    resultRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+    };
     promptService = {
       ensureExists: jest.fn(),
     };
@@ -58,6 +66,7 @@ describe('MeetingService', () => {
 
     service = new MeetingService(
       meetingRepository as unknown as Repository<MeetingEntity>,
+      resultRepository as unknown as Repository<ResultEntity>,
       promptService as unknown as PromptService,
       eventEmitter as unknown as EventEmitter2,
       meetingSearchDocumentService as unknown as MeetingSearchDocumentService,

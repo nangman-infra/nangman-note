@@ -206,7 +206,9 @@ describe('ResultService', () => {
       expect(createArg.content).toContain('# 테스트 회의');
       expect(createArg.content).toContain('## 회의 개요');
       expect(createArg.content).toContain('## 안건별 논의');
-      expect(createArg.content).toContain('작업: 진행 현황 정리');
+      expect(createArg.content).toContain(
+        '| 진행 현황 정리 | 택준 | 다음 주 | Medium |',
+      );
       expect(createArg.metadata?.totalDuration).toBe(600);
       expect(createArg.metadata?.transcriptWordCount).toBe(2);
       expect(createArg.metadata?.noteLength).toBe(5);
@@ -473,6 +475,71 @@ describe('ResultService', () => {
       await expect(
         service.exportResult('meeting-1', 'txt'),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('retry and fallback', () => {
+    it('retries extraction 3 times then calls legacy fallback', async () => {
+      // Setup: extraction always returns invalid (empty summary)
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue({
+        id: 'note-1',
+        meetingId: 'meeting-1',
+        content: '테스트 노트',
+      } as NoteEntity);
+      transcriptRepository.find.mockResolvedValue([
+        {
+          id: 'seg-1',
+          meetingId: 'meeting-1',
+          startTime: 0,
+          endTime: 1,
+          text: '테스트 전사',
+          confidence: 0.95,
+        } as TranscriptSegmentEntity,
+      ]);
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        summary: '', // Will fail quality validation
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      });
+      bedrockService.generateMeetingResult.mockResolvedValue('# 레거시 결과');
+      resultRepository.create.mockImplementation((entity) => entity as ResultEntity);
+      resultRepository.save.mockImplementation((entity) => Promise.resolve(entity as ResultEntity));
+
+      const result = await service.findByMeetingId('meeting-1');
+
+      expect(bedrockService.extractStructuredNotes).toHaveBeenCalledTimes(3);
+      expect(bedrockService.generateMeetingResult).toHaveBeenCalledTimes(1);
+      expect(result.content).toBe('# 레거시 결과');
+    });
+
+    it('returns fallback template when both extraction and legacy fail', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue({
+        id: 'note-1',
+        meetingId: 'meeting-1',
+        content: '테스트 노트',
+      } as NoteEntity);
+      transcriptRepository.find.mockResolvedValue([]);
+      bedrockService.extractStructuredNotes.mockRejectedValue(new Error('Bedrock error'));
+      bedrockService.generateMeetingResult.mockRejectedValue(new Error('Legacy error'));
+      resultRepository.create.mockImplementation((entity) => entity as ResultEntity);
+      resultRepository.save.mockImplementation((entity) => Promise.resolve(entity as ResultEntity));
+
+      const result = await service.findByMeetingId('meeting-1');
+
+      expect(bedrockService.extractStructuredNotes).toHaveBeenCalledTimes(3);
+      expect(bedrockService.generateMeetingResult).toHaveBeenCalledTimes(1);
+      expect(result.content).toContain('AI 회의록 생성에 일시적 문제가 발생');
     });
   });
 });
