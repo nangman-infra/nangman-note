@@ -1,9 +1,27 @@
-// @vitest-environment jsdom
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { settingsApi } from '../api/settingsApi';
 import { useUserSettingsStore } from './settingsStore';
 import { MeetingTranscriptionMode } from '../../meeting/types/meeting.types';
+
+// localStorage + window polyfill for node test environment
+const storageMap = new Map<string, string>();
+const localStorageMock = {
+  getItem: (key: string) => storageMap.get(key) ?? null,
+  setItem: (key: string, value: string) => { storageMap.set(key, value); },
+  removeItem: (key: string) => { storageMap.delete(key); },
+  clear: () => { storageMap.clear(); },
+  get length() { return storageMap.size; },
+  key: (index: number) => [...storageMap.keys()][index] ?? null,
+};
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true });
+
+// window must exist for extractPersistedState (typeof window !== 'undefined' guard)
+if (typeof globalThis.window === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).window = { localStorage: localStorageMock };
+} else {
+  Object.defineProperty(globalThis.window, 'localStorage', { value: localStorageMock, writable: true });
+}
 
 vi.mock('../api/settingsApi', () => ({
   settingsApi: {
