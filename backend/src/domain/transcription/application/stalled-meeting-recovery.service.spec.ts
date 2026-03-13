@@ -103,7 +103,8 @@ describe('StalledMeetingRecoveryService', () => {
     resultRepository.findOne.mockResolvedValue(null);
     transcriptionJobRepository.findOne.mockResolvedValue(null);
 
-    await (service as never).recoverStalledMeetings();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (service as any).recoverStalledMeetings();
 
     expect(
       transcriptionResultCollectorService.recoverMissingBatchJob,
@@ -117,7 +118,8 @@ describe('StalledMeetingRecoveryService', () => {
       meetingId: 'meeting-1',
     } as ResultEntity);
 
-    await (service as never).recoverStalledMeetings();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (service as any).recoverStalledMeetings();
 
     expect(meetingService.updateStatus).toHaveBeenCalledWith(
       'meeting-1',
@@ -144,7 +146,8 @@ describe('StalledMeetingRecoveryService', () => {
       }),
     );
 
-    await (service as never).recoverStalledMeetings();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (service as any).recoverStalledMeetings();
 
     expect(
       transcriptionResultCollectorService.recoverStalledBatchJob,
@@ -161,7 +164,8 @@ describe('StalledMeetingRecoveryService', () => {
       }),
     );
 
-    await (service as never).recoverStalledMeetings();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (service as any).recoverStalledMeetings();
 
     expect(
       transcriptionResultCollectorService.recoverStalledBatchJob,
@@ -169,13 +173,15 @@ describe('StalledMeetingRecoveryService', () => {
   });
 
   it('uses a Postgres advisory lock when available', async () => {
-    dataSource.options.type = 'postgres';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dataSource.options as any).type = 'postgres';
     dataSource.query
       .mockResolvedValueOnce([{ locked: true }])
       .mockResolvedValueOnce([]);
     meetingRepository.find.mockResolvedValue([]);
 
-    await (service as never).recoverStalledMeetings();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (service as any).recoverStalledMeetings();
 
     expect(dataSource.query).toHaveBeenNthCalledWith(
       1,
