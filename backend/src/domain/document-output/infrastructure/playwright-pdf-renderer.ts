@@ -34,8 +34,22 @@ export class PlaywrightPdfRenderer implements PdfRendererPort {
         locale: 'ko-KR',
       });
 
+      await page.route('**/*', (route) => {
+        const url = route.request().url();
+
+        if (
+          url === 'about:blank' ||
+          url.startsWith('data:') ||
+          url.startsWith('blob:')
+        ) {
+          return route.continue();
+        }
+
+        return route.abort();
+      });
+
       await page.emulateMedia({ media: 'print' });
-      await page.setContent(input.html, { waitUntil: 'load' });
+      await page.setContent(input.html, { waitUntil: 'domcontentloaded' });
 
       const pdf = await page.pdf({
         format: 'A4',
@@ -109,4 +123,3 @@ export class PlaywrightPdfRenderer implements PdfRendererPort {
     return null;
   }
 }
-

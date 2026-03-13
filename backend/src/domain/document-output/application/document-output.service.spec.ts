@@ -62,6 +62,23 @@ describe('DocumentOutputService', () => {
     expect(pdfRenderer.render.mock.calls[0]?.[0].html).toContain('<table>');
   });
 
+  it('does not render markdown images into PDF HTML output', async () => {
+    resultService.findByMeetingId.mockResolvedValue(
+      buildResult({
+        content:
+          '## 요약\n\n![internal](http://169.254.169.254/latest/meta-data)\n\n[참고](https://example.com)',
+      }),
+    );
+    pdfRenderer.render.mockResolvedValue(Buffer.from('pdf-bytes'));
+
+    await service.exportResult('meeting-1', 'pdf');
+
+    const html = pdfRenderer.render.mock.calls[0]?.[0].html ?? '';
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('169.254.169.254');
+    expect(html).toContain('<a href="https://example.com">참고</a>');
+  });
+
   it('exports DOCX buffer for word documents', async () => {
     resultService.findByMeetingId.mockResolvedValue(
       buildResult({ content: '## 항목\n\n- 정리 필요' }),

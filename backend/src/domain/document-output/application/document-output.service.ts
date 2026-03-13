@@ -13,12 +13,7 @@ import { StructuredLogger } from '../../../shared/logging/structured-logger';
 @Injectable()
 export class DocumentOutputService {
   private readonly logger = new StructuredLogger(DocumentOutputService.name);
-  private readonly markdown = new MarkdownIt({
-    html: false,
-    linkify: true,
-    breaks: true,
-    typographer: false,
-  });
+  private readonly markdown = this.createPdfMarkdownRenderer();
 
   constructor(
     private readonly resultService: ResultService,
@@ -139,6 +134,20 @@ export class DocumentOutputService {
       '</body>',
       '</html>',
     ].join('');
+  }
+
+  private createPdfMarkdownRenderer(): MarkdownIt {
+    const markdown = new MarkdownIt({
+      html: false,
+      linkify: true,
+      breaks: true,
+      typographer: false,
+    });
+
+    // PDF export must stay self-contained to avoid server-side fetches.
+    markdown.renderer.rules.image = () => '';
+
+    return markdown;
   }
 
   private async renderDocxBuffer(
@@ -313,4 +322,3 @@ export class DocumentOutputService {
       .replace(/'/g, '&#39;');
   }
 }
-
