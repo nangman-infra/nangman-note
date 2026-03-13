@@ -9,6 +9,7 @@ import { NoteModule } from './domain/note/note.module';
 import { PromptModule } from './domain/prompt/prompt.module';
 import { ResultModule } from './domain/result/result.module';
 import { TranscriptionModule } from './domain/transcription/transcription.module';
+import { UserSettingsModule } from './domain/user-settings/user-settings.module';
 import { AuthModule } from './shared/auth/auth.module';
 import { AwsModule } from './shared/aws/aws.module';
 import { CryptoModule } from './shared/crypto/crypto.module';
@@ -70,6 +71,7 @@ import { buildTypeOrmModuleOptions } from './shared/config/typeorm-options.facto
     CryptoModule,
     AuthModule,
     PromptModule,
+    UserSettingsModule,
     MeetingModule,
     NoteModule,
     ResultModule,

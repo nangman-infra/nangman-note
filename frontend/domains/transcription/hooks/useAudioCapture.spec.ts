@@ -108,4 +108,22 @@ describe('useAudioCapture', () => {
     expect(result.current.permission).toBe('granted');
     expect(result.current.error).toBeNull();
   });
+
+  it('rejects unsupported future input sources without opening the mic', async () => {
+    const getUserMedia = vi.fn(() => Promise.resolve(createMockStream()));
+    mockMediaDevices({ getUserMedia });
+
+    const { result } = renderHook(() => useAudioCapture());
+    let response: Awaited<ReturnType<typeof result.current.requestPermission>>;
+
+    await act(async () => {
+      response = await result.current.requestPermission({
+        inputSource: 'meeting-audio-mix',
+      });
+    });
+
+    expect(response!).toEqual({ granted: false, reason: 'unsupported' });
+    expect(result.current.error).toContain('마이크 입력만 지원');
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
 });

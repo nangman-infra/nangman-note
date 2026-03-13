@@ -1,7 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Edit3, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Plus,
+  Settings2,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
+import { DEFAULT_PROMPT_ID } from '@/lib/constants';
+import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
 import { usePrompt } from '../hooks/usePrompt';
 import { PromptEditorDialog } from './PromptEditorDialog';
 import {
@@ -15,17 +25,14 @@ interface PromptSelectorProps {
 
 export function PromptSelector({ onChange }: PromptSelectorProps) {
   const [expanded, setExpanded] = useState(false);
-  const {
-    prompts,
-    selectedPromptId,
-    isLoading,
-    setSelectedPrompt,
-    createPrompt,
-    updatePrompt,
-    deletePrompt,
-  } = usePrompt();
+  const { prompts, isLoading, createPrompt, updatePrompt, deletePrompt } =
+    usePrompt();
+  const { defaultPromptId, updateSettings } = useMeetingSettingsStore();
 
-  const selectedPrompt = prompts.find((p) => p.id === selectedPromptId);
+  const selectedPromptId = prompts.some((prompt) => prompt.id === defaultPromptId)
+    ? defaultPromptId
+    : DEFAULT_PROMPT_ID;
+  const selectedPrompt = prompts.find((prompt) => prompt.id === selectedPromptId);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
@@ -37,8 +44,9 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const handleChange = (promptId: string) => {
-    setSelectedPrompt(promptId);
+  const handleChange = async (promptId: string) => {
+    const success = await updateSettings({ defaultPromptId: promptId });
+    if (!success) return;
     onChange?.(promptId);
   };
 
@@ -87,9 +95,9 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
     setDeleteConfirmId(null);
     await deletePrompt(id);
     if (selectedPromptId === id) {
-      const fallback = prompts.find((p) => p.id !== id && p.isDefault);
+      const fallback = prompts.find((prompt) => prompt.id !== id && prompt.isDefault);
       if (fallback) {
-        handleChange(fallback.id);
+        void handleChange(fallback.id);
       }
     }
   };
@@ -107,17 +115,25 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
             프롬프트 설정
           </span>
           <span className="text-muted">
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </span>
         </div>
 
         <div className="mt-3 rounded-xl border border-[var(--line-soft)] bg-white p-3 transition hover:border-[var(--line-strong)]">
-          <p className="mb-1 text-xs font-semibold tracking-wide text-muted">현재 선택</p>
-          <p className="text-sm font-medium">{selectedPrompt?.name || '기본 회의록 프롬프트'}</p>
+          <p className="mb-1 text-xs font-semibold tracking-wide text-muted">
+            현재 선택
+          </p>
+          <p className="text-sm font-medium">
+            {selectedPrompt?.name || '기본 회의록 프롬프트'}
+          </p>
         </div>
       </button>
 
-      {expanded && (
+      {expanded ? (
         <div className="motion-rise mt-3 space-y-2">
           {prompts.map((prompt) => {
             const isSelected = selectedPromptId === prompt.id;
@@ -126,20 +142,31 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => handleChange(prompt.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleChange(prompt.id); } }}
+                  onClick={() => void handleChange(prompt.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      void handleChange(prompt.id);
+                    }
+                  }}
                   className={`surface-card block w-full cursor-pointer p-3 text-left transition ${
-                    isSelected ? 'border-[var(--line-strong)] bg-brand/5' : 'hover:border-[var(--line-strong)]'
+                    isSelected
+                      ? 'border-[var(--line-strong)] bg-brand/5'
+                      : 'hover:border-[var(--line-strong)]'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="inline-flex items-center gap-2">
                       <span
                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                          isSelected ? 'border-brand bg-brand' : 'border-slate-300 bg-white'
+                          isSelected
+                            ? 'border-brand bg-brand'
+                            : 'border-slate-300 bg-white'
                         }`}
                       >
-                        {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        {isSelected ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                        ) : null}
                       </span>
                       <span className="text-sm font-medium">{prompt.name}</span>
                       <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
@@ -156,7 +183,10 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
                         <>
                           <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); openEdit(prompt); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(prompt);
+                            }}
                             className="rounded-full p-1 text-muted transition hover:bg-black/5"
                             aria-label="편집"
                           >
@@ -165,7 +195,10 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
                           {deleteConfirmId === prompt.id ? (
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); void handleDelete(prompt.id); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDelete(prompt.id);
+                              }}
                               className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-200"
                             >
                               삭제 확인
@@ -173,7 +206,10 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
                           ) : (
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(prompt.id); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirmId(prompt.id);
+                              }}
                               className="rounded-full p-1 text-muted transition hover:bg-rose-50 hover:text-rose-600"
                               aria-label="삭제"
                             >
@@ -184,7 +220,9 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
                       )}
                     </div>
                   </div>
-                  <p className="mt-2 line-clamp-2 text-xs text-muted">{prompt.content}</p>
+                  <p className="mt-2 line-clamp-2 text-xs text-muted">
+                    {prompt.content}
+                  </p>
                 </div>
               </div>
             );
@@ -200,9 +238,10 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
             새 프롬프트 만들기
           </button>
         </div>
-      )}
+      ) : null}
 
-      <PromptEditorDialog key={editingPromptId ?? "create"}
+      <PromptEditorDialog
+        key={editingPromptId ?? 'create'}
         open={editorOpen}
         mode={editorMode}
         initialName={editorInitialName}

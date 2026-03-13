@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -15,51 +15,75 @@ import {
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
-import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
-import { usePromptStore } from '@/domains/prompt/stores/promptStore';
-import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
-import {
-  PROMPT_DOCUMENT_TYPE_HELP_TEXT,
-  PROMPT_DOCUMENT_TYPE_LABELS,
-} from '@/domains/prompt/types/prompt.types';
+import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
+import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
+import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
+import { PROMPT_DOCUMENT_TYPE_HELP_TEXT } from '@/domains/prompt/types/prompt.types';
+import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 
 export default function NewMeetingPage() {
   const router = useRouter();
   const { pushToast } = useFeedback();
   const { startMeeting, isLoading, error } = useMeeting();
-  const { selectedPromptId, setSelectedPrompt } = usePromptStore();
   const { prompts, isLoading: isPromptsLoading } = usePrompt();
-
-  // 글로벌 설정에서 기본값 가져오기
   const {
+    defaultPromptId,
     defaultTranscriptionMode,
     defaultLanguageCode,
     defaultTranslateTargetLanguage,
+    isHydrated: isSettingsHydrated,
+    fetchSettings,
   } = useMeetingSettingsStore();
 
   const [title, setTitle] = useState('');
-  const [showAgenda, setShowAgenda] = useState(false);
   const [agenda, setAgenda] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-
-  // 고급 설정 (글로벌 기본값으로 초기화, 이 회의에서만 override)
-  const [transcriptionMode, setTranscriptionMode] = useState(defaultTranscriptionMode);
+  const [hasCustomizedSessionDefaults, setHasCustomizedSessionDefaults] =
+    useState(false);
+  const [selectedPromptId, setSelectedPromptId] = useState(defaultPromptId);
+  const [transcriptionMode, setTranscriptionMode] = useState(
+    defaultTranscriptionMode,
+  );
   const [languageCode, setLanguageCode] = useState(defaultLanguageCode);
-  const [translateTargetLanguage, setTranslateTargetLanguage] = useState(defaultTranslateTargetLanguage);
+  const [translateTargetLanguage, setTranslateTargetLanguage] = useState(
+    defaultTranslateTargetLanguage,
+  );
 
-  // 프롬프트 개념 설명 (A-3): localStorage로 dismiss 상태 관리
   const [showPromptHelp, setShowPromptHelp] = useState(() => {
     if (typeof window === 'undefined') return false;
     return !localStorage.getItem('transnote_prompt_help_dismissed');
   });
+
+  useEffect(() => {
+    if (!isSettingsHydrated) {
+      void fetchSettings();
+    }
+  }, [fetchSettings, isSettingsHydrated]);
+
+  useEffect(() => {
+    if (hasCustomizedSessionDefaults) return;
+    setSelectedPromptId(defaultPromptId);
+    setTranscriptionMode(defaultTranscriptionMode);
+    setLanguageCode(defaultLanguageCode);
+    setTranslateTargetLanguage(defaultTranslateTargetLanguage);
+  }, [
+    defaultLanguageCode,
+    defaultPromptId,
+    defaultTranscriptionMode,
+    defaultTranslateTargetLanguage,
+    hasCustomizedSessionDefaults,
+  ]);
 
   const dismissPromptHelp = () => {
     localStorage.setItem('transnote_prompt_help_dismissed', 'true');
     setShowPromptHelp(false);
   };
 
-  const selectedPrompt = prompts.find((p) => p.id === selectedPromptId);
+  const resolvedPromptId = prompts.some((prompt) => prompt.id === selectedPromptId)
+    ? selectedPromptId
+    : DEFAULT_PROMPT_ID;
+  const selectedPrompt = prompts.find((prompt) => prompt.id === resolvedPromptId);
 
   const handleStart = async () => {
     if (isLoading) return;
@@ -67,7 +91,7 @@ export default function NewMeetingPage() {
     const meeting = await startMeeting({
       title: title.trim() || undefined,
       agenda: agenda.trim() || undefined,
-      promptId: selectedPromptId,
+      promptId: resolvedPromptId,
       transcriptionMode,
       languageCode: languageCode || undefined,
       translateTargetLanguage: translateTargetLanguage || undefined,
@@ -93,10 +117,13 @@ export default function NewMeetingPage() {
   return (
     <div className="app-shell min-h-dvh p-4 sm:p-6">
       <div className="mx-auto grid min-h-[calc(100dvh-2rem)] w-full max-w-6xl gap-4 lg:grid-cols-[1fr_460px]">
-        {/* 왼쪽: 소개 영역 — 모바일에서 숨김 (1.19) */}
         <section className="glass-surface motion-rise hidden flex-col justify-between p-6 sm:p-8 lg:flex">
           <div>
-            <button type="button" onClick={() => router.push('/')} className="btn-neo inline-flex mb-5 text-xs text-muted">
+            <button
+              type="button"
+              onClick={() => router.push('/')}
+              className="btn-neo inline-flex mb-5 text-xs text-muted"
+            >
               <ArrowLeft className="h-3.5 w-3.5" />
               워크스페이스로 돌아가기
             </button>
@@ -105,23 +132,38 @@ export default function NewMeetingPage() {
               <Sparkles className="h-3.5 w-3.5" />
               Start Session
             </div>
-            <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">회의를 시작하고 노트를 바로 작성하세요</h1>
+            <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
+              회의를 시작하고 노트를 바로 작성하세요
+            </h1>
             <p className="mt-3 max-w-xl text-sm text-muted sm:text-base">
               제목만 입력하면 바로 시작됩니다. 전사 모드, 언어, 번역은 기본 설정이 자동 적용됩니다.
             </p>
           </div>
 
           <div className="mt-8 grid gap-2 sm:grid-cols-3">
-            <FeatureCard icon={Clock3} title="실시간 기록" description="노트 자동 저장 + 전사 수집" />
-            <FeatureCard icon={ShieldCheck} title="보안 우선" description="녹음 파일 미저장 정책" />
-            <FeatureCard icon={Mic} title="빠른 시작" description="제목만 입력하면 바로 시작" />
+            <FeatureCard
+              icon={Clock3}
+              title="실시간 기록"
+              description="노트 자동 저장 + 전사 수집"
+            />
+            <FeatureCard
+              icon={ShieldCheck}
+              title="보안 우선"
+              description="녹음 파일 미저장 정책"
+            />
+            <FeatureCard
+              icon={Mic}
+              title="빠른 시작"
+              description="제목만 입력하면 바로 시작"
+            />
           </div>
         </section>
 
-        {/* 오른쪽: 간소화된 설정 폼 */}
         <section className="glass-surface motion-rise flex flex-col p-6 sm:p-7">
           <div className="flex-1">
-            <p className="text-xs font-semibold tracking-wide text-muted">NEW MEETING</p>
+            <p className="text-xs font-semibold tracking-wide text-muted">
+              NEW MEETING
+            </p>
             <h2 className="mt-1 text-2xl font-semibold">회의 시작</h2>
 
             {error ? (
@@ -134,9 +176,11 @@ export default function NewMeetingPage() {
             ) : null}
 
             <div className="mt-6 space-y-4">
-              {/* 제목 */}
               <div>
-                <label htmlFor="meeting-title" className="mb-1.5 block text-sm font-medium">
+                <label
+                  htmlFor="meeting-title"
+                  className="mb-1.5 block text-sm font-medium"
+                >
                   회의 제목 (선택)
                 </label>
                 <input
@@ -156,59 +200,57 @@ export default function NewMeetingPage() {
                 </p>
               </div>
 
-              {/* 아젠다 토글 */}
-              {!showAgenda ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAgenda(true)}
-                  className="text-xs text-brand hover:underline"
-                >
-                  + 아젠다 추가
-                </button>
-              ) : (
-                <div>
-                  <label htmlFor="meeting-agenda" className="mb-1.5 block text-sm font-medium">
-                    회의 아젠다
-                  </label>
-                  <textarea
-                    id="meeting-agenda"
-                    value={agenda}
-                    onChange={(e) => setAgenda(e.target.value)}
-                    placeholder="예: 신규 제품 런칭 전략, 예산 논의"
-                    rows={2}
-                    className="input-shell w-full resize-y text-sm"
-                  />
-                </div>
-              )}
-
-              {/* 프롬프트 한 줄 셀렉트 */}
               <div>
-                <label htmlFor="prompt-select" className="mb-1.5 block text-sm font-medium">
+                <label
+                  htmlFor="meeting-agenda"
+                  className="mb-1.5 block text-sm font-medium"
+                >
+                  회의 아젠다 (선택)
+                </label>
+                <textarea
+                  id="meeting-agenda"
+                  value={agenda}
+                  onChange={(e) => setAgenda(e.target.value)}
+                  placeholder="예: 신규 제품 런칭 전략, 예산 논의"
+                  rows={2}
+                  className="input-shell w-full resize-y text-sm"
+                />
+                <p className="mt-1 text-[11px] text-muted">
+                  입력하지 않아도 시작할 수 있지만, 아젠다가 있으면 회의록 구조화 품질이 좋아집니다.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="prompt-select"
+                  className="mb-1.5 block text-sm font-medium"
+                >
                   결과 프롬프트
                 </label>
                 <select
                   id="prompt-select"
-                  value={selectedPromptId}
-                  onChange={(e) => setSelectedPrompt(e.target.value)}
+                  value={resolvedPromptId}
+                  onChange={(e) => {
+                    setHasCustomizedSessionDefaults(true);
+                    setSelectedPromptId(e.target.value);
+                  }}
                   className="input-shell w-full text-sm"
                   disabled={isPromptsLoading}
                 >
                   {isPromptsLoading ? (
-                    <option value="" disabled>프롬프트 로딩 중...</option>
+                    <option value="" disabled>
+                      프롬프트 로딩 중...
+                    </option>
                   ) : (
-                    prompts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} · {PROMPT_DOCUMENT_TYPE_LABELS[p.documentType]}
-                        {p.isDefault ? ' (기본)' : ''}
+                    prompts.map((prompt) => (
+                      <option key={prompt.id} value={prompt.id}>
+                        {formatPromptLabel(prompt)}
                       </option>
                     ))
                   )}
                 </select>
                 <p className="mt-1 text-[11px] text-muted">
-                  현재: {selectedPrompt?.name || '회의'}
-                  {selectedPrompt
-                    ? ` · ${PROMPT_DOCUMENT_TYPE_LABELS[selectedPrompt.documentType]}`
-                    : ''}
+                  현재: {selectedPrompt ? formatPromptLabel(selectedPrompt) : '회의 (기본)'}
                   {' · '}
                   <button
                     type="button"
@@ -223,12 +265,13 @@ export default function NewMeetingPage() {
                     ? `${PROMPT_DOCUMENT_TYPE_HELP_TEXT[selectedPrompt.documentType]} 사용자 프롬프트는 이 기본 구조 위에 추가 강조만 적용됩니다.`
                     : '기본 문서 타입이 결과 구조를 정하고, 사용자 프롬프트는 추가 강조만 적용됩니다.'}
                 </p>
-                {showPromptHelp && (
+                {showPromptHelp ? (
                   <div className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-[11px] text-sky-800">
                     <p className="font-semibold">💡 프롬프트란?</p>
                     <p className="mt-1">
-                      AI가 회의록을 작성할 때 사용하는 템플릿입니다. &ldquo;회의록&rdquo;은
-                      안건·결정사항 중심, &ldquo;강의&rdquo;는 핵심 개념·요약 중심,
+                      AI가 회의록을 작성할 때 사용하는 템플릿입니다.
+                      &ldquo;회의록&rdquo;은 안건·결정사항 중심,
+                      &ldquo;강의&rdquo;는 핵심 개념·요약 중심,
                       &ldquo;멘토링&rdquo;은 조언·액션아이템 중심으로 정리합니다.
                     </p>
                     <button
@@ -239,14 +282,13 @@ export default function NewMeetingPage() {
                       다시 보지 않기
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
 
-              {/* 고급 설정 (접기/펼치기) */}
               <div className="rounded-[14px] border border-[var(--line-soft)]">
                 <button
                   type="button"
-                  onClick={() => setShowAdvanced((v) => !v)}
+                  onClick={() => setShowAdvanced((value) => !value)}
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
                 >
                   <div className="min-w-0 flex-1">
@@ -254,21 +296,38 @@ export default function NewMeetingPage() {
                       <Settings2 className="h-3.5 w-3.5" />
                       고급 설정
                     </span>
-                    {!showAdvanced && (
+                    {!showAdvanced ? (
                       <p className="mt-1 truncate text-[11px] text-muted/70">
                         {transcriptionMode === MeetingTranscriptionMode.REALTIME
                           ? 'Realtime'
                           : 'Batch'}
                         {' · '}
                         {languageCode
-                          ? { 'ko-KR': '한국어', 'en-US': '영어', 'ja-JP': '일본어', 'zh-CN': '중국어', 'de-DE': '독일어', 'fr-FR': '프랑스어', 'es-ES': '스페인어' }[languageCode] ?? languageCode
+                          ? {
+                              'ko-KR': '한국어',
+                              'en-US': '영어',
+                              'ja-JP': '일본어',
+                              'zh-CN': '중국어',
+                              'de-DE': '독일어',
+                              'fr-FR': '프랑스어',
+                              'es-ES': '스페인어',
+                            }[languageCode] ?? languageCode
                           : '자동 감지'}
                         {' · '}
                         {translateTargetLanguage
-                          ? { ko: '한국어 번역', en: '영어 번역', ja: '일본어 번역', zh: '중국어 번역', de: '독일어 번역', fr: '프랑스어 번역', es: '스페인어 번역' }[translateTargetLanguage] ?? `${translateTargetLanguage} 번역`
+                          ? {
+                              ko: '한국어 번역',
+                              en: '영어 번역',
+                              ja: '일본어 번역',
+                              zh: '중국어 번역',
+                              de: '독일어 번역',
+                              fr: '프랑스어 번역',
+                              es: '스페인어 번역',
+                            }[translateTargetLanguage] ??
+                            `${translateTargetLanguage} 번역`
                           : '번역 없음'}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                   {showAdvanced ? (
                     <ChevronUp className="h-4 w-4 flex-shrink-0 text-muted" />
@@ -277,19 +336,24 @@ export default function NewMeetingPage() {
                   )}
                 </button>
 
-                {showAdvanced && (
-                  <div className="border-t border-[var(--line-soft)] px-4 py-3 space-y-3">
-                    {/* 전사 모드 */}
+                {showAdvanced ? (
+                  <div className="space-y-3 border-t border-[var(--line-soft)] px-4 py-3">
                     <div>
-                      <label htmlFor="transcription-mode" className="mb-1 block text-xs font-medium">
+                      <label
+                        htmlFor="transcription-mode"
+                        className="mb-1 block text-xs font-medium"
+                      >
                         전사 모드
                       </label>
                       <select
                         id="transcription-mode"
                         value={transcriptionMode}
-                        onChange={(e) =>
-                          setTranscriptionMode(e.target.value as MeetingTranscriptionMode)
-                        }
+                        onChange={(e) => {
+                          setHasCustomizedSessionDefaults(true);
+                          setTranscriptionMode(
+                            e.target.value as MeetingTranscriptionMode,
+                          );
+                        }}
                         className="input-shell w-full text-sm"
                       >
                         <option value={MeetingTranscriptionMode.REALTIME}>
@@ -301,15 +365,20 @@ export default function NewMeetingPage() {
                       </select>
                     </div>
 
-                    {/* 전사 언어 */}
                     <div>
-                      <label htmlFor="language-code" className="mb-1 block text-xs font-medium">
+                      <label
+                        htmlFor="language-code"
+                        className="mb-1 block text-xs font-medium"
+                      >
                         전사 언어
                       </label>
                       <select
                         id="language-code"
                         value={languageCode}
-                        onChange={(e) => setLanguageCode(e.target.value)}
+                        onChange={(e) => {
+                          setHasCustomizedSessionDefaults(true);
+                          setLanguageCode(e.target.value);
+                        }}
                         className="input-shell w-full text-sm"
                       >
                         <option value="">자동 감지 (권장)</option>
@@ -323,15 +392,20 @@ export default function NewMeetingPage() {
                       </select>
                     </div>
 
-                    {/* 번역 대상 */}
                     <div>
-                      <label htmlFor="translate-target" className="mb-1 block text-xs font-medium">
+                      <label
+                        htmlFor="translate-target"
+                        className="mb-1 block text-xs font-medium"
+                      >
                         번역 대상 언어
                       </label>
                       <select
                         id="translate-target"
                         value={translateTargetLanguage}
-                        onChange={(e) => setTranslateTargetLanguage(e.target.value)}
+                        onChange={(e) => {
+                          setHasCustomizedSessionDefaults(true);
+                          setTranslateTargetLanguage(e.target.value);
+                        }}
                         className="input-shell w-full text-sm"
                       >
                         <option value="">번역 안 함</option>
@@ -349,12 +423,11 @@ export default function NewMeetingPage() {
                       기본값은 글로벌 설정에서 변경할 수 있습니다.
                     </p>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
 
-          {/* Sticky 시작 버튼 */}
           <div className="sticky bottom-0 -mx-6 -mb-6 border-t border-[var(--line-soft)] bg-[var(--bg-card)] px-6 py-4 sm:-mx-7 sm:-mb-7 sm:px-7">
             <button
               type="button"

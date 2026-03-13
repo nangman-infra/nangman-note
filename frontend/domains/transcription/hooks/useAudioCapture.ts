@@ -1,6 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  DEFAULT_AUDIO_INPUT_SOURCE,
+  type AudioInputSource,
+} from '../types/audio-input.types';
 
 export interface AudioDevice {
   deviceId: string;
@@ -21,13 +25,20 @@ export interface AudioCaptureRequestResult {
   reason?: AudioCaptureFailureReason;
 }
 
+export interface AudioCaptureRequest {
+  deviceId?: string;
+  inputSource?: AudioInputSource;
+}
+
 interface UseAudioCaptureReturn {
   permission: AudioCapturePermission;
   error: string | null;
   devices: AudioDevice[];
   selectedDeviceId: string | null;
   stream: MediaStream | null;
-  requestPermission: (nextDeviceId?: string) => Promise<AudioCaptureRequestResult>;
+  requestPermission: (
+    request?: AudioCaptureRequest | string,
+  ) => Promise<AudioCaptureRequestResult>;
   selectDevice: (deviceId: string) => void;
   stopCapture: () => void;
 }
@@ -71,7 +82,9 @@ export function useAudioCapture(): UseAudioCaptureReturn {
   }, []);
 
   const requestPermission = useCallback(
-    async (nextDeviceId?: string): Promise<AudioCaptureRequestResult> => {
+    async (
+      request?: AudioCaptureRequest | string,
+    ): Promise<AudioCaptureRequestResult> => {
       if (!isMediaDevicesSupported()) {
         setPermission('unsupported');
         setError('현재 브라우저는 마이크 캡처를 지원하지 않습니다.');
@@ -80,11 +93,16 @@ export function useAudioCapture(): UseAudioCaptureReturn {
 
       // 이전 스트림이 남아있으면 정리
       stopCapture();
-      const effectiveDeviceId = nextDeviceId ?? selectedDeviceId;
+      const normalizedRequest =
+        typeof request === 'string' ? { deviceId: request } : request;
+      const effectiveDeviceId =
+        normalizedRequest?.deviceId ?? selectedDeviceId;
+      const inputSource =
+        normalizedRequest?.inputSource ?? DEFAULT_AUDIO_INPUT_SOURCE;
       setError(null);
 
       const audioConstraints: MediaTrackConstraints = {
-        // 장치 선택
+        // 현재는 마이크 수집만 지원하지만, 요청 모델은 이후 meeting audio mix / desktop app 확장을 대비한다.
         ...(effectiveDeviceId ? { deviceId: { exact: effectiveDeviceId } } : {}),
         // 회의 양측 음성을 함께 수집하기 위해 브라우저 DSP(특히 echo cancellation)를 비활성화한다.
         // 노트북 스피커로 재생되는 상대방 음성은 echo cancellation이 켜져 있으면 제거될 수 있다.
@@ -95,6 +113,13 @@ export function useAudioCapture(): UseAudioCaptureReturn {
         noiseSuppression: false,
         autoGainControl: false,
       };
+
+      if (inputSource !== DEFAULT_AUDIO_INPUT_SOURCE) {
+        setError(
+          '선택한 입력 소스는 아직 준비 중입니다. 현재는 마이크 입력만 지원합니다.',
+        );
+        return { granted: false, reason: 'unsupported' };
+      }
 
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({

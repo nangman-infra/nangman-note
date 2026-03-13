@@ -3,6 +3,7 @@ import { Repository } from 'typeorm';
 import { DEFAULT_PROMPTS } from '../domain/default-prompts';
 import { PromptDocumentType } from '../domain/prompt-document-type.enum';
 import { PromptEntity } from '../domain/prompt.entity';
+import { UserSettingsEntity } from '../../user-settings/domain/user-settings.entity';
 import { PromptService } from './prompt.service';
 
 describe('PromptService', () => {
@@ -12,6 +13,9 @@ describe('PromptService', () => {
       Repository<PromptEntity>,
       'create' | 'save' | 'find' | 'findOne' | 'delete' | 'upsert'
     >
+  >;
+  let userSettingsRepository: jest.Mocked<
+    Pick<Repository<UserSettingsEntity>, 'update'>
   >;
 
   const buildPrompt = (overrides: Partial<PromptEntity> = {}): PromptEntity =>
@@ -35,9 +39,13 @@ describe('PromptService', () => {
       delete: jest.fn(),
       upsert: jest.fn(),
     };
+    userSettingsRepository = {
+      update: jest.fn(),
+    };
 
     service = new PromptService(
       promptRepository as unknown as Repository<PromptEntity>,
+      userSettingsRepository as unknown as Repository<UserSettingsEntity>,
     );
   });
 
@@ -171,6 +179,15 @@ describe('PromptService', () => {
     expect(promptRepository.delete).toHaveBeenCalledWith({
       id: 'prompt_user_abc',
     });
+    expect(userSettingsRepository.update).toHaveBeenCalledWith(
+      {
+        ownerSub: '__anonymous__',
+        defaultPromptId: 'prompt_user_abc',
+      },
+      {
+        defaultPromptId: null,
+      },
+    );
   });
 
   it('findById throws NotFoundException when missing', async () => {

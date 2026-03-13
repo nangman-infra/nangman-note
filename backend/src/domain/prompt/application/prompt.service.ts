@@ -7,16 +7,21 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
+import { UserSettingsEntity } from '../../user-settings/domain/user-settings.entity';
 import { CreatePromptDto } from './dto/create-prompt.dto';
 import { UpdatePromptDto } from './dto/update-prompt.dto';
 import { DEFAULT_PROMPTS } from '../domain/default-prompts';
 import { PromptEntity } from '../domain/prompt.entity';
+
+const ANONYMOUS_OWNER_SUB = '__anonymous__';
 
 @Injectable()
 export class PromptService implements OnModuleInit {
   constructor(
     @InjectRepository(PromptEntity)
     private readonly promptRepository: Repository<PromptEntity>,
+    @InjectRepository(UserSettingsEntity)
+    private readonly userSettingsRepository: Repository<UserSettingsEntity>,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -122,6 +127,15 @@ export class PromptService implements OnModuleInit {
     }
 
     await this.promptRepository.delete(ownerSub ? { id, ownerSub } : { id });
+    await this.userSettingsRepository.update(
+      {
+        ownerSub: ownerSub?.trim() || ANONYMOUS_OWNER_SUB,
+        defaultPromptId: id,
+      },
+      {
+        defaultPromptId: null,
+      },
+    );
   }
 
   private async seedDefaultPrompts(): Promise<void> {

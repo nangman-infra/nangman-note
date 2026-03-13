@@ -4,14 +4,12 @@ import { usePromptStore } from '../stores/promptStore';
 export function usePrompt() {
   const {
     prompts,
-    selectedPromptId,
     isLoading,
     error,
     fetchPrompts,
     createPrompt,
     updatePrompt,
     deletePrompt,
-    setSelectedPrompt,
   } = usePromptStore();
 
   // 초기 로드
@@ -23,12 +21,10 @@ export function usePrompt() {
 
   return {
     prompts,
-    selectedPromptId,
     isLoading,
     error,
     createPrompt,
     updatePrompt,
     deletePrompt,
-    setSelectedPrompt,
   };
 }

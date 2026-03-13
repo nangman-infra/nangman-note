@@ -11,6 +11,7 @@ import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
 import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/lib/constants';
 import { meetingApi } from '@/domains/meeting/api/meetingApi';
 import { useMeetingStore } from '@/domains/meeting/stores/meetingStore';
+import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
 import { useResult } from '../hooks/useResult';
 import { useResultStore } from '../stores/resultStore';
 import {
@@ -560,9 +561,7 @@ export function ResultViewer({
                     })
                     .map((prompt) => (
                       <option key={prompt.id} value={prompt.id}>
-                        {prompt.isDefault
-                          ? `${prompt.name} (기본)`
-                          : `${prompt.name} · ${PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}`}
+                        {formatPromptLabel(prompt)}
                       </option>
                     ))}
                 </select>

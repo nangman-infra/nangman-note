@@ -297,7 +297,7 @@ export default function InProgressMeetingPage() {
         await stopRecording();
       }
 
-      const captureResult = await requestPermission(deviceId);
+      const captureResult = await requestPermission({ deviceId });
       if (captureResult.granted) {
         // stream이 변경되면 위 useEffect에서 자동 재시작
       }
