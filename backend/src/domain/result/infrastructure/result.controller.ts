@@ -7,11 +7,7 @@ import {
   Param,
   Patch,
   Post,
-  Query,
-  Res,
-  StreamableFile,
 } from '@nestjs/common';
-import type { Response } from 'express';
 import { RegenerateResultDto } from '../application/dto/regenerate-result.dto';
 import { UpdateResultDto } from '../application/dto/update-result.dto';
 import { ResultService } from '../application/result.service';
@@ -62,28 +58,6 @@ export class ResultController {
       promptId: dto.promptId,
       status: 'regenerating',
     };
-  }
-
-  @Get('export')
-  async export(
-    @Param('meetingId') meetingId: string,
-    @Query('format') format: string | undefined,
-    @Res({ passthrough: true }) response: Response,
-    @CurrentUser() user?: AuthUser,
-  ): Promise<StreamableFile> {
-    const exported = await this.resultService.exportResult(
-      meetingId,
-      format,
-      user?.sub,
-    );
-
-    response.setHeader('Content-Type', exported.contentType);
-    response.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${exported.fileName}"`,
-    );
-
-    return new StreamableFile(exported.buffer);
   }
 
   private toResultResponse(result: ResultEntity): ResultResponse {

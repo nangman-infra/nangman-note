@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { QueryFailedError, Repository } from 'typeorm';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
@@ -449,32 +448,6 @@ describe('ResultService', () => {
       expect(
         meetingSearchDocumentService.refreshByMeetingId,
       ).toHaveBeenCalledWith('meeting-1');
-    });
-  });
-
-  describe('exportResult', () => {
-    it('exports markdown result buffer', async () => {
-      const existing = buildResult({ content: '# Markdown' });
-      meetingService.findById.mockResolvedValue(buildMeeting());
-      resultRepository.findOne.mockResolvedValue(existing);
-
-      const exported = await service.exportResult('meeting-1', 'md');
-
-      expect(exported.fileName).toMatch(
-        /^meeting_meeting-1_\d{4}-\d{2}-\d{2}\.md$/u,
-      );
-      expect(exported.contentType).toBe('text/markdown; charset=utf-8');
-      expect(exported.buffer.toString('utf-8')).toBe('# Markdown');
-    });
-
-    it('throws BadRequestException on unsupported export format', async () => {
-      const existing = buildResult();
-      meetingService.findById.mockResolvedValue(buildMeeting());
-      resultRepository.findOne.mockResolvedValue(existing);
-
-      await expect(
-        service.exportResult('meeting-1', 'txt'),
-      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

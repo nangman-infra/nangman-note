@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { MeetingModule } from './domain/meeting/meeting.module';
 import { NoteModule } from './domain/note/note.module';
+import { DocumentOutputModule } from './domain/document-output/document-output.module';
 import { PromptModule } from './domain/prompt/prompt.module';
 import { ResultModule } from './domain/result/result.module';
 import { TranscriptionModule } from './domain/transcription/transcription.module';
@@ -75,6 +76,7 @@ import { buildTypeOrmModuleOptions } from './shared/config/typeorm-options.facto
     MeetingModule,
     NoteModule,
     ResultModule,
+    DocumentOutputModule,
     TranscriptionModule,
   ],
   controllers: [AppController],

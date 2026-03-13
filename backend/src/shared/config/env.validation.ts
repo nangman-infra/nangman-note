@@ -37,6 +37,7 @@ export interface AppEnv {
   AUTH_OIDC_ISSUER: string;
   AUTH_OIDC_AUDIENCE: string;
   AUTH_OIDC_JWKS_URI: string;
+  PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: string;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -365,6 +366,11 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     AUTH_OIDC_ISSUER: authIssuer,
     AUTH_OIDC_AUDIENCE: authAudience,
     AUTH_OIDC_JWKS_URI: authJwksUri,
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: readString(
+      config,
+      'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH',
+      '',
+    ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: readString(
       config,
