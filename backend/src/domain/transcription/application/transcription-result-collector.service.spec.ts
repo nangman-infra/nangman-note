@@ -211,6 +211,92 @@ describe('TranscriptionResultCollectorService', () => {
     );
   });
 
+  it('recovers stale queued jobs by collecting transcripts before generating', async () => {
+    const job = buildJob({
+      status: TranscriptionJobStatus.PROCESSING,
+    });
+    jobRepository.findOne.mockResolvedValue(job);
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
+    batchProvider.getJobStatus.mockResolvedValue({
+      status: TranscriptionJobStatus.COMPLETED,
+      transcriptUri: 's3://transcript-bucket/meeting-1/result.json',
+    });
+    s3AudioService.getObjectAsStringFromBucket.mockResolvedValue(
+      JSON.stringify({
+        results: {
+          items: [
+            {
+              type: 'pronunciation',
+              start_time: '0.0',
+              end_time: '1.0',
+              alternatives: [{ confidence: '0.9', content: '안녕' }],
+            },
+          ],
+        },
+      }),
+    );
+    segmentRepository.create.mockImplementation(
+      (entity) => entity as TranscriptSegmentEntity,
+    );
+    segmentRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptSegmentEntity),
+    );
+    s3AudioService.deleteAudioFile.mockResolvedValue(undefined);
+
+    const result = await service.recoverStalledBatchJob(
+      'meeting-1',
+      'job-1',
+      'user-1',
+    );
+
+    expect(result).toEqual({ success: true, segmentCount: 1 });
+    expect(segmentRepository.save).toHaveBeenCalledTimes(1);
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'meeting.status.changed',
+      expect.objectContaining({
+        meetingId: 'meeting-1',
+        phase: 'generating',
+      }),
+    );
+  });
+
+  it('marks stale jobs failed and falls back to generating when provider remains stuck', async () => {
+    const job = buildJob({
+      status: TranscriptionJobStatus.PROCESSING,
+    });
+    jobRepository.findOne.mockResolvedValue(job);
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
+    batchProvider.getJobStatus.mockResolvedValue({
+      status: TranscriptionJobStatus.PROCESSING,
+    });
+    s3AudioService.deleteAudioFile.mockResolvedValue(undefined);
+
+    const result = await service.recoverStalledBatchJob(
+      'meeting-1',
+      'job-1',
+      'user-1',
+    );
+
+    expect(result).toEqual({ success: false, segmentCount: 0 });
+    expect(jobRepository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: TranscriptionJobStatus.FAILED,
+        errorMessage: 'Batch transcription stalled for over 1 hour',
+      }),
+    );
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'meeting.status.changed',
+      expect.objectContaining({
+        meetingId: 'meeting-1',
+        phase: 'generating',
+      }),
+    );
+  });
+
   it('still marks meeting completed when result generation fails on generating phase', async () => {
     resultService.generateForPipeline.mockRejectedValue(
       new Error('generation failed'),

@@ -2,8 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { settingsApi } from '../api/settingsApi';
-import { useMeetingSettingsStore } from './settingsStore';
-import { MeetingTranscriptionMode } from '../types/meeting.types';
+import { useUserSettingsStore } from './settingsStore';
+import { MeetingTranscriptionMode } from '../../meeting/types/meeting.types';
 
 vi.mock('../api/settingsApi', () => ({
   settingsApi: {
@@ -15,7 +15,7 @@ vi.mock('../api/settingsApi', () => ({
 const mockedSettingsApi = vi.mocked(settingsApi);
 
 function resetStore() {
-  useMeetingSettingsStore.setState({
+  useUserSettingsStore.setState({
     defaultPromptId: 'prompt_default_meeting',
     defaultTranscriptionMode: MeetingTranscriptionMode.REALTIME,
     defaultLanguageCode: '',
@@ -28,7 +28,7 @@ function resetStore() {
   });
 }
 
-describe('useMeetingSettingsStore', () => {
+describe('useUserSettingsStore', () => {
   beforeEach(() => {
     resetStore();
     localStorage.clear();
@@ -49,9 +49,9 @@ describe('useMeetingSettingsStore', () => {
       isConfigured: true,
     });
 
-    await useMeetingSettingsStore.getState().fetchSettings();
+    await useUserSettingsStore.getState().fetchSettings();
 
-    expect(useMeetingSettingsStore.getState()).toMatchObject({
+    expect(useUserSettingsStore.getState()).toMatchObject({
       defaultPromptId: 'prompt_user_a',
       defaultTranscriptionMode: MeetingTranscriptionMode.BATCH,
       defaultLanguageCode: 'en-US',
@@ -99,7 +99,7 @@ describe('useMeetingSettingsStore', () => {
       isConfigured: true,
     });
 
-    await useMeetingSettingsStore.getState().fetchSettings();
+    await useUserSettingsStore.getState().fetchSettings();
 
     expect(mockedSettingsApi.update).toHaveBeenCalledWith({
       defaultPromptId: 'prompt_user_legacy',
@@ -109,7 +109,7 @@ describe('useMeetingSettingsStore', () => {
     });
     expect(localStorage.getItem('transnote-meeting-settings')).toBeNull();
     expect(localStorage.getItem('transnote-prompt-settings')).toBeNull();
-    expect(useMeetingSettingsStore.getState()).toMatchObject({
+    expect(useUserSettingsStore.getState()).toMatchObject({
       defaultPromptId: 'prompt_user_legacy',
       defaultTranscriptionMode: MeetingTranscriptionMode.BATCH,
       defaultLanguageCode: 'ja-JP',

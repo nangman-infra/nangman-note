@@ -48,6 +48,20 @@ const buildMeeting = (): MeetingEntity =>
     endedAt: new Date(),
   }) as unknown as MeetingEntity;
 
+function normalizeNarrative(text: string): string {
+  return text
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .filter((line) => line.length > 0)
+    .join(' ')
+    .trim();
+}
+
 function createService(): ResultService {
   return new ResultService(
     {
@@ -155,8 +169,9 @@ describe('Meeting Rendering Property Tests', () => {
         );
         expect(hasBullet).toBe(false);
         // Summary text should be present
-        if (extracted.summary) {
-          expect(md).toContain(extracted.summary);
+        const normalizedSummary = normalizeNarrative(extracted.summary);
+        if (normalizedSummary) {
+          expect(md).toContain(normalizedSummary);
         }
       }),
       { numRuns: 100 },
@@ -380,8 +395,9 @@ describe('Lecture Rendering Property Tests', () => {
           l.trimStart().startsWith('- '),
         );
         expect(hasBullet).toBe(false);
-        if (extracted.summary) {
-          expect(md).toContain(extracted.summary);
+        const normalizedSummary = normalizeNarrative(extracted.summary);
+        if (normalizedSummary) {
+          expect(md).toContain(normalizedSummary);
         }
       }),
       { numRuns: 100 },
@@ -500,8 +516,9 @@ describe('Mentoring Rendering Property Tests', () => {
           l.trimStart().startsWith('- '),
         );
         expect(hasBullet).toBe(false);
-        if (extracted.summary) {
-          expect(md).toContain(extracted.summary);
+        const normalizedSummary = normalizeNarrative(extracted.summary);
+        if (normalizedSummary) {
+          expect(md).toContain(normalizedSummary);
         }
       }),
       { numRuns: 100 },

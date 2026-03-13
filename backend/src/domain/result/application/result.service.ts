@@ -615,7 +615,7 @@ export class ResultService {
 
     const participantsLine =
       extracted.participants.length > 0
-        ? extracted.participants.join(', ')
+        ? this.renderInlineNarrativeList(extracted.participants)
         : '확인 불가';
 
     return [
@@ -625,7 +625,7 @@ export class ResultService {
       participantsLine,
       '',
       '## 회의 개요',
-      extracted.summary || '_요약 추출 없음_',
+      this.renderNarrativeParagraph(extracted.summary, '_요약 추출 없음_'),
       '',
       '## 안건별 논의',
       ...agendaSections,
@@ -683,7 +683,7 @@ export class ResultService {
       `# ${title}`,
       '',
       '## 강의 요약',
-      extracted.summary || '_요약 추출 없음_',
+      this.renderNarrativeParagraph(extracted.summary, '_요약 추출 없음_'),
       '',
       '## 핵심 개념',
       ...concepts,
@@ -747,7 +747,7 @@ export class ResultService {
       `# ${title}`,
       '',
       '## 세션 요약',
-      extracted.summary || '_요약 추출 없음_',
+      this.renderNarrativeParagraph(extracted.summary, '_요약 추출 없음_'),
       '',
       '## 핵심 주제',
       ...topicSections,
@@ -835,6 +835,24 @@ export class ResultService {
     return `${context.trim()}\n`;
   }
 
+  private renderNarrativeParagraph(
+    text: string | undefined,
+    emptyText: string,
+  ): string {
+    if (!text) {
+      return emptyText;
+    }
+
+    const normalized = text
+      .split('\n')
+      .map((line) => this.normalizeNarrativeLine(line))
+      .filter((line) => line.length > 0)
+      .join(' ')
+      .trim();
+
+    return normalized.length > 0 ? normalized : emptyText;
+  }
+
   private renderNumberedList(items: string[], emptyText: string): string {
     if (items.length === 0) {
       return `- ${emptyText}`;
@@ -844,6 +862,21 @@ export class ResultService {
 
   private renderInlineList(items: string[], emptyText: string): string {
     return items.length > 0 ? items.join('; ') : emptyText;
+  }
+
+  private renderInlineNarrativeList(items: string[]): string {
+    const normalized = items
+      .map((item) => this.normalizeNarrativeLine(item))
+      .filter((item) => item.length > 0);
+
+    return normalized.length > 0 ? normalized.join(', ') : '확인 불가';
+  }
+
+  private normalizeNarrativeLine(text: string): string {
+    return text
+      .replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private buildEmptyContentNotice(meeting: MeetingEntity): string {

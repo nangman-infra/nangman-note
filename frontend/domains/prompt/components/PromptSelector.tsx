@@ -11,7 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
-import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
+import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
 import { usePrompt } from '../hooks/usePrompt';
 import { PromptEditorDialog } from './PromptEditorDialog';
 import {
@@ -27,7 +27,7 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
   const [expanded, setExpanded] = useState(false);
   const { prompts, isLoading, createPrompt, updatePrompt, deletePrompt } =
     usePrompt();
-  const { defaultPromptId, updateSettings } = useMeetingSettingsStore();
+  const { defaultPromptId, updateSettings } = useUserSettingsStore();
 
   const selectedPromptId = prompts.some((prompt) => prompt.id === defaultPromptId)
     ? defaultPromptId

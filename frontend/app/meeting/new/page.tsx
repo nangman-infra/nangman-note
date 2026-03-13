@@ -15,7 +15,7 @@ import {
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
-import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
+import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
 import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
 import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
@@ -34,7 +34,7 @@ export default function NewMeetingPage() {
     defaultTranslateTargetLanguage,
     isHydrated: isSettingsHydrated,
     fetchSettings,
-  } = useMeetingSettingsStore();
+  } = useUserSettingsStore();
 
   const [title, setTitle] = useState('');
   const [agenda, setAgenda] = useState('');

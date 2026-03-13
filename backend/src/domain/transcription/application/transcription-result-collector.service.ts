@@ -167,6 +167,74 @@ export class TranscriptionResultCollectorService {
     return { success: false, segmentCount: 0 };
   }
 
+  async recoverMissingBatchJob(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<void> {
+    this.emitGeneratingPhase(meetingId, ownerSub);
+  }
+
+  async recoverStalledBatchJob(
+    meetingId: string,
+    jobId: string,
+    ownerSub?: string,
+  ): Promise<{ success: boolean; segmentCount: number }> {
+    const job = await this.jobRepository.findOne({ where: { id: jobId } });
+    if (!job) {
+      this.logger.warn(
+        `Cannot recover stalled batch job ${jobId} because the job does not exist`,
+      );
+      this.emitGeneratingPhase(meetingId, ownerSub);
+      return { success: false, segmentCount: 0 };
+    }
+
+    try {
+      const result = await this.batchProvider.getJobStatus(job.providerJobId);
+
+      job.status = result.status;
+      if (result.transcriptUri) {
+        job.transcriptUri = result.transcriptUri;
+      }
+      if (result.errorMessage) {
+        job.errorMessage = result.errorMessage;
+      }
+      await this.jobRepository.save(job);
+
+      if (result.status === TranscriptionJobStatus.COMPLETED) {
+        const segmentCount = await this.parseAndSaveResults(
+          meetingId,
+          result.transcriptUri,
+        );
+        await this.deleteAudioFile(job.mediaUri);
+        this.emitGeneratingPhase(meetingId, ownerSub);
+        return { success: true, segmentCount };
+      }
+
+      if (result.status === TranscriptionJobStatus.FAILED) {
+        await this.finalizeAfterFailedTranscription(
+          meetingId,
+          job.mediaUri,
+          ownerSub,
+        );
+        return { success: false, segmentCount: 0 };
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to re-check stalled batch job ${job.providerJobId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+
+    job.status = TranscriptionJobStatus.FAILED;
+    job.errorMessage = 'Batch transcription stalled for over 1 hour';
+    await this.jobRepository.save(job);
+    await this.finalizeAfterFailedTranscription(
+      meetingId,
+      job.mediaUri,
+      ownerSub,
+    );
+    return { success: false, segmentCount: 0 };
+  }
+
   private async parseAndSaveResults(
     meetingId: string,
     transcriptUri?: string,

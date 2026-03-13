@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { settingsApi } from '../api/settingsApi';
-import { MeetingTranscriptionMode } from '../types/meeting.types';
+import { MeetingTranscriptionMode } from '../../meeting/types/meeting.types';
 import type { UpdateUserSettingsDto, UserSettings } from '../types/settings.types';
 
 const LEGACY_MEETING_SETTINGS_KEY = 'transnote-meeting-settings';
@@ -82,7 +82,7 @@ function applySettings(settings: UserSettings) {
   };
 }
 
-interface MeetingSettingsState {
+interface UserSettingsState {
   /** 기본 결과 프롬프트 */
   defaultPromptId: string;
   /** 기본 전사 모드 */
@@ -106,7 +106,7 @@ interface MeetingSettingsState {
   updateSettings: (dto: UpdateUserSettingsDto) => Promise<boolean>;
 }
 
-export const useMeetingSettingsStore = create<MeetingSettingsState>((set, get) => ({
+export const useUserSettingsStore = create<UserSettingsState>((set, get) => ({
   defaultPromptId: DEFAULT_PROMPT_ID,
   defaultTranscriptionMode: MeetingTranscriptionMode.REALTIME,
   defaultLanguageCode: '',

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
-import { useMeetingSettingsStore } from '@/domains/meeting/stores/settingsStore';
+import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
 import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
 import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
@@ -40,7 +40,7 @@ export default function SettingsPage() {
     error: settingsError,
     fetchSettings,
     updateSettings,
-  } = useMeetingSettingsStore();
+  } = useUserSettingsStore();
   const {
     prompts,
     isLoading,

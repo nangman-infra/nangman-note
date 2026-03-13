@@ -1,4 +1,4 @@
-import { MeetingTranscriptionMode } from './meeting.types';
+import { MeetingTranscriptionMode } from '../../meeting/types/meeting.types';
 
 export interface UserSettings {
   defaultPromptId: string;
