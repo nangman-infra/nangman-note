@@ -585,7 +585,7 @@ export function ResultViewer({
                 <button
                   type="button"
                   onClick={() => setShowRegenerate(false)}
-                  className="btn-neo inline-flex whitespace-nowrap px-4 py-2 text-sm"
+                  className="btn-neo inline-flex whitespace-nowrap px-4 py-2 text-sm text-muted hover:text-foreground"
                 >
                   취소
                 </button>
@@ -616,7 +616,7 @@ export function ResultViewer({
           <button
             type="button"
             onClick={() => setShowRegenerateConfirm(false)}
-            className="btn-neo inline-flex px-4 py-2 text-sm"
+            className="btn-neo inline-flex px-4 py-2 text-sm text-muted hover:text-foreground"
           >
             취소
           </button>
