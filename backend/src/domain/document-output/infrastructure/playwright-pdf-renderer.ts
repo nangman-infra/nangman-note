@@ -18,13 +18,16 @@ export class PlaywrightPdfRenderer implements PdfRendererPort {
   async render(input: PdfRenderInput): Promise<Buffer> {
     const executablePath = this.resolveExecutablePath();
     const browser = await chromium.launch({
-      executablePath,
+      ...(executablePath ? { executablePath } : {}),
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--single-process',
+        '--disable-extensions',
+        '--disable-background-networking',
       ],
     });
 
@@ -69,7 +72,7 @@ export class PlaywrightPdfRenderer implements PdfRendererPort {
     }
   }
 
-  private resolveExecutablePath(): string {
+  private resolveExecutablePath(): string | undefined {
     const configuredPath = this.configService.get(
       'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH',
       {
@@ -102,9 +105,8 @@ export class PlaywrightPdfRenderer implements PdfRendererPort {
       return fromPath;
     }
 
-    throw new Error(
-      'No Chromium executable found for PDF rendering. Set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH or install chromium/google-chrome in the runtime image.',
-    );
+    // undefined → playwright-core가 자체 번들 Chromium을 자동 탐색
+    return undefined;
   }
 
   private resolveFromPath(commands: string[]): string | null {
