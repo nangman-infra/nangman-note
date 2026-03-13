@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ConverseCommand,
@@ -16,13 +16,14 @@ import type {
   StructuredMentoringTopic,
   StructuredNoteExtraction,
 } from './bedrock.types';
+import { StructuredLogger } from '../../logging/structured-logger';
 
 const MAX_TRANSCRIPT_CHARS = 200_000;
 const TRANSCRIPT_HEAD_CHARS = 110_000;
 
 @Injectable()
 export class BedrockService {
-  private readonly logger = new Logger(BedrockService.name);
+  private readonly logger = new StructuredLogger(BedrockService.name);
   private readonly client: BedrockRuntimeClient;
   private readonly modelId: string;
   private readonly maxTokens: number;
@@ -113,9 +114,10 @@ export class BedrockService {
     ];
 
     try {
-      this.logger.log(
-        `Invoking Bedrock model ${this.modelId} for meeting: ${meetingTitle ?? 'untitled'}`,
-      );
+      this.logger.log('ai.bedrock.legacy_generation.started', {
+        modelId: this.modelId,
+        meetingTitle: meetingTitle ?? 'untitled',
+      });
 
       const command = new ConverseCommand({
         modelId: this.modelId,
@@ -132,19 +134,25 @@ export class BedrockService {
       const outputText = response.output?.message?.content?.[0]?.text ?? '';
 
       if (!outputText) {
-        this.logger.warn('Bedrock returned empty response');
+        this.logger.warn('ai.bedrock.legacy_generation.empty_response', {
+          modelId: this.modelId,
+          meetingTitle: meetingTitle ?? 'untitled',
+        });
         return '';
       }
 
-      this.logger.log(
-        `Bedrock response received: ${outputText.length} chars, stop reason: ${response.stopReason}`,
-      );
+      this.logger.log('ai.bedrock.legacy_generation.completed', {
+        modelId: this.modelId,
+        outputLength: outputText.length,
+        stopReason: response.stopReason,
+      });
 
       return outputText;
     } catch (error) {
-      this.logger.error(
-        `Bedrock invocation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      this.logger.error('ai.bedrock.legacy_generation.failed', error, {
+        modelId: this.modelId,
+        meetingTitle: meetingTitle ?? 'untitled',
+      });
       throw error;
     }
   }
@@ -202,20 +210,41 @@ export class BedrockService {
       },
     });
 
+    this.logger.log('ai.bedrock.structured_extraction.started', {
+      modelId: this.modelId,
+      documentType,
+      meetingTitle: meetingTitle ?? 'untitled',
+    });
     const response = await this.client.send(command);
     const outputText = response.output?.message?.content?.[0]?.text ?? '';
 
     if (!outputText.trim()) {
+      this.logger.warn('ai.bedrock.structured_extraction.empty_response', {
+        modelId: this.modelId,
+        documentType,
+        meetingTitle: meetingTitle ?? 'untitled',
+      });
       throw new Error('Bedrock returned empty structured extraction response');
     }
 
     const parsed = this.parseJsonObject(outputText);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      this.logger.warn('ai.bedrock.structured_extraction.invalid_json', {
+        modelId: this.modelId,
+        documentType,
+        meetingTitle: meetingTitle ?? 'untitled',
+      });
       throw new Error(
         'Bedrock structured extraction did not return valid JSON',
       );
     }
 
+    this.logger.log('ai.bedrock.structured_extraction.completed', {
+      modelId: this.modelId,
+      documentType,
+      outputLength: outputText.length,
+      stopReason: response.stopReason,
+    });
     return this.normalizeStructuredNotes(
       parsed as Record<string, unknown>,
       documentType,

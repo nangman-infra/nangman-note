@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Param,
   Post,
 } from '@nestjs/common';
@@ -14,10 +13,11 @@ import { TranscriptionResultCollectorService } from '../application/transcriptio
 import { S3AudioService } from '../../../shared/aws/s3/s3.service';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import type { AuthUser } from '../../../shared/auth/auth-user.interface';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 @Controller('api/v1/meetings/:meetingId/transcripts')
 export class TranscriptionController {
-  private readonly logger = new Logger(TranscriptionController.name);
+  private readonly logger = new StructuredLogger(TranscriptionController.name);
 
   constructor(
     private readonly transcriptionService: TranscriptionService,
@@ -77,14 +77,18 @@ export class TranscriptionController {
     this.resultCollectorService
       .pollAndCollect(meetingId, job.id)
       .then((result) => {
-        this.logger.log(
-          `[AsyncPoll] Meeting ${meetingId}: success=${result.success}, segments=${result.segmentCount}`,
-        );
+        this.logger.log('transcription.batch.poll.completed', {
+          meetingId,
+          jobId: job.id,
+          success: result.success,
+          segmentCount: result.segmentCount,
+        });
       })
       .catch((err: Error) => {
-        this.logger.error(
-          `[AsyncPoll] Meeting ${meetingId} failed: ${err.message}`,
-        );
+        this.logger.error('transcription.batch.poll.failed', err, {
+          meetingId,
+          jobId: job.id,
+        });
       });
 
     return { job };

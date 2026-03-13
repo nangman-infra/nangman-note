@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -8,10 +8,21 @@ import {
 } from './shared/config/cors-origin.util';
 import { AppEnv } from './shared/config/env.validation';
 import { AllExceptionsFilter } from './shared/filters/all-exceptions.filter';
+import { requestContextMiddleware } from './shared/logging/request-context.middleware';
+import { HttpRequestLoggingInterceptor } from './shared/interceptors/http-request-logging.interceptor';
 import { ResponseInterceptor } from './shared/interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+  app.useLogger(
+    new ConsoleLogger('', {
+      json: true,
+      colors: false,
+      compact: true,
+    }),
+  );
 
   const configService = app.get(ConfigService<AppEnv, true>);
   const port = configService.get('PORT', { infer: true });
@@ -34,6 +45,7 @@ async function bootstrap() {
     origin: corsOriginHandler,
     credentials: true,
   });
+  app.use(requestContextMiddleware);
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -41,6 +53,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  app.useGlobalInterceptors(new HttpRequestLoggingInterceptor());
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
 

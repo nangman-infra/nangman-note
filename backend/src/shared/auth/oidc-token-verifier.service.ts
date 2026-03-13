@@ -1,15 +1,16 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { JWTPayload } from 'jose';
 import { AppEnv } from '../config/env.validation';
 import type { AuthUser } from './auth-user.interface';
+import { StructuredLogger } from '../logging/structured-logger';
 
 type JoseModule = typeof import('jose');
 type JoseJwtKeyResolver = Parameters<JoseModule['jwtVerify']>[1];
 
 @Injectable()
 export class OidcTokenVerifierService {
-  private readonly logger = new Logger(OidcTokenVerifierService.name);
+  private readonly logger = new StructuredLogger(OidcTokenVerifierService.name);
   private readonly authEnabled: boolean;
   private readonly issuer: string;
   private readonly audience: string;
@@ -48,9 +49,9 @@ export class OidcTokenVerifierService {
 
       return this.toAuthUser(payload);
     } catch (error) {
-      this.logger.warn(
-        `Access token verification failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn('auth.oidc.access_token.invalid', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       throw new UnauthorizedException('Invalid access token');
     }
   }
@@ -102,9 +103,10 @@ export class OidcTokenVerifierService {
     try {
       const response = await fetch(discoveryUrl, { cache: 'no-store' });
       if (!response.ok) {
-        this.logger.warn(
-          `Failed to fetch OIDC discovery document (${response.status}), fallback to ${defaultJwksUri}`,
-        );
+        this.logger.warn('auth.oidc.discovery.fetch_failed', {
+          statusCode: response.status,
+          fallbackJwksUri: defaultJwksUri,
+        });
         return defaultJwksUri;
       }
 
@@ -116,14 +118,15 @@ export class OidcTokenVerifierService {
         return data.jwks_uri.trim();
       }
 
-      this.logger.warn(
-        `OIDC discovery document missing jwks_uri, fallback to ${defaultJwksUri}`,
-      );
+      this.logger.warn('auth.oidc.discovery.jwks_missing', {
+        fallbackJwksUri: defaultJwksUri,
+      });
       return defaultJwksUri;
     } catch (error) {
-      this.logger.warn(
-        `OIDC discovery fetch failed, fallback to ${defaultJwksUri}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn('auth.oidc.discovery.request_failed', {
+        fallbackJwksUri: defaultJwksUri,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       return defaultJwksUri;
     }
   }

@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -24,6 +23,7 @@ import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { ListMeetingsQueryDto } from './dto/list-meetings-query.dto';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
 import { UpdateMeetingDto } from './dto/update-meeting.dto';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const DEFAULT_PROMPT_ID = 'prompt_default_meeting';
 const SEARCH_SCOPES = ['all', 'title', 'result', 'transcript', 'note'] as const;
@@ -42,7 +42,7 @@ export interface MeetingSearchResult {
 
 @Injectable()
 export class MeetingService {
-  private readonly logger = new Logger(MeetingService.name);
+  private readonly logger = new StructuredLogger(MeetingService.name);
 
   constructor(
     @InjectRepository(MeetingEntity)
@@ -77,6 +77,12 @@ export class MeetingService {
 
     const saved = await this.meetingRepository.save(meeting);
     await this.meetingSearchDocumentService.refreshByMeetingId(saved.id);
+    this.logger.log('meeting.created', {
+      meetingId: saved.id,
+      ownerSub: saved.ownerSub,
+      promptId: saved.promptId,
+      transcriptionMode: saved.transcriptionMode,
+    });
     return saved;
   }
 
@@ -194,9 +200,13 @@ export class MeetingService {
         },
       };
     } catch (error) {
-      this.logger.warn(
-        `Search projection unavailable, falling back to legacy search: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.warn('meeting.search.projection_fallback', {
+        ownerSub,
+        scope,
+        keywordLength: keyword.length,
+        errorMessage:
+          error instanceof Error ? error.message : String(error),
+      });
       return this.searchLegacy({
         scope,
         keyword,
@@ -286,6 +296,11 @@ export class MeetingService {
       meeting.status = MeetingStatus.PROCESSING;
       meeting.endedAt = new Date();
       const updated = await this.meetingRepository.save(meeting);
+      this.logger.log('meeting.completed.awaiting_transcription', {
+        meetingId: updated.id,
+        ownerSub: updated.ownerSub,
+        transcriptionMode: updated.transcriptionMode,
+      });
       this.emitStatusChanged(
         updated.id,
         updated.status,
@@ -299,6 +314,12 @@ export class MeetingService {
     meeting.status = MeetingStatus.PROCESSING;
     meeting.endedAt = new Date();
     const updated = await this.meetingRepository.save(meeting);
+    this.logger.log('meeting.completed.awaiting_generation', {
+      meetingId: updated.id,
+      ownerSub: updated.ownerSub,
+      transcriptionMode: updated.transcriptionMode,
+      skipTranscription,
+    });
     this.emitStatusChanged(
       updated.id,
       updated.status,
@@ -316,6 +337,11 @@ export class MeetingService {
     const meeting = await this.findById(id, ownerSub);
     meeting.status = status;
     const updated = await this.meetingRepository.save(meeting);
+    this.logger.log('meeting.status.updated', {
+      meetingId: updated.id,
+      ownerSub: updated.ownerSub,
+      status: updated.status,
+    });
     this.emitStatusChanged(
       updated.id,
       updated.status,

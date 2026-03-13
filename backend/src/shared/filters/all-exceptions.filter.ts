@@ -6,6 +6,8 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { StructuredLogger } from '../logging/structured-logger';
+import { updateRequestContext } from '../logging/request-context.storage';
 
 interface ApiErrorResponse {
   success: false;
@@ -20,6 +22,8 @@ interface ApiErrorResponse {
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new StructuredLogger(AllExceptionsFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -31,6 +35,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const message = this.resolveMessage(exception);
+    updateRequestContext({
+      method: request.method,
+      path: request.originalUrl || request.url,
+    });
+    this.logger.error('http.request.failed', exception, {
+      statusCode,
+      code: this.resolveCode(exception),
+    });
 
     const payload: ApiErrorResponse = {
       success: false,

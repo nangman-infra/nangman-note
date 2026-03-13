@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ConnectedSocket,
@@ -22,6 +21,11 @@ import {
 } from '../application/transcription.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
+import {
+  runWithRequestContext,
+  updateRequestContext,
+} from '../../../shared/logging/request-context.storage';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 interface AudioAckResponse {
   ok: boolean;
@@ -55,7 +59,7 @@ export class TranscriptionGateway
   @WebSocketServer()
   private readonly server: Server;
 
-  private readonly logger = new Logger(TranscriptionGateway.name);
+  private readonly logger = new StructuredLogger(TranscriptionGateway.name);
 
   /** meetingId → Set<socket.id> (같은 회의에 여러 클라이언트가 연결될 수 있음) */
   private readonly meetingClients = new Map<string, Set<string>>();
@@ -118,43 +122,79 @@ export class TranscriptionGateway
     }
 
     try {
-      const authContext = await this.resolveSocketAuthContext(client);
-      const ownerSub = authContext?.ownerSub;
-      await this.meetingService.findById(meetingId, ownerSub);
-      await client.join(meetingId);
-      this.socketUsers.set(client.id, ownerSub);
-      this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
+      await runWithRequestContext(
+        {
+          transport: 'ws',
+          socketId: client.id,
+          meetingId,
+        },
+        async () => {
+          const authContext = await this.resolveSocketAuthContext(client);
+          const ownerSub = authContext?.ownerSub;
+          updateRequestContext({ ownerSub });
+          await this.meetingService.findById(meetingId, ownerSub);
+          await client.join(meetingId);
+          this.socketUsers.set(client.id, ownerSub);
+          this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
 
-      // 클라이언트 추적
-      if (!this.meetingClients.has(meetingId)) {
-        this.meetingClients.set(meetingId, new Set());
-      }
-      this.meetingClients.get(meetingId)!.add(client.id);
+          if (!this.meetingClients.has(meetingId)) {
+            this.meetingClients.set(meetingId, new Set());
+          }
+          this.meetingClients.get(meetingId)!.add(client.id);
 
-      // Transcribe 세션은 첫 오디오 청크 도착 시 시작 (handleAudio에서)
-      client.emit('connected', {
-        meetingId,
-        hasActiveSession:
-          this.transcriptionService.hasActiveRealtimeSession(meetingId),
-      });
+          client.emit('connected', {
+            meetingId,
+            hasActiveSession:
+              this.transcriptionService.hasActiveRealtimeSession(meetingId),
+          });
 
-      this.logger.log(
-        `Client ${client.id} connected to meeting ${meetingId} (realtime ready)`,
+          this.logger.log('transcription.gateway.client.connected', {
+            meetingId,
+            socketId: client.id,
+            ownerSub,
+          });
+        },
       );
     } catch (error) {
-      this.logger.warn(
-        `Failed to connect socket ${client.id} to meeting ${meetingId}`,
+      await runWithRequestContext(
+        {
+          transport: 'ws',
+          socketId: client.id,
+          meetingId,
+        },
+        async () => {
+          this.logger.warn('transcription.gateway.client.connection_failed', {
+            meetingId,
+            socketId: client.id,
+            errorMessage:
+              error instanceof Error ? error.message : 'Invalid meeting id',
+          });
+          client.emit('error', {
+            message:
+              error instanceof Error ? error.message : 'Invalid meeting id',
+          });
+          client.disconnect(true);
+        },
       );
-      client.emit('error', {
-        message: error instanceof Error ? error.message : 'Invalid meeting id',
-      });
-      client.disconnect(true);
     }
   }
 
   async handleDisconnect(client: Socket): Promise<void> {
     const meetingId = this.resolveMeetingId(client);
-    this.logger.debug(`Socket disconnected: ${client.id}`);
+    await runWithRequestContext(
+      {
+        transport: 'ws',
+        socketId: client.id,
+        meetingId,
+        ownerSub: this.socketUsers.get(client.id),
+      },
+      async () => {
+        this.logger.debug('transcription.gateway.client.disconnected', {
+          meetingId,
+          socketId: client.id,
+        });
+      },
+    );
     this.socketUsers.delete(client.id);
     this.unregisterSocketAuthExpiry(client.id);
 
@@ -171,9 +211,9 @@ export class TranscriptionGateway
         this.lastBackpressureLogAt.delete(meetingId);
         if (this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
           await this.transcriptionService.stopRealtimeSession(meetingId);
-          this.logger.log(
-            `Realtime session stopped (no clients) for meeting ${meetingId}`,
-          );
+          this.logger.log('transcription.gateway.session.stopped_no_clients', {
+            meetingId,
+          });
         }
       }
     }
@@ -197,63 +237,81 @@ export class TranscriptionGateway
     const ownerSub = this.socketUsers.get(client.id);
 
     try {
-      const chunk = this.toBuffer(payload);
-      if (!chunk || chunk.length === 0) {
-        return { ok: true };
-      }
-      if (chunk.length > this.maxAudioChunkBytes) {
-        return {
-          ok: false,
-          reason: 'chunk-too-large',
-          retryAfterMs: this.backpressureRetryMs,
-        };
-      }
+      return await runWithRequestContext(
+        {
+          transport: 'ws',
+          socketId: client.id,
+          meetingId,
+          ownerSub,
+        },
+        async () => {
+          const chunk = this.toBuffer(payload);
+          if (!chunk || chunk.length === 0) {
+            return { ok: true };
+          }
+          if (chunk.length > this.maxAudioChunkBytes) {
+            return {
+              ok: false,
+              reason: 'chunk-too-large',
+              retryAfterMs: this.backpressureRetryMs,
+            };
+          }
 
-      const sessionStart = await this.ensureRealtimeSessionStarted(
-        meetingId,
-        ownerSub,
+          const sessionStart = await this.ensureRealtimeSessionStarted(
+            meetingId,
+            ownerSub,
+          );
+          if (!sessionStart.ok) {
+            return {
+              ok: false,
+              reason: sessionStart.reason,
+              fallbackToBatch: sessionStart.fallbackToBatch,
+              mode: sessionStart.fallbackToBatch ? 'batch' : undefined,
+              retryAfterMs: this.backpressureRetryMs,
+            };
+          }
+
+          const accepted = this.transcriptionService.feedRealtimeAudio(
+            meetingId,
+            chunk,
+          );
+          if (!accepted) {
+            if (!this.transcriptionService.isRealtimeSessionReady(meetingId)) {
+              return {
+                ok: false,
+                reason: 'session-warming',
+                retryAfterMs: this.backpressureRetryMs,
+              };
+            }
+
+            if (!this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
+              return {
+                ok: false,
+                reason: 'session-start-failed',
+                retryAfterMs: this.backpressureRetryMs,
+              };
+            }
+
+            this.logBackpressure(meetingId);
+            return {
+              ok: false,
+              reason: 'backpressure',
+              retryAfterMs: this.backpressureRetryMs,
+            };
+          }
+          return { ok: true };
+        },
       );
-      if (!sessionStart.ok) {
-        return {
-          ok: false,
-          reason: sessionStart.reason,
-          fallbackToBatch: sessionStart.fallbackToBatch,
-          mode: sessionStart.fallbackToBatch ? 'batch' : undefined,
-          retryAfterMs: this.backpressureRetryMs,
-        };
-      }
-
-      // 오디오 청크를 streaming provider에 전달
-      const accepted = this.transcriptionService.feedRealtimeAudio(
-        meetingId,
-        chunk,
-      );
-      if (!accepted) {
-        if (!this.transcriptionService.isRealtimeSessionReady(meetingId)) {
-          return {
-            ok: false,
-            reason: 'session-warming',
-            retryAfterMs: this.backpressureRetryMs,
-          };
-        }
-
-        if (!this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
-          return {
-            ok: false,
-            reason: 'session-start-failed',
-            retryAfterMs: this.backpressureRetryMs,
-          };
-        }
-
-        this.logBackpressure(meetingId);
-        return {
-          ok: false,
-          reason: 'backpressure',
-          retryAfterMs: this.backpressureRetryMs,
-        };
-      }
-      return { ok: true };
     } catch (error) {
+      this.logger.warn('transcription.gateway.audio.processing_failed', {
+        meetingId,
+        socketId: client.id,
+        ownerSub,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : 'Failed to process audio chunk',
+      });
       client.emit('transcript:error', {
         message:
           error instanceof Error
@@ -281,20 +339,45 @@ export class TranscriptionGateway
     const ownerSub = this.socketUsers.get(client.id);
 
     try {
-      await this.meetingService.findById(meetingId, ownerSub);
-      if (this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
-        await this.transcriptionService.stopRealtimeSession(meetingId);
-      }
-      // 명시적 전사 중지 = 회의 종료 → 인메모리 오프셋 정리
-      this.transcriptionService.clearRealtimeTimeOffset(meetingId);
+      return await runWithRequestContext(
+        {
+          transport: 'ws',
+          socketId: client.id,
+          meetingId,
+          ownerSub,
+        },
+        async () => {
+          await this.meetingService.findById(meetingId, ownerSub);
+          if (this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
+            await this.transcriptionService.stopRealtimeSession(meetingId);
+          }
+          this.transcriptionService.clearRealtimeTimeOffset(meetingId);
 
-      this.server.to(meetingId).emit('connected', {
-        meetingId,
-        hasActiveSession: false,
-      });
-      this.server.to(meetingId).emit('transcript:session-ended', { meetingId });
-      return { ok: true };
+          this.server.to(meetingId).emit('connected', {
+            meetingId,
+            hasActiveSession: false,
+          });
+          this.server.to(meetingId).emit('transcript:session-ended', {
+            meetingId,
+          });
+          this.logger.log('transcription.gateway.session.stopped_explicit', {
+            meetingId,
+            socketId: client.id,
+            ownerSub,
+          });
+          return { ok: true };
+        },
+      );
     } catch (error) {
+      this.logger.warn('transcription.gateway.session.stop_failed', {
+        meetingId,
+        socketId: client.id,
+        ownerSub,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : 'Failed to stop transcription session',
+      });
       client.emit('transcript:error', {
         message:
           error instanceof Error
@@ -351,9 +434,10 @@ export class TranscriptionGateway
           meetingId,
           hasActiveSession: false,
         });
-        this.logger.warn(
-          `Realtime capacity exceeded; meeting ${meetingId} switched to batch mode`,
-        );
+        this.logger.warn('transcription.gateway.capacity_fallback', {
+          meetingId,
+          ownerSub,
+        });
       }
 
       return {
@@ -371,14 +455,20 @@ export class TranscriptionGateway
           this.emitToMeeting(meetingId, transcriptPayload);
         },
         (error: Error) => {
+          this.logger.warn('transcription.gateway.session.stream_error', {
+            meetingId,
+            ownerSub,
+            errorMessage: error.message,
+          });
           this.server.to(meetingId).emit('transcript:error', {
             message: error.message,
           });
         },
         () => {
-          this.logger.debug(
-            `Streaming session closed for meeting ${meetingId}`,
-          );
+          this.logger.debug('transcription.gateway.session.closed', {
+            meetingId,
+            ownerSub,
+          });
           this.server.to(meetingId).emit('transcript:session-ended', {
             meetingId,
           });
@@ -386,16 +476,21 @@ export class TranscriptionGateway
         ownerSub,
       );
 
-      this.logger.log(`Realtime session started for meeting ${meetingId}`);
+      this.logger.log('transcription.gateway.session.started', {
+        meetingId,
+        ownerSub,
+      });
       this.server.to(meetingId).emit('connected', {
         meetingId,
         hasActiveSession: true,
       });
       return { ok: true };
     } catch (error) {
-      this.logger.warn(
-        `Failed to start realtime session for meeting ${meetingId}: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.warn('transcription.gateway.session.start_failed', {
+        meetingId,
+        ownerSub,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       this.server.to(meetingId).emit('transcript:error', {
         message:
           error instanceof Error
@@ -464,9 +559,10 @@ export class TranscriptionGateway
     }
 
     this.lastBackpressureLogAt.set(meetingId, now);
-    this.logger.warn(
-      `Backpressure for meeting ${meetingId}: audio queue is full, retryAfter=${this.backpressureRetryMs}ms`,
-    );
+    this.logger.warn('transcription.gateway.backpressure', {
+      meetingId,
+      retryAfterMs: this.backpressureRetryMs,
+    });
   }
 
   private async resolveSocketAuthContext(
@@ -552,7 +648,11 @@ export class TranscriptionGateway
   }
 
   private disconnectExpiredSocket(client: Socket): void {
-    this.logger.warn(`Socket ${client.id} disconnected due to expired auth`);
+    this.logger.warn('transcription.gateway.socket.auth_expired', {
+      socketId: client.id,
+      meetingId: this.resolveMeetingId(client),
+      ownerSub: this.socketUsers.get(client.id),
+    });
     client.emit('error', { message: 'Authentication expired' });
     client.disconnect(true);
   }

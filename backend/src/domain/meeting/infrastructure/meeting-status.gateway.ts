@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
@@ -18,6 +17,7 @@ import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status
 import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
 import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
 import { MeetingService } from '../application/meeting.service';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 interface SocketAuthContext {
   ownerSub?: string;
@@ -34,7 +34,7 @@ interface SocketAuthContext {
 export class MeetingStatusGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  private readonly logger = new Logger(MeetingStatusGateway.name);
+  private readonly logger = new StructuredLogger(MeetingStatusGateway.name);
 
   @WebSocketServer()
   private readonly server!: Server;
@@ -66,9 +66,11 @@ export class MeetingStatusGateway
       }
       this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
 
-      this.logger.debug(
-        `Client ${client.id} joined meeting-status rooms (owner=${ownerSub ?? 'anonymous'}, meeting=${meetingId ?? 'all'})`,
-      );
+      this.logger.debug('meeting-status.gateway.client.connected', {
+        socketId: client.id,
+        ownerSub,
+        meetingId,
+      });
     } catch {
       client.emit('error', {
         message: 'Meeting status socket connection failed',
@@ -79,7 +81,9 @@ export class MeetingStatusGateway
 
   handleDisconnect(client: Socket): void {
     this.unregisterSocketAuthExpiry(client.id);
-    this.logger.debug(`Client ${client.id} disconnected from meeting-status`);
+    this.logger.debug('meeting-status.gateway.client.disconnected', {
+      socketId: client.id,
+    });
   }
 
   /**
@@ -90,9 +94,12 @@ export class MeetingStatusGateway
   handleMeetingStatusChanged(event: MeetingStatusChangedEvent): void {
     const ownerSub = event.ownerSub;
 
-    this.logger.log(
-      `Broadcasting status change: meeting=${event.meetingId}, status=${event.status}, owner=${ownerSub ?? 'anonymous'}`,
-    );
+    this.logger.log('meeting-status.gateway.broadcast.status_changed', {
+      meetingId: event.meetingId,
+      status: event.status,
+      phase: event.phase,
+      ownerSub,
+    });
     this.server.to(this.userRoom(ownerSub)).emit('meeting:status', {
       meetingId: event.meetingId,
       status: event.status,
@@ -105,9 +112,11 @@ export class MeetingStatusGateway
    */
   @OnEvent(ResultRegenerateEvent.EVENT_NAME)
   handleResultRegenerate(event: ResultRegenerateEvent): void {
-    this.logger.log(
-      `Broadcasting result regenerate: meeting=${event.meetingId}, phase=${event.phase}, owner=${event.ownerSub ?? 'anonymous'}`,
-    );
+    this.logger.log('meeting-status.gateway.broadcast.result_regenerate', {
+      meetingId: event.meetingId,
+      phase: event.phase,
+      ownerSub: event.ownerSub,
+    });
     this.server
       .to(this.meetingRoom(event.meetingId))
       .emit('result:regenerate', {
@@ -233,9 +242,10 @@ export class MeetingStatusGateway
   }
 
   private disconnectExpiredSocket(client: Socket): void {
-    this.logger.warn(
-      `Meeting-status socket ${client.id} disconnected due to expired auth`,
-    );
+    this.logger.warn('meeting-status.gateway.socket.auth_expired', {
+      socketId: client.id,
+      meetingId: this.resolveMeetingId(client),
+    });
     client.emit('error', { message: 'Authentication expired' });
     client.disconnect(true);
   }

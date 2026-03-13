@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +15,11 @@ import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { ResultService } from '../../result/application/result.service';
 import { S3AudioService } from '../../../shared/aws/s3/s3.service';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
+import {
+  runWithRequestContext,
+  type RequestContextStore,
+} from '../../../shared/logging/request-context.storage';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const POLL_INTERVAL_MS = 5_000; // 5초
 const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10분
@@ -54,7 +59,7 @@ interface TranscribeResultJson {
 
 @Injectable()
 export class TranscriptionResultCollectorService {
-  private readonly logger = new Logger(
+  private readonly logger = new StructuredLogger(
     TranscriptionResultCollectorService.name,
   );
 
@@ -87,91 +92,128 @@ export class TranscriptionResultCollectorService {
       meetingOwnerSub = undefined;
     }
 
-    const job = await this.jobRepository.findOne({ where: { id: jobId } });
-    if (!job) {
-      this.logger.error(`Transcription job ${jobId} not found`);
-      return { success: false, segmentCount: 0 };
-    }
-
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < MAX_POLL_DURATION_MS) {
-      try {
-        const result = await this.batchProvider.getJobStatus(job.providerJobId);
-
-        // 상태 업데이트
-        job.status = result.status;
-        if (result.transcriptUri) {
-          job.transcriptUri = result.transcriptUri;
-        }
-        if (result.errorMessage) {
-          job.errorMessage = result.errorMessage;
-        }
-        await this.jobRepository.save(job);
-
-        if (result.status === TranscriptionJobStatus.COMPLETED) {
-          this.logger.log(
-            `Transcription job ${job.providerJobId} completed for meeting ${meetingId}`,
-          );
-
-          // 결과 파싱 + DB 저장
-          const segmentCount = await this.parseAndSaveResults(
+    return runWithRequestContext(
+      {
+        transport: 'job',
+        meetingId,
+        jobId,
+        ownerSub: meetingOwnerSub,
+      },
+      async () => {
+        const job = await this.jobRepository.findOne({ where: { id: jobId } });
+        if (!job) {
+          this.logger.error('transcription.batch.job.missing', new Error('Transcription job not found'), {
             meetingId,
-            result.transcriptUri,
-          );
-
-          // 오디오 파일 삭제
-          await this.deleteAudioFile(job.mediaUri);
-
-          // 결과 생성 단계 진입 이벤트
-          this.emitGeneratingPhase(meetingId, meetingOwnerSub);
-
-          return { success: true, segmentCount };
-        }
-
-        if (result.status === TranscriptionJobStatus.FAILED) {
-          this.logger.error(
-            `Transcription job ${job.providerJobId} failed: ${result.errorMessage}`,
-          );
-          await this.finalizeAfterFailedTranscription(
-            meetingId,
-            job.mediaUri,
-            meetingOwnerSub,
-          );
+            jobId,
+          });
           return { success: false, segmentCount: 0 };
         }
 
-        // IN_PROGRESS 또는 QUEUED → 대기 후 재시도
-        await this.sleep(POLL_INTERVAL_MS);
-      } catch (error) {
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < MAX_POLL_DURATION_MS) {
+          try {
+            const result = await this.batchProvider.getJobStatus(
+              job.providerJobId,
+            );
+
+            job.status = result.status;
+            if (result.transcriptUri) {
+              job.transcriptUri = result.transcriptUri;
+            }
+            if (result.errorMessage) {
+              job.errorMessage = result.errorMessage;
+            }
+            await this.jobRepository.save(job);
+
+            if (result.status === TranscriptionJobStatus.COMPLETED) {
+              this.logger.log('transcription.batch.job.completed', {
+                meetingId,
+                jobId,
+                providerJobId: job.providerJobId,
+              });
+
+              const segmentCount = await this.parseAndSaveResults(
+                meetingId,
+                result.transcriptUri,
+              );
+
+              await this.deleteAudioFile(job.mediaUri);
+              this.emitGeneratingPhase(meetingId, meetingOwnerSub);
+
+              return { success: true, segmentCount };
+            }
+
+            if (result.status === TranscriptionJobStatus.FAILED) {
+              this.logger.error(
+                'transcription.batch.job.failed',
+                new Error(result.errorMessage ?? 'Batch transcription job failed'),
+                {
+                  meetingId,
+                  jobId,
+                  providerJobId: job.providerJobId,
+                },
+              );
+              await this.finalizeAfterFailedTranscription(
+                meetingId,
+                job.mediaUri,
+                meetingOwnerSub,
+              );
+              return { success: false, segmentCount: 0 };
+            }
+
+            await this.sleep(POLL_INTERVAL_MS);
+          } catch (error) {
+            this.logger.error('transcription.batch.job.poll_failed', error, {
+              meetingId,
+              jobId,
+              providerJobId: job.providerJobId,
+            });
+            await this.sleep(POLL_INTERVAL_MS);
+          }
+        }
+
+        job.status = TranscriptionJobStatus.FAILED;
+        job.errorMessage = `Polling timed out after ${MAX_POLL_DURATION_MS / 1000}s`;
+        await this.jobRepository.save(job);
+
         this.logger.error(
-          `Error polling job ${job.providerJobId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          'transcription.batch.job.timed_out',
+          new Error(job.errorMessage),
+          {
+            meetingId,
+            jobId,
+            providerJobId: job.providerJobId,
+          },
         );
-        await this.sleep(POLL_INTERVAL_MS);
-      }
-    }
-
-    // 타임아웃
-    job.status = TranscriptionJobStatus.FAILED;
-    job.errorMessage = `Polling timed out after ${MAX_POLL_DURATION_MS / 1000}s`;
-    await this.jobRepository.save(job);
-
-    this.logger.error(
-      `Transcription job ${job.providerJobId} timed out for meeting ${meetingId}`,
+        await this.finalizeAfterFailedTranscription(
+          meetingId,
+          job.mediaUri,
+          meetingOwnerSub,
+        );
+        return { success: false, segmentCount: 0 };
+      },
     );
-    await this.finalizeAfterFailedTranscription(
-      meetingId,
-      job.mediaUri,
-      meetingOwnerSub,
-    );
-    return { success: false, segmentCount: 0 };
   }
 
   async recoverMissingBatchJob(
     meetingId: string,
     ownerSub?: string,
   ): Promise<void> {
-    this.emitGeneratingPhase(meetingId, ownerSub);
+    await runWithRequestContext(
+      {
+        transport: 'job',
+        meetingId,
+        ownerSub,
+      },
+      async () => {
+        this.logger.warn('transcription.batch.job.recover_missing', {
+          meetingId,
+          ownerSub,
+        });
+        this.emitGeneratingPhase(meetingId, ownerSub);
+      },
+    );
   }
 
   async recoverStalledBatchJob(
@@ -179,60 +221,94 @@ export class TranscriptionResultCollectorService {
     jobId: string,
     ownerSub?: string,
   ): Promise<{ success: boolean; segmentCount: number }> {
-    const job = await this.jobRepository.findOne({ where: { id: jobId } });
-    if (!job) {
-      this.logger.warn(
-        `Cannot recover stalled batch job ${jobId} because the job does not exist`,
-      );
-      this.emitGeneratingPhase(meetingId, ownerSub);
-      return { success: false, segmentCount: 0 };
-    }
+    return runWithRequestContext(
+      {
+        transport: 'job',
+        meetingId,
+        jobId,
+        ownerSub,
+      },
+      async () => {
+        const job = await this.jobRepository.findOne({ where: { id: jobId } });
+        if (!job) {
+          this.logger.warn('transcription.batch.job.recover_missing_record', {
+            meetingId,
+            jobId,
+            ownerSub,
+          });
+          this.emitGeneratingPhase(meetingId, ownerSub);
+          return { success: false, segmentCount: 0 };
+        }
 
-    try {
-      const result = await this.batchProvider.getJobStatus(job.providerJobId);
+        try {
+          const result = await this.batchProvider.getJobStatus(
+            job.providerJobId,
+          );
 
-      job.status = result.status;
-      if (result.transcriptUri) {
-        job.transcriptUri = result.transcriptUri;
-      }
-      if (result.errorMessage) {
-        job.errorMessage = result.errorMessage;
-      }
-      await this.jobRepository.save(job);
+          job.status = result.status;
+          if (result.transcriptUri) {
+            job.transcriptUri = result.transcriptUri;
+          }
+          if (result.errorMessage) {
+            job.errorMessage = result.errorMessage;
+          }
+          await this.jobRepository.save(job);
 
-      if (result.status === TranscriptionJobStatus.COMPLETED) {
-        const segmentCount = await this.parseAndSaveResults(
+          if (result.status === TranscriptionJobStatus.COMPLETED) {
+            this.logger.log('transcription.batch.job.recovered_completed', {
+              meetingId,
+              jobId,
+              providerJobId: job.providerJobId,
+            });
+            const segmentCount = await this.parseAndSaveResults(
+              meetingId,
+              result.transcriptUri,
+            );
+            await this.deleteAudioFile(job.mediaUri);
+            this.emitGeneratingPhase(meetingId, ownerSub);
+            return { success: true, segmentCount };
+          }
+
+          if (result.status === TranscriptionJobStatus.FAILED) {
+            this.logger.warn('transcription.batch.job.recovered_failed', {
+              meetingId,
+              jobId,
+              providerJobId: job.providerJobId,
+              errorMessage: result.errorMessage,
+            });
+            await this.finalizeAfterFailedTranscription(
+              meetingId,
+              job.mediaUri,
+              ownerSub,
+            );
+            return { success: false, segmentCount: 0 };
+          }
+        } catch (error) {
+          this.logger.warn('transcription.batch.job.recovery_recheck_failed', {
+            meetingId,
+            jobId,
+            providerJobId: job.providerJobId,
+            errorMessage:
+              error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+
+        job.status = TranscriptionJobStatus.FAILED;
+        job.errorMessage = 'Batch transcription stalled for over 1 hour';
+        await this.jobRepository.save(job);
+        this.logger.warn('transcription.batch.job.marked_failed_after_stall', {
           meetingId,
-          result.transcriptUri,
-        );
-        await this.deleteAudioFile(job.mediaUri);
-        this.emitGeneratingPhase(meetingId, ownerSub);
-        return { success: true, segmentCount };
-      }
-
-      if (result.status === TranscriptionJobStatus.FAILED) {
+          jobId,
+          providerJobId: job.providerJobId,
+        });
         await this.finalizeAfterFailedTranscription(
           meetingId,
           job.mediaUri,
           ownerSub,
         );
         return { success: false, segmentCount: 0 };
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Failed to re-check stalled batch job ${job.providerJobId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
-    }
-
-    job.status = TranscriptionJobStatus.FAILED;
-    job.errorMessage = 'Batch transcription stalled for over 1 hour';
-    await this.jobRepository.save(job);
-    await this.finalizeAfterFailedTranscription(
-      meetingId,
-      job.mediaUri,
-      ownerSub,
+      },
     );
-    return { success: false, segmentCount: 0 };
   }
 
   private async parseAndSaveResults(
@@ -240,7 +316,9 @@ export class TranscriptionResultCollectorService {
     transcriptUri?: string,
   ): Promise<number> {
     if (!transcriptUri) {
-      this.logger.warn('No transcript URI provided, skipping parse');
+      this.logger.warn('transcription.batch.transcript_uri.missing', {
+        meetingId,
+      });
       return 0;
     }
 
@@ -249,9 +327,9 @@ export class TranscriptionResultCollectorService {
       const jsonContent = await this.fetchTranscriptJson(transcriptUri);
       const parsedUnknown: unknown = JSON.parse(jsonContent);
       if (!this.isTranscribeResultJson(parsedUnknown)) {
-        this.logger.warn(
-          `Unexpected transcript json shape for meeting ${meetingId}`,
-        );
+        this.logger.warn('transcription.batch.transcript_shape.invalid', {
+          meetingId,
+        });
         return 0;
       }
 
@@ -261,16 +339,18 @@ export class TranscriptionResultCollectorService {
 
       if (segments.length > 0) {
         await this.segmentRepository.save(segments);
-        this.logger.log(
-          `Saved ${segments.length} transcript segments for meeting ${meetingId}`,
-        );
+        this.logger.log('transcription.segment.saved', {
+          meetingId,
+          segmentCount: segments.length,
+        });
       }
 
       return segments.length;
     } catch (error) {
-      this.logger.error(
-        `Failed to parse transcript for meeting ${meetingId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      this.logger.error('transcription.batch.transcript_parse_failed', error, {
+        meetingId,
+        transcriptUri,
+      });
       return 0;
     }
   }
@@ -402,9 +482,10 @@ export class TranscriptionResultCollectorService {
     // 또는: https://{bucket}.s3.{region}.amazonaws.com/{key}
     const s3HttpsParsed = this.parseS3HttpsUrl(transcriptUri);
     if (s3HttpsParsed) {
-      this.logger.log(
-        `Fetching transcript via SDK: bucket=${s3HttpsParsed.bucket}, key=${s3HttpsParsed.key}`,
-      );
+      this.logger.debug('transcription.batch.transcript_fetching_via_sdk', {
+        bucket: s3HttpsParsed.bucket,
+        key: s3HttpsParsed.key,
+      });
       return this.s3AudioService.getObjectAsStringFromBucket(
         s3HttpsParsed.bucket,
         s3HttpsParsed.key,
@@ -482,12 +563,16 @@ export class TranscriptionResultCollectorService {
         const slashIndex = withoutProtocol.indexOf('/');
         const key = withoutProtocol.slice(slashIndex + 1);
         await this.s3AudioService.deleteAudioFile(key);
-        this.logger.log(`Deleted audio file: ${key}`);
+        this.logger.log('transcription.audio.deleted', {
+          key,
+        });
       }
     } catch (error) {
-      this.logger.warn(
-        `Failed to delete audio file ${mediaUri}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      this.logger.warn('transcription.audio.delete_failed', {
+        mediaUri,
+        errorMessage:
+          error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
@@ -497,22 +582,30 @@ export class TranscriptionResultCollectorService {
         meetingId,
         MeetingStatus.COMPLETED,
       );
-      this.logger.log(`Meeting ${meetingId} status updated to COMPLETED`);
+      this.logger.log('meeting.status.completed_after_transcription', {
+        meetingId,
+      });
     } catch (error) {
-      this.logger.warn(
-        `Failed to update meeting status for ${meetingId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      this.logger.warn('meeting.status.complete_failed', {
+        meetingId,
+        errorMessage:
+          error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
   private async triggerResultGeneration(meetingId: string): Promise<void> {
     try {
       await this.resultService.generateForPipeline(meetingId);
-      this.logger.log(`Result auto-generated for meeting ${meetingId}`);
+      this.logger.log('result.auto_generated', {
+        meetingId,
+      });
     } catch (error) {
-      this.logger.warn(
-        `Failed to auto-generate result for meeting ${meetingId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
+      this.logger.warn('result.auto_generate_failed', {
+        meetingId,
+        errorMessage:
+          error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
@@ -538,23 +631,31 @@ export class TranscriptionResultCollectorService {
   async handleGeneratingPhase(event: MeetingStatusChangedEvent): Promise<void> {
     if (event.phase !== 'generating') return;
 
-    this.logger.log(
-      `Generating result for meeting ${event.meetingId} (realtime mode)`,
-    );
+    this.logger.log('result.generation.phase_started', {
+      meetingId: event.meetingId,
+      ownerSub: event.ownerSub,
+      phase: event.phase,
+    });
 
     try {
       await this.triggerResultGeneration(event.meetingId);
       await this.updateMeetingStatus(event.meetingId);
     } catch (error) {
-      this.logger.error(
-        `Failed to generate result for meeting ${event.meetingId}: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error('result.generation.phase_failed', error, {
+        meetingId: event.meetingId,
+        ownerSub: event.ownerSub,
+        phase: event.phase,
+      });
       // 실패해도 COMPLETED로 전환 (사용자가 결과 페이지에서 재생성 가능)
       await this.updateMeetingStatus(event.meetingId);
     }
   }
 
   private emitGeneratingPhase(meetingId: string, ownerSub?: string): void {
+    this.logger.log('meeting.phase.generating.emitted', {
+      meetingId,
+      ownerSub,
+    });
     this.eventEmitter.emit(
       MeetingStatusChangedEvent.EVENT_NAME,
       new MeetingStatusChangedEvent(

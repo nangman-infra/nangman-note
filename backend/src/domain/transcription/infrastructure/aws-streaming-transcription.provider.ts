@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   TranscribeStreamingClient,
@@ -16,6 +16,7 @@ import type {
   StreamingSessionOptions,
   StreamingTranscriptEvent,
 } from '../application/ports/streaming-transcription-provider.port';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const DEFAULT_SAMPLE_RATE = 48_000;
 const DEFAULT_MAX_BUFFERED_AUDIO_BYTES = 8 * 1024 * 1024; // 8MB
@@ -122,7 +123,9 @@ class AudioChunkQueue {
 export class AwsStreamingTranscriptionProvider
   implements StreamingTranscriptionProvider, OnModuleInit
 {
-  private readonly logger = new Logger(AwsStreamingTranscriptionProvider.name);
+  private readonly logger = new StructuredLogger(
+    AwsStreamingTranscriptionProvider.name,
+  );
   private readonly sessions = new Map<string, ActiveSession>();
   private readonly client: TranscribeStreamingClient;
   private readonly maxBufferedAudioBytes: number;
@@ -142,9 +145,10 @@ export class AwsStreamingTranscriptionProvider
 
   onModuleInit(): void {
     void this.awsClientFactory.warmCredentials().catch((error: unknown) => {
-      this.logger.warn(
-        `Failed to warm AWS credentials on boot: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn('transcription.streaming.credentials_warm_failed', {
+        errorMessage:
+          error instanceof Error ? error.message : String(error),
+      });
     });
   }
 
@@ -160,9 +164,9 @@ export class AwsStreamingTranscriptionProvider
     } = options;
 
     if (this.sessions.has(meetingId)) {
-      this.logger.warn(
-        `Session already exists for meeting ${meetingId}, stopping previous session`,
-      );
+      this.logger.warn('transcription.streaming.session.replaced', {
+        meetingId,
+      });
       await this.stopSession(meetingId);
     }
 
@@ -208,9 +212,11 @@ export class AwsStreamingTranscriptionProvider
 
     const command = new StartStreamTranscriptionCommand(commandInput);
 
-    this.logger.log(
-      `Starting streaming session for meeting ${meetingId} (lang=${languageCode ?? 'auto'}, rate=${effectiveSampleRate})`,
-    );
+    this.logger.log('transcription.streaming.session.starting', {
+      meetingId,
+      languageCode: languageCode ?? 'auto',
+      sampleRate: effectiveSampleRate,
+    });
 
     // 비동기로 결과 수신 루프 실행
     this.runResultLoop(meetingId, command, onTranscript, onError, onClose);
@@ -226,7 +232,9 @@ export class AwsStreamingTranscriptionProvider
     const session = this.sessions.get(meetingId);
     if (!session) return Promise.resolve();
 
-    this.logger.log(`Stopping streaming session for meeting ${meetingId}`);
+    this.logger.log('transcription.streaming.session.stopping', {
+      meetingId,
+    });
 
     session.closed = true;
     session.audioQueue.end();
@@ -273,32 +281,35 @@ export class AwsStreamingTranscriptionProvider
   ): void {
     void (async () => {
       try {
-        this.logger.debug(
-          `Sending StartStreamTranscription command for meeting ${meetingId}...`,
-        );
+        this.logger.debug('transcription.streaming.command.sending', {
+          meetingId,
+        });
         const response = await this.client.send(command);
         const activeSession = this.sessions.get(meetingId);
         if (activeSession) {
           activeSession.ready = true;
         }
-        this.logger.debug(
-          `StartStreamTranscription response received for meeting ${meetingId}, SessionId=${response.SessionId}`,
-        );
+        this.logger.debug('transcription.streaming.command.accepted', {
+          meetingId,
+          providerSessionId: response.SessionId,
+        });
 
         if (!response.TranscriptResultStream) {
           throw new Error('No TranscriptResultStream in response');
         }
 
-        this.logger.debug(
-          `Entering TranscriptResultStream loop for meeting ${meetingId}...`,
-        );
+        this.logger.debug('transcription.streaming.loop.started', {
+          meetingId,
+        });
         let eventCount = 0;
         for await (const event of response.TranscriptResultStream) {
           eventCount++;
           if (eventCount <= 3) {
-            this.logger.debug(
-              `TranscriptResultStream event #${eventCount} for meeting ${meetingId}: ${JSON.stringify(Object.keys(event))}`,
-            );
+            this.logger.debug('transcription.streaming.loop.event_received', {
+              meetingId,
+              eventCount,
+              keys: Object.keys(event),
+            });
           }
           // 세션이 이미 종료되었으면 루프 탈출
           if (!this.sessions.has(meetingId)) break;
@@ -348,9 +359,13 @@ export class AwsStreamingTranscriptionProvider
               try {
                 onTranscript(transcriptEvent);
               } catch (callbackError) {
-                this.logger.warn(
-                  `onTranscript callback error for meeting ${meetingId}: ${callbackError}`,
-                );
+                this.logger.warn('transcription.streaming.callback_failed', {
+                  meetingId,
+                  errorMessage:
+                    callbackError instanceof Error
+                      ? callbackError.message
+                      : String(callbackError),
+                });
               }
             }
           }
@@ -361,13 +376,13 @@ export class AwsStreamingTranscriptionProvider
           error instanceof Error &&
           (error.name === 'AbortError' || error.message.includes('aborted'))
         ) {
-          this.logger.debug(
-            `Streaming session aborted (normal) for meeting ${meetingId}`,
-          );
+          this.logger.debug('transcription.streaming.session.aborted', {
+            meetingId,
+          });
         } else {
-          this.logger.error(
-            `Streaming session error for meeting ${meetingId}: ${error}`,
-          );
+          this.logger.error('transcription.streaming.session.failed', error, {
+            meetingId,
+          });
           try {
             onError(error instanceof Error ? error : new Error(String(error)));
           } catch {
@@ -389,7 +404,9 @@ export class AwsStreamingTranscriptionProvider
           // 콜백 에러 무시
         }
 
-        this.logger.log(`Streaming session ended for meeting ${meetingId}`);
+        this.logger.log('transcription.streaming.session.ended', {
+          meetingId,
+        });
       }
     })();
   }

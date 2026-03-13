@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { AUTH_USER_KEY, IS_PUBLIC_KEY } from './auth.constants';
 import { OidcTokenVerifierService } from './oidc-token-verifier.service';
+import { updateRequestContext } from '../logging/request-context.storage';
 
 @Injectable()
 export class HttpAuthGuard implements CanActivate {
@@ -41,6 +42,9 @@ export class HttpAuthGuard implements CanActivate {
 
     request[AUTH_USER_KEY] = user;
     request.user = user;
+    updateRequestContext({
+      ownerSub: user.sub,
+    });
     return true;
   }
 

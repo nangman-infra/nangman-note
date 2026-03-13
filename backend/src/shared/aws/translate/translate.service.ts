@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   TranslateClient,
   TranslateTextCommand,
 } from '@aws-sdk/client-translate';
 import { AwsClientFactory } from '../aws-client.factory';
+import { StructuredLogger } from '../../logging/structured-logger';
 
 export interface TranslateResult {
   translatedText: string;
@@ -13,7 +14,7 @@ export interface TranslateResult {
 
 @Injectable()
 export class TranslateService {
-  private readonly logger = new Logger(TranslateService.name);
+  private readonly logger = new StructuredLogger(TranslateService.name);
   private readonly client: TranslateClient;
 
   constructor(private readonly awsClientFactory: AwsClientFactory) {
@@ -64,9 +65,11 @@ export class TranslateService {
         targetLanguageCode: response.TargetLanguageCode ?? targetLanguage,
       };
     } catch (error) {
-      this.logger.warn(
-        `Translation failed (${sourceLanguage} → ${targetLanguage}): ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.warn('translate.text.failed', {
+        sourceLanguage,
+        targetLanguage,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       // 번역 실패 시 원본 텍스트 반환 (서비스 중단 방지)
       return {
         translatedText: text,

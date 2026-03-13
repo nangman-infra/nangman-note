@@ -3,7 +3,6 @@ import {
   BadRequestException,
   Inject,
   Injectable,
-  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -25,6 +24,7 @@ import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobProvider } from '../domain/transcription-job-provider.enum';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 /** 프론트에 emit할 partial/final 이벤트 페이로드 */
 export interface RealtimeTranscriptContentPayload {
@@ -53,7 +53,7 @@ export type RealtimeTranscriptPayload =
 
 @Injectable()
 export class TranscriptionService {
-  private readonly logger = new Logger(TranscriptionService.name);
+  private readonly logger = new StructuredLogger(TranscriptionService.name);
 
   /**
    * 실시간 전사 세션 재연결 시 타임스탬프 보정을 위한 누적 오프셋.
@@ -117,14 +117,16 @@ export class TranscriptionService {
       const dbOffset = lastSegment?.endTime ?? 0;
       this.realtimeTimeOffsets.set(meetingId, dbOffset);
       if (dbOffset > 0) {
-        this.logger.debug(
-          `Realtime time offset restored from DB for meeting ${meetingId}: ${dbOffset}s`,
-        );
+        this.logger.debug('transcription.realtime.offset.restored_from_db', {
+          meetingId,
+          offsetSeconds: dbOffset,
+        });
       }
     } else {
-      this.logger.debug(
-        `Realtime time offset from memory for meeting ${meetingId}: ${this.realtimeTimeOffsets.get(meetingId)}s`,
-      );
+      this.logger.debug('transcription.realtime.offset.loaded_from_memory', {
+        meetingId,
+        offsetSeconds: this.realtimeTimeOffsets.get(meetingId),
+      });
     }
 
     const translateTarget = meeting.translateTargetLanguage || null;
@@ -144,7 +146,12 @@ export class TranscriptionService {
       onClose,
     });
 
-    this.logger.log(`Realtime session started for meeting ${meetingId}`);
+    this.logger.log('transcription.realtime.session.started', {
+      meetingId,
+      ownerSub,
+      languageCode: meeting.languageCode || null,
+      translateTarget,
+    });
   }
 
   /**
@@ -161,7 +168,9 @@ export class TranscriptionService {
     await this.streamingProvider.stopSession(meetingId);
     // 오프셋은 삭제하지 않음 — 세션 재연결 시 인메모리 오프셋을 유지하기 위해.
     // 회의 종료(complete) 시 clearRealtimeTimeOffset()으로 명시적으로 정리합니다.
-    this.logger.log(`Realtime session stopped for meeting ${meetingId}`);
+    this.logger.log('transcription.realtime.session.stopped', {
+      meetingId,
+    });
   }
 
   /**
@@ -205,9 +214,10 @@ export class TranscriptionService {
       },
       ownerSub,
     );
-    this.logger.warn(
-      `Meeting ${meetingId} switched from realtime to batch due to capacity constraints`,
-    );
+    this.logger.warn('transcription.realtime.capacity_fallback', {
+      meetingId,
+      ownerSub,
+    });
     return true;
   }
 
@@ -409,9 +419,10 @@ export class TranscriptionService {
       const saved = await this.transcriptRepository.save(segment);
       return saved.id;
     } catch (error) {
-      this.logger.warn(
-        `Failed to save transcript segment for meeting ${meetingId}: ${error}`,
-      );
+      this.logger.warn('transcription.segment.save_failed', {
+        meetingId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -456,7 +467,11 @@ export class TranscriptionService {
         await this.transcriptRepository.save(patch);
       }
     } catch (error) {
-      this.logger.warn(`Translation failed for meeting ${meetingId}: ${error}`);
+      this.logger.warn('transcription.translation.failed', {
+        meetingId,
+        targetLanguage: translateTarget,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       this.emitPayload(onPayload, {
         type: 'translation',
         resultId: event.resultId,
@@ -472,9 +487,10 @@ export class TranscriptionService {
     try {
       onPayload(payload);
     } catch (error) {
-      this.logger.warn(
-        `Failed to emit transcript payload: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.warn('transcription.payload.emit_failed', {
+        errorMessage:
+          error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

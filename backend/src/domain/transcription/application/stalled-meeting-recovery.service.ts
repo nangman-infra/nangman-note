@@ -1,6 +1,5 @@
 import {
   Injectable,
-  Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
@@ -14,6 +13,8 @@ import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
+import { runWithRequestContext } from '../../../shared/logging/request-context.storage';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const STALLED_THRESHOLD_MS = 60 * 60 * 1000;
 const RECOVERY_INTERVAL_MS = 5 * 60 * 1000;
@@ -23,7 +24,9 @@ const POSTGRES_LOCK_KEY = 74_274_001;
 export class StalledMeetingRecoveryService
   implements OnModuleInit, OnModuleDestroy
 {
-  private readonly logger = new Logger(StalledMeetingRecoveryService.name);
+  private readonly logger = new StructuredLogger(
+    StalledMeetingRecoveryService.name,
+  );
   private recoveryInterval: NodeJS.Timeout | null = null;
   private isRecovering = false;
 
@@ -90,44 +93,59 @@ export class StalledMeetingRecoveryService
     meeting: MeetingEntity,
     threshold: Date,
   ): Promise<void> {
-    const existingResult = await this.resultRepository.findOne({
-      where: { meetingId: meeting.id },
-    });
-    if (existingResult) {
-      this.logger.warn(
-        `Meeting ${meeting.id} was stuck in processing despite having a result; marking completed`,
-      );
-      await this.meetingService.updateStatus(meeting.id, MeetingStatus.COMPLETED);
-      return;
-    }
+    await runWithRequestContext(
+      {
+        transport: 'job',
+        meetingId: meeting.id,
+        ownerSub: meeting.ownerSub,
+      },
+      async () => {
+        const existingResult = await this.resultRepository.findOne({
+          where: { meetingId: meeting.id },
+        });
+        if (existingResult) {
+          this.logger.warn('meeting.recovery.result_exists_marking_completed', {
+            meetingId: meeting.id,
+          });
+          await this.meetingService.updateStatus(
+            meeting.id,
+            MeetingStatus.COMPLETED,
+          );
+          return;
+        }
 
-    const latestJob = await this.transcriptionJobRepository.findOne({
-      where: { meetingId: meeting.id },
-      order: { createdAt: 'DESC' },
-    });
+        const latestJob = await this.transcriptionJobRepository.findOne({
+          where: { meetingId: meeting.id },
+          order: { createdAt: 'DESC' },
+        });
 
-    if (!latestJob) {
-      this.logger.warn(
-        `Recovering stalled batch meeting ${meeting.id} without a transcription job`,
-      );
-      await this.transcriptionResultCollectorService.recoverMissingBatchJob(
-        meeting.id,
-        meeting.ownerSub,
-      );
-      return;
-    }
+        if (!latestJob) {
+          this.logger.warn('meeting.recovery.missing_transcription_job', {
+            meetingId: meeting.id,
+          });
+          await this.transcriptionResultCollectorService.recoverMissingBatchJob(
+            meeting.id,
+            meeting.ownerSub,
+          );
+          return;
+        }
 
-    if (!this.shouldRecoverJob(latestJob, threshold)) {
-      return;
-    }
+        if (!this.shouldRecoverJob(latestJob, threshold)) {
+          return;
+        }
 
-    this.logger.warn(
-      `Recovering stalled batch meeting ${meeting.id} using job ${latestJob.id}`,
-    );
-    await this.transcriptionResultCollectorService.recoverStalledBatchJob(
-      meeting.id,
-      latestJob.id,
-      meeting.ownerSub,
+        this.logger.warn('meeting.recovery.stalled_transcription_job', {
+          meetingId: meeting.id,
+          jobId: latestJob.id,
+          transcriptionJobStatus: latestJob.status,
+          providerJobId: latestJob.providerJobId,
+        });
+        await this.transcriptionResultCollectorService.recoverStalledBatchJob(
+          meeting.id,
+          latestJob.id,
+          meeting.ownerSub,
+        );
+      },
     );
   }
 
@@ -166,9 +184,9 @@ export class StalledMeetingRecoveryService
     )) as Array<{ locked?: boolean }>;
 
     if (!rows[0]?.locked) {
-      this.logger.debug(
-        'Skipping stalled meeting recovery because another instance owns the lock',
-      );
+      this.logger.debug('meeting.recovery.lock_skipped', {
+        lockKey: POSTGRES_LOCK_KEY,
+      });
       return;
     }
 

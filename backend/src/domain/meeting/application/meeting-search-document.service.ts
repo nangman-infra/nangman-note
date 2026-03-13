@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NoteEntity } from '../../note/domain/note.entity';
@@ -6,6 +6,7 @@ import { ResultEntity } from '../../result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingSearchDocumentEntity } from '../domain/meeting-search-document.entity';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const MAX_TRANSCRIPT_CONTENT_LENGTH = 40_000;
 const MAX_NOTE_CONTENT_LENGTH = 20_000;
@@ -32,7 +33,9 @@ export interface MeetingSearchDocumentRow {
 
 @Injectable()
 export class MeetingSearchDocumentService {
-  private readonly logger = new Logger(MeetingSearchDocumentService.name);
+  private readonly logger = new StructuredLogger(
+    MeetingSearchDocumentService.name,
+  );
 
   constructor(
     @InjectRepository(MeetingEntity)
@@ -110,9 +113,10 @@ export class MeetingSearchDocumentService {
         this.searchDocumentRepository.create(nextPayload),
       );
     } catch (error) {
-      this.logger.warn(
-        `Failed to refresh search document for meeting ${meetingId}: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.warn('meeting.search_document.refresh_failed', {
+        meetingId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -135,9 +139,10 @@ export class MeetingSearchDocumentService {
       try {
         await this.refreshByMeetingId(row.id);
       } catch (error) {
-        this.logger.warn(
-          `Failed to backfill search document for meeting ${row.id}: ${error instanceof Error ? error.message : error}`,
-        );
+        this.logger.warn('meeting.search_document.backfill_failed', {
+          meetingId: row.id,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

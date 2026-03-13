@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -26,6 +25,12 @@ import { ResultEntity } from '../domain/result.entity';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
+import {
+  getRequestContext,
+  runWithRequestContext,
+  type RequestContextStore,
+} from '../../../shared/logging/request-context.storage';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 import type {
   StructuredLectureExtraction,
   StructuredMeetingExtraction,
@@ -49,7 +54,7 @@ interface ValidationResult {
 
 @Injectable()
 export class ResultService {
-  private readonly logger = new Logger(ResultService.name);
+  private readonly logger = new StructuredLogger(ResultService.name);
   private readonly regeneratingMeetings = new Set<string>();
 
   constructor(
@@ -188,70 +193,94 @@ export class ResultService {
 
     // 중복 방지 잠금 + started 이벤트
     this.regeneratingMeetings.add(meetingId);
+    this.logger.log('result.regeneration.started', {
+      meetingId,
+      promptId: dto.promptId,
+      ownerSub,
+    });
     this.eventEmitter.emit(
       ResultRegenerateEvent.EVENT_NAME,
       new ResultRegenerateEvent(meetingId, 'started', ownerSub),
     );
 
     // 백그라운드 실행 (fire-and-forget)
-    void this.executeRegenerateInBackground(meetingId, dto.promptId, ownerSub);
+    void this.executeRegenerateInBackground(
+      meetingId,
+      dto.promptId,
+      ownerSub,
+      getRequestContext(),
+    );
   }
 
   private executeRegenerateInBackground(
     meetingId: string,
     promptId: string,
     ownerSub?: string,
+    requestContext?: RequestContextStore,
   ): void {
-    void (async () => {
-      try {
-        const existing = await this.resultRepository.findOne({
-          where: { meetingId },
-        });
-        if (!existing) {
-          throw new Error(`Result not found for meeting ${meetingId}`);
-        }
+    void runWithRequestContext(
+      {
+        ...requestContext,
+        requestId: requestContext?.requestId,
+        transport: 'job',
+        meetingId,
+        ownerSub,
+      },
+      async () => {
+        try {
+          const existing = await this.resultRepository.findOne({
+            where: { meetingId },
+          });
+          if (!existing) {
+            throw new Error(`Result not found for meeting ${meetingId}`);
+          }
 
-        const generated = await this.generateResultPayload(
-          meetingId,
-          promptId,
-          ownerSub,
-        );
-
-        existing.promptId = generated.promptId;
-        existing.content = generated.content;
-        existing.metadata = generated.metadata;
-
-        await this.resultRepository.save(existing);
-        await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
-
-        this.logger.log(
-          `Async regeneration completed for meeting ${meetingId}`,
-        );
-
-        this.eventEmitter.emit(
-          ResultRegenerateEvent.EVENT_NAME,
-          new ResultRegenerateEvent(meetingId, 'completed', ownerSub),
-        );
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(
-          `Async regeneration failed for meeting ${meetingId}: ${errorMessage}`,
-        );
-
-        this.eventEmitter.emit(
-          ResultRegenerateEvent.EVENT_NAME,
-          new ResultRegenerateEvent(
+          const generated = await this.generateResultPayload(
             meetingId,
-            'failed',
+            promptId,
             ownerSub,
-            errorMessage,
-          ),
-        );
-      } finally {
-        this.regeneratingMeetings.delete(meetingId);
-      }
-    })();
+          );
+
+          existing.promptId = generated.promptId;
+          existing.content = generated.content;
+          existing.metadata = generated.metadata;
+
+          await this.resultRepository.save(existing);
+          await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+
+          this.logger.log('result.regeneration.completed', {
+            meetingId,
+            promptId,
+            ownerSub,
+          });
+
+          this.eventEmitter.emit(
+            ResultRegenerateEvent.EVENT_NAME,
+            new ResultRegenerateEvent(meetingId, 'completed', ownerSub),
+          );
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          this.logger.error('result.regeneration.failed', error, {
+            meetingId,
+            promptId,
+            ownerSub,
+          });
+
+          this.eventEmitter.emit(
+            ResultRegenerateEvent.EVENT_NAME,
+            new ResultRegenerateEvent(
+              meetingId,
+              'failed',
+              ownerSub,
+              errorMessage,
+            ),
+          );
+        } finally {
+          this.regeneratingMeetings.delete(meetingId);
+        }
+      },
+    );
   }
 
   async exportResult(
@@ -336,9 +365,9 @@ export class ResultService {
     } catch (error) {
       // UNIQUE constraint 실패 시 이미 생성된 결과를 반환
       if (this.isUniqueConstraintError(error)) {
-        this.logger.warn(
-          `Duplicate result generation for meeting ${meetingId}, returning existing`,
-        );
+        this.logger.warn('result.generation.duplicate', {
+          meetingId,
+        });
         const fallback = await this.resultRepository.findOne({
           where: { meetingId },
         });
@@ -494,18 +523,34 @@ export class ResultService {
             return aiContent;
           }
 
-          this.logger.warn(
-            `Structured extraction rendered empty content for meeting ${meeting.id} (attempt ${attempt}/${maxAttempts})`,
-          );
+          this.logger.warn('result.structured_extraction.empty_render', {
+            meetingId: meeting.id,
+            promptId: prompt.id,
+            attempt,
+            maxAttempts,
+            documentType: prompt.documentType,
+          });
         } else {
-          this.logger.warn(
-            `Validation failed for meeting ${meeting.id} (attempt ${attempt}/${maxAttempts}, stage: ${validation.stage}): ${validation.reason}`,
-          );
+          this.logger.warn('result.structured_extraction.validation_failed', {
+            meetingId: meeting.id,
+            promptId: prompt.id,
+            attempt,
+            maxAttempts,
+            documentType: prompt.documentType,
+            validationStage: validation.stage,
+            validationReason: validation.reason,
+          });
         }
       } catch (error) {
-        this.logger.warn(
-          `Structured extraction failed for meeting ${meeting.id} (attempt ${attempt}/${maxAttempts}): ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
+        this.logger.warn('result.structured_extraction.failed', {
+          meetingId: meeting.id,
+          promptId: prompt.id,
+          attempt,
+          maxAttempts,
+          documentType: prompt.documentType,
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
+        });
       }
     }
 
@@ -523,9 +568,11 @@ export class ResultService {
         return legacyContent;
       }
     } catch (error) {
-      this.logger.error(
-        `Legacy Bedrock generation failed for meeting ${meeting.id}: ${error instanceof Error ? error.message : 'Unknown error'}. Using fallback template.`,
-      );
+      this.logger.error('result.legacy_generation.failed', error, {
+        meetingId: meeting.id,
+        promptId: prompt.id,
+        documentType: prompt.documentType,
+      });
     }
 
     return this.buildFallbackContent(params);
