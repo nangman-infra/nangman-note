@@ -83,5 +83,5 @@ services:
 
       # ─── Auth.js + Authentik ───
       NEXTAUTH_URL: ${CORS_ORIGIN}
-      AUTHENTIK_ISSUER: ${AUTH_OIDC_ISSUER}
+      AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER_FE}
       AUTHENTIK_CLIENT_ID: ${AUTH_OIDC_AUDIENCE}
