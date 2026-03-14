@@ -38,6 +38,7 @@ export interface AppEnv {
   AUTH_OIDC_AUDIENCE: string;
   AUTH_OIDC_JWKS_URI: string;
   PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: string;
+  PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: number;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -370,6 +371,15 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       config,
       'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH',
       '',
+    ),
+    PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: readIntegerInRange(
+      config,
+      'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS',
+      {
+        fallback: 2,
+        min: 1,
+        max: 8,
+      },
     ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: readString(

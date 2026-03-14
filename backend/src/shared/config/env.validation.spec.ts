@@ -159,4 +159,38 @@ describe('validateEnv', () => {
       }),
     ).toThrow('Environment variable AUTH_OIDC_ISSUER is required.');
   });
+
+  it('defaults PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS to 2', () => {
+    const env = validateEnv({
+      NODE_ENV: 'development',
+      PORT: '9999',
+      ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+    });
+
+    expect(env.PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS).toBe(2);
+  });
+
+  it('parses PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS within range', () => {
+    const env = validateEnv({
+      NODE_ENV: 'development',
+      PORT: '9999',
+      ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+      PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: '4',
+    });
+
+    expect(env.PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS).toBe(4);
+  });
+
+  it('throws when PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS is outside range', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'development',
+        PORT: '9999',
+        ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+        PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: '12',
+      }),
+    ).toThrow(
+      'Environment variable PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS must be an integer between 1 and 8.',
+    );
+  });
 });

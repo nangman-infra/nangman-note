@@ -327,6 +327,61 @@ describe('ResultService', () => {
       ).toHaveBeenCalledWith('meeting-1');
     });
 
+    it('deduplicates concurrent generation requests for the same meeting', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue({
+        id: 'note-1',
+        meetingId: 'meeting-1',
+        content: '핵심 내용',
+      } as NoteEntity);
+      transcriptRepository.find.mockResolvedValue([
+        {
+          id: 'segment-1',
+          meetingId: 'meeting-1',
+          startTime: 0,
+          endTime: 3.1,
+          text: '안건 공유',
+          confidence: 0.95,
+        } as TranscriptSegmentEntity,
+      ]);
+      bedrockService.extractStructuredNotes.mockImplementation(
+        async () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                documentType: PromptDocumentType.MEETING,
+                summary: '안건 공유와 후속 작업을 정리했다.',
+                participants: ['택준'],
+                agendaItems: [],
+                overallDecisions: [],
+                followUps: [],
+                keywords: [],
+                uncertainties: [],
+              });
+            }, 0);
+          }),
+      );
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+
+      const first = service.findByMeetingId('meeting-1');
+      const second = service.findByMeetingId('meeting-1');
+
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+
+      expect(firstResult).toEqual(secondResult);
+      expect(resultRepository.save).toHaveBeenCalledTimes(1);
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledTimes(1);
+    });
+
     it('rethrows save failure when it is not a unique constraint error', async () => {
       meetingService.findById.mockResolvedValue(buildMeeting());
       resultRepository.findOne.mockResolvedValue(null);

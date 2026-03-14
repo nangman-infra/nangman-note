@@ -50,6 +50,7 @@ interface ValidationResult {
 export class ResultService {
   private readonly logger = new StructuredLogger(ResultService.name);
   private readonly regeneratingMeetings = new Set<string>();
+  private readonly generationInFlight = new Map<string, Promise<ResultEntity>>();
 
   constructor(
     @InjectRepository(ResultEntity)
@@ -91,7 +92,7 @@ export class ResultService {
       });
     }
 
-    return this.generateAndSave(meetingId, ownerSub);
+    return this.generateAndSaveDeduped(meetingId, ownerSub);
   }
 
   /**
@@ -108,7 +109,7 @@ export class ResultService {
       return existing;
     }
 
-    return this.generateAndSave(meetingId);
+    return this.generateAndSaveDeduped(meetingId);
   }
 
   async update(
@@ -322,6 +323,29 @@ export class ResultService {
       }
       throw error;
     }
+  }
+
+  private generateAndSaveDeduped(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<ResultEntity> {
+    const existing = this.generationInFlight.get(meetingId);
+    if (existing) {
+      this.logger.log('result.generation.joined_inflight', {
+        meetingId,
+      });
+      return existing;
+    }
+
+    let generationPromise: Promise<ResultEntity>;
+    generationPromise = this.generateAndSave(meetingId, ownerSub).finally(() => {
+      if (this.generationInFlight.get(meetingId) === generationPromise) {
+        this.generationInFlight.delete(meetingId);
+      }
+    });
+
+    this.generationInFlight.set(meetingId, generationPromise);
+    return generationPromise;
   }
 
   private isUniqueConstraintError(error: unknown): boolean {

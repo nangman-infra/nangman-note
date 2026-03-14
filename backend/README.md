@@ -75,6 +75,7 @@ Required/used variables:
 - `REALTIME_MAX_BUFFERED_AUDIO_BYTES` (default: `4194304`)
 - `REALTIME_MAX_AUDIO_CHUNK_BYTES` (default: `65536`)
 - `REALTIME_BACKPRESSURE_RETRY_MS` (default: `200`)
+- `PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS` (`1` ~ `8`, default: `2`)
 - `LOG_LEVEL`
 - `CORS_ORIGIN` (comma-separated)
 

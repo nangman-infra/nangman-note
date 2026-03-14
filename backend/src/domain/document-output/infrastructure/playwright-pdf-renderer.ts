@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { existsSync } from 'fs';
 import { spawnSync } from 'child_process';
-import { chromium } from 'playwright-core';
+import { chromium, type Browser } from 'playwright-core';
 import type { AppEnv } from '../../../shared/config/env.validation';
 import {
   type PdfRenderInput,
@@ -10,64 +10,73 @@ import {
 } from '../application/ports/pdf-renderer.port';
 
 @Injectable()
-export class PlaywrightPdfRenderer implements PdfRendererPort {
+export class PlaywrightPdfRenderer
+  implements PdfRendererPort, OnModuleDestroy
+{
+  private activeRenderCount = 0;
+  private readonly renderQueue: Array<() => void> = [];
+  private browserPromise: Promise<Browser> | null = null;
+
   constructor(
     private readonly configService: ConfigService<AppEnv, true>,
   ) {}
 
   async render(input: PdfRenderInput): Promise<Buffer> {
-    const executablePath = this.resolveExecutablePath();
-    const browser = await chromium.launch({
-      ...(executablePath ? { executablePath } : {}),
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--single-process',
-        '--disable-extensions',
-        '--disable-background-networking',
-      ],
-    });
-
-    try {
-      const page = await browser.newPage({
+    return this.withRenderSlot(async () => {
+      const browser = await this.getBrowser();
+      const context = await browser.newContext({
         viewport: { width: 1280, height: 1800 },
         locale: 'ko-KR',
       });
 
-      await page.route('**/*', (route) => {
-        const url = route.request().url();
+      try {
+        const page = await context.newPage();
 
-        if (
-          url === 'about:blank' ||
-          url.startsWith('data:') ||
-          url.startsWith('blob:')
-        ) {
-          return route.continue();
-        }
+        await page.route('**/*', (route) => {
+          const url = route.request().url();
 
-        return route.abort();
-      });
+          if (
+            url === 'about:blank' ||
+            url.startsWith('data:') ||
+            url.startsWith('blob:')
+          ) {
+            return route.continue();
+          }
 
-      await page.emulateMedia({ media: 'print' });
-      await page.setContent(input.html, { waitUntil: 'domcontentloaded' });
+          return route.abort();
+        });
 
-      const pdf = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        preferCSSPageSize: true,
-        margin: {
-          top: '0',
-          right: '0',
-          bottom: '0',
-          left: '0',
-        },
-      });
+        await page.emulateMedia({ media: 'print' });
+        await page.setContent(input.html, { waitUntil: 'domcontentloaded' });
 
-      return Buffer.from(pdf);
-    } finally {
+        const pdf = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          preferCSSPageSize: true,
+          margin: {
+            top: '0',
+            right: '0',
+            bottom: '0',
+            left: '0',
+          },
+        });
+
+        return Buffer.from(pdf);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    const browserPromise = this.browserPromise;
+    this.browserPromise = null;
+    if (!browserPromise) {
+      return;
+    }
+
+    const browser = await browserPromise.catch(() => null);
+    if (browser) {
       await browser.close();
     }
   }
@@ -107,6 +116,75 @@ export class PlaywrightPdfRenderer implements PdfRendererPort {
 
     // undefined → playwright-core가 자체 번들 Chromium을 자동 탐색
     return undefined;
+  }
+
+  private async getBrowser(): Promise<Browser> {
+    if (this.browserPromise) {
+      return this.browserPromise;
+    }
+
+    const executablePath = this.resolveExecutablePath();
+    const browserPromise = chromium
+      .launch({
+        ...(executablePath ? { executablePath } : {}),
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--single-process',
+          '--disable-extensions',
+          '--disable-background-networking',
+        ],
+      })
+      .catch((error) => {
+        if (this.browserPromise === browserPromise) {
+          this.browserPromise = null;
+        }
+        throw error;
+      });
+
+    this.browserPromise = browserPromise;
+    return browserPromise;
+  }
+
+  private async withRenderSlot<T>(task: () => Promise<T>): Promise<T> {
+    await this.acquireRenderSlot();
+
+    try {
+      return await task();
+    } finally {
+      this.releaseRenderSlot();
+    }
+  }
+
+  private async acquireRenderSlot(): Promise<void> {
+    if (this.activeRenderCount < this.getMaxConcurrentRenders()) {
+      this.activeRenderCount += 1;
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      this.renderQueue.push(() => {
+        this.activeRenderCount += 1;
+        resolve();
+      });
+    });
+  }
+
+  private releaseRenderSlot(): void {
+    this.activeRenderCount = Math.max(0, this.activeRenderCount - 1);
+    const next = this.renderQueue.shift();
+    if (next) {
+      next();
+    }
+  }
+
+  private getMaxConcurrentRenders(): number {
+    return this.configService.get('PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS', {
+      infer: true,
+    });
   }
 
   private resolveFromPath(commands: string[]): string | null {
