@@ -28,6 +28,7 @@ describe('PlaywrightPdfRenderer', () => {
   });
 
   it('reuses one browser across multiple renders and closes contexts per render', async () => {
+    let disconnectedHandler: (() => void) | undefined;
     const pageA = {
       route: jest.fn().mockResolvedValue(undefined),
       emulateMedia: jest.fn().mockResolvedValue(undefined),
@@ -53,6 +54,11 @@ describe('PlaywrightPdfRenderer', () => {
         .fn()
         .mockResolvedValueOnce(contextA)
         .mockResolvedValueOnce(contextB),
+      on: jest.fn().mockImplementation((event: string, handler: () => void) => {
+        if (event === 'disconnected') {
+          disconnectedHandler = handler;
+        }
+      }),
       close: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -70,6 +76,7 @@ describe('PlaywrightPdfRenderer', () => {
     expect(first.toString('utf-8')).toBe('pdf-a');
     expect(second.toString('utf-8')).toBe('pdf-b');
     expect(launchMock).toHaveBeenCalledTimes(1);
+    expect(launchMock.mock.calls[0]?.[0].args).not.toContain('--single-process');
     expect(browser.newContext).toHaveBeenCalledTimes(2);
     expect(contextA.close).toHaveBeenCalledTimes(1);
     expect(contextB.close).toHaveBeenCalledTimes(1);
@@ -77,6 +84,7 @@ describe('PlaywrightPdfRenderer', () => {
     await renderer.onModuleDestroy();
 
     expect(browser.close).toHaveBeenCalledTimes(1);
+    expect(disconnectedHandler).toBeDefined();
   });
 
   it('aborts external requests while keeping inline resources available', async () => {
@@ -98,6 +106,7 @@ describe('PlaywrightPdfRenderer', () => {
     };
     const browser = {
       newContext: jest.fn().mockResolvedValue(context),
+      on: jest.fn(),
       close: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -157,5 +166,87 @@ describe('PlaywrightPdfRenderer', () => {
     const maxConcurrentRenders = privateRenderer.getMaxConcurrentRenders();
 
     expect(maxConcurrentRenders).toBe(2);
+  });
+
+  it('relaunches a new browser after disconnect', async () => {
+    let disconnectedHandler: (() => void) | undefined;
+    const page = {
+      route: jest.fn().mockResolvedValue(undefined),
+      emulateMedia: jest.fn().mockResolvedValue(undefined),
+      setContent: jest.fn().mockResolvedValue(undefined),
+      pdf: jest.fn().mockResolvedValue(Buffer.from('pdf')),
+    };
+    const context = {
+      newPage: jest.fn().mockResolvedValue(page),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const firstBrowser = {
+      newContext: jest.fn().mockResolvedValue(context),
+      on: jest.fn().mockImplementation((event: string, handler: () => void) => {
+        if (event === 'disconnected') {
+          disconnectedHandler = handler;
+        }
+      }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const secondBrowser = {
+      newContext: jest.fn().mockResolvedValue(context),
+      on: jest.fn(),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+
+    launchMock
+      .mockResolvedValueOnce(firstBrowser as never)
+      .mockResolvedValueOnce(secondBrowser as never);
+
+    await renderer.render({ title: '첫 번째', html: '<p>first</p>' });
+    disconnectedHandler?.();
+    await renderer.render({ title: '두 번째', html: '<p>second</p>' });
+
+    expect(launchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries once when browser-backed rendering fails with a retryable error', async () => {
+    const failingContext = {
+      newPage: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('Target page, context or browser has been closed'),
+        ),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const succeedingPage = {
+      route: jest.fn().mockResolvedValue(undefined),
+      emulateMedia: jest.fn().mockResolvedValue(undefined),
+      setContent: jest.fn().mockResolvedValue(undefined),
+      pdf: jest.fn().mockResolvedValue(Buffer.from('pdf-retried')),
+    };
+    const succeedingContext = {
+      newPage: jest.fn().mockResolvedValue(succeedingPage),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const firstBrowser = {
+      newContext: jest.fn().mockResolvedValue(failingContext),
+      on: jest.fn(),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const secondBrowser = {
+      newContext: jest.fn().mockResolvedValue(succeedingContext),
+      on: jest.fn(),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+
+    launchMock
+      .mockResolvedValueOnce(firstBrowser as never)
+      .mockResolvedValueOnce(secondBrowser as never);
+
+    const pdf = await renderer.render({
+      title: '재시도',
+      html: '<p>retry</p>',
+    });
+
+    expect(pdf.toString('utf-8')).toBe('pdf-retried');
+    expect(launchMock).toHaveBeenCalledTimes(2);
+    expect(firstBrowser.close).toHaveBeenCalledTimes(1);
   });
 });

@@ -23,6 +23,7 @@ export class PlaywrightPdfRenderer
   private activeRenderCount = 0;
   private readonly renderQueue: Array<() => void> = [];
   private browserPromise: Promise<Browser> | null = null;
+  private browserInstance: Browser | null = null;
   private resolvedMaxConcurrentRenders: number | null = null;
 
   constructor(
@@ -31,62 +32,25 @@ export class PlaywrightPdfRenderer
 
   async render(input: PdfRenderInput): Promise<Buffer> {
     return this.withRenderSlot(async () => {
-      const browser = await this.getBrowser();
-      const context = await browser.newContext({
-        viewport: { width: 1280, height: 1800 },
-        locale: 'ko-KR',
-      });
-
       try {
-        const page = await context.newPage();
+        return await this.renderOnce(input);
+      } catch (error) {
+        if (!this.isRetryableBrowserError(error)) {
+          throw error;
+        }
 
-        await page.route('**/*', (route) => {
-          const url = route.request().url();
-
-          if (
-            url === 'about:blank' ||
-            url.startsWith('data:') ||
-            url.startsWith('blob:')
-          ) {
-            return route.continue();
-          }
-
-          return route.abort();
+        this.logger.warn('document_output.pdf_render.retrying_after_browser_error', {
+          errorMessage: error instanceof Error ? error.message : String(error),
         });
+        await this.resetBrowser();
 
-        await page.emulateMedia({ media: 'print' });
-        await page.setContent(input.html, { waitUntil: 'domcontentloaded' });
-
-        const pdf = await page.pdf({
-          format: 'A4',
-          printBackground: true,
-          preferCSSPageSize: true,
-          margin: {
-            top: '0',
-            right: '0',
-            bottom: '0',
-            left: '0',
-          },
-        });
-
-        return Buffer.from(pdf);
-      } finally {
-        await context.close();
+        return this.renderOnce(input);
       }
     });
   }
 
   async onModuleDestroy(): Promise<void> {
-    const browserPromise = this.browserPromise;
-    this.browserPromise = null;
-    if (!browserPromise) {
-      return;
-    }
-
-    const browser = await browserPromise.catch(() => null);
-    if (browser) {
-      await browser.close();
-    }
+    await this.resetBrowser();
   }
 
   private resolveExecutablePath(): string | undefined {
@@ -141,20 +105,80 @@ export class PlaywrightPdfRenderer
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-gpu',
-          '--single-process',
           '--disable-extensions',
           '--disable-background-networking',
         ],
       })
+      .then((browser) => {
+        this.browserInstance = browser;
+        browser.on('disconnected', () => {
+          if (this.browserInstance === browser) {
+            this.browserInstance = null;
+          }
+          if (this.browserPromise === browserPromise) {
+            this.browserPromise = null;
+          }
+          this.logger.warn('document_output.browser.disconnected');
+        });
+        return browser;
+      })
       .catch((error) => {
         if (this.browserPromise === browserPromise) {
           this.browserPromise = null;
+        }
+        if (this.browserInstance) {
+          this.browserInstance = null;
         }
         throw error;
       });
 
     this.browserPromise = browserPromise;
     return browserPromise;
+  }
+
+  private async renderOnce(input: PdfRenderInput): Promise<Buffer> {
+    const browser = await this.getBrowser();
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 1800 },
+      locale: 'ko-KR',
+    });
+
+    try {
+      const page = await context.newPage();
+
+      await page.route('**/*', (route) => {
+        const url = route.request().url();
+
+        if (
+          url === 'about:blank' ||
+          url.startsWith('data:') ||
+          url.startsWith('blob:')
+        ) {
+          return route.continue();
+        }
+
+        return route.abort();
+      });
+
+      await page.emulateMedia({ media: 'print' });
+      await page.setContent(input.html, { waitUntil: 'domcontentloaded' });
+
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: {
+          top: '0',
+          right: '0',
+          bottom: '0',
+          left: '0',
+        },
+      });
+
+      return Buffer.from(pdf);
+    } finally {
+      await context.close().catch(() => undefined);
+    }
   }
 
   private async withRenderSlot<T>(task: () => Promise<T>): Promise<T> {
@@ -291,6 +315,45 @@ export class PlaywrightPdfRenderer
     return typeof process.availableMemory === 'function'
       ? process.availableMemory()
       : 0;
+  }
+
+  private async resetBrowser(): Promise<void> {
+    const browser = this.browserInstance;
+    const browserPromise = this.browserPromise;
+
+    this.browserInstance = null;
+    this.browserPromise = null;
+
+    if (browser) {
+      await browser.close().catch(() => undefined);
+      return;
+    }
+
+    if (browserPromise) {
+      const resolvedBrowser = await browserPromise.catch(() => null);
+      if (resolvedBrowser) {
+        await resolvedBrowser.close().catch(() => undefined);
+      }
+    }
+  }
+
+  private isRetryableBrowserError(error: unknown): boolean {
+    const message =
+      error instanceof Error
+        ? `${error.name} ${error.message}`
+        : typeof error === 'string'
+          ? error
+          : '';
+    const normalized = message.toLowerCase();
+
+    return (
+      normalized.includes('target page, context or browser has been closed') ||
+      normalized.includes('browser has been closed') ||
+      normalized.includes('browser closed') ||
+      normalized.includes('browser disconnected') ||
+      normalized.includes('connection closed') ||
+      normalized.includes('target closed')
+    );
   }
 
   private resolveFromPath(commands: string[]): string | null {
