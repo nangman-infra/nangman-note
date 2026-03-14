@@ -36,7 +36,10 @@ RUN corepack enable && corepack prepare pnpm@latest --activate && \
     pnpm store prune
 
 # Playwright와 호환되는 Chromium + 시스템 의존성 설치
-RUN npx playwright-core install --with-deps chromium
+# root 에서 설치 후 nestjs 유저에서도 접근 가능하도록 공유 경로 사용
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers
+RUN npx playwright-core install --with-deps chromium && \
+    chmod -R 755 /app/.playwright-browsers
 
 # 빌드 결과물 복사
 COPY --from=build /app/dist ./dist
