@@ -12,7 +12,6 @@ describe('PlaywrightPdfRenderer', () => {
   const launchMock = chromium.launch as jest.MockedFunction<typeof chromium.launch>;
   let configService: jest.Mocked<Pick<ConfigService, 'get'>>;
   let renderer: PlaywrightPdfRenderer;
-
   beforeEach(() => {
     jest.clearAllMocks();
     configService = {
@@ -132,5 +131,31 @@ describe('PlaywrightPdfRenderer', () => {
     expect(allowRoute.abort).not.toHaveBeenCalled();
     expect(blockRoute.abort).toHaveBeenCalledTimes(1);
     expect(blockRoute.continue).not.toHaveBeenCalled();
+  });
+
+  it('computes dynamic concurrency from cpu and memory when env override is missing', () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS') {
+        return null;
+      }
+      return '/bin/echo';
+    });
+    const privateRenderer = renderer as unknown as {
+      getAvailableParallelism: () => number;
+      getConstrainedMemoryBytes: () => number;
+      getAvailableMemoryBytes: () => number;
+      getMaxConcurrentRenders: () => number;
+    };
+    jest
+      .spyOn(privateRenderer, 'getAvailableParallelism')
+      .mockReturnValue(8);
+    jest
+      .spyOn(privateRenderer, 'getConstrainedMemoryBytes')
+      .mockReturnValue(2 * 512 * 1024 * 1024);
+    jest.spyOn(privateRenderer, 'getAvailableMemoryBytes').mockReturnValue(0);
+
+    const maxConcurrentRenders = privateRenderer.getMaxConcurrentRenders();
+
+    expect(maxConcurrentRenders).toBe(2);
   });
 });

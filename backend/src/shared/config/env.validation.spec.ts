@@ -160,14 +160,14 @@ describe('validateEnv', () => {
     ).toThrow('Environment variable AUTH_OIDC_ISSUER is required.');
   });
 
-  it('defaults PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS to 2', () => {
+  it('defaults PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS to null when omitted', () => {
     const env = validateEnv({
       NODE_ENV: 'development',
       PORT: '9999',
       ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
     });
 
-    expect(env.PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS).toBe(2);
+    expect(env.PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS).toBeNull();
   });
 
   it('parses PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS within range', () => {

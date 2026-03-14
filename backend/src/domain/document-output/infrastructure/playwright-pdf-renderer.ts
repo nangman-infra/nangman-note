@@ -2,20 +2,28 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { existsSync } from 'fs';
 import { spawnSync } from 'child_process';
+import * as os from 'os';
 import { chromium, type Browser } from 'playwright-core';
 import type { AppEnv } from '../../../shared/config/env.validation';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
 import {
   type PdfRenderInput,
   type PdfRendererPort,
 } from '../application/ports/pdf-renderer.port';
 
+const DEFAULT_DYNAMIC_PDF_CONCURRENCY = 2;
+const MAX_DYNAMIC_PDF_CONCURRENCY = 4;
+const PDF_RENDER_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024;
+
 @Injectable()
 export class PlaywrightPdfRenderer
   implements PdfRendererPort, OnModuleDestroy
 {
+  private readonly logger = new StructuredLogger(PlaywrightPdfRenderer.name);
   private activeRenderCount = 0;
   private readonly renderQueue: Array<() => void> = [];
   private browserPromise: Promise<Browser> | null = null;
+  private resolvedMaxConcurrentRenders: number | null = null;
 
   constructor(
     private readonly configService: ConfigService<AppEnv, true>,
@@ -182,9 +190,107 @@ export class PlaywrightPdfRenderer
   }
 
   private getMaxConcurrentRenders(): number {
-    return this.configService.get('PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS', {
-      infer: true,
+    if (this.resolvedMaxConcurrentRenders !== null) {
+      return this.resolvedMaxConcurrentRenders;
+    }
+
+    const configured = this.configService.get(
+      'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS',
+      {
+        infer: true,
+      },
+    );
+
+    if (typeof configured === 'number') {
+      this.resolvedMaxConcurrentRenders = configured;
+      this.logger.log('document_output.pdf_concurrency.configured', {
+        source: 'env',
+        maxConcurrentRenders: configured,
+      });
+      return configured;
+    }
+
+    const computed = this.computeDynamicPdfConcurrency();
+    this.resolvedMaxConcurrentRenders = computed.maxConcurrentRenders;
+    this.logger.log('document_output.pdf_concurrency.configured', {
+      source: 'dynamic',
+      maxConcurrentRenders: computed.maxConcurrentRenders,
+      availableParallelism: computed.availableParallelism,
+      constrainedMemoryBytes: computed.constrainedMemoryBytes,
+      availableMemoryBytes: computed.availableMemoryBytes,
+      memoryBudgetBytes: computed.memoryBudgetBytes,
+      cpuSlots: computed.cpuSlots,
+      memorySlots: computed.memorySlots,
     });
+    return computed.maxConcurrentRenders;
+  }
+
+  private computeDynamicPdfConcurrency(): {
+    maxConcurrentRenders: number;
+    availableParallelism: number;
+    constrainedMemoryBytes: number;
+    availableMemoryBytes: number;
+    memoryBudgetBytes: number;
+    cpuSlots: number;
+    memorySlots: number;
+  } {
+    const availableParallelism =
+      this.getAvailableParallelism();
+    const constrainedMemoryBytes = this.getConstrainedMemoryBytes();
+    const availableMemoryBytes = this.getAvailableMemoryBytes();
+    const memoryBudgetBytes =
+      constrainedMemoryBytes > 0
+        ? constrainedMemoryBytes
+        : availableMemoryBytes > 0
+          ? availableMemoryBytes
+          : os.totalmem();
+
+    const cpuSlots = Math.max(
+      1,
+      Math.floor(Math.max(1, availableParallelism) / 2),
+    );
+    const memorySlots = Math.max(
+      1,
+      Math.floor(memoryBudgetBytes / PDF_RENDER_MEMORY_BUDGET_BYTES),
+    );
+    const maxConcurrentRenders = Math.min(
+      MAX_DYNAMIC_PDF_CONCURRENCY,
+      Math.max(
+        1,
+        Math.min(cpuSlots, memorySlots, MAX_DYNAMIC_PDF_CONCURRENCY),
+      ),
+    );
+
+    return {
+      maxConcurrentRenders:
+        Number.isFinite(maxConcurrentRenders) && maxConcurrentRenders > 0
+          ? maxConcurrentRenders
+          : DEFAULT_DYNAMIC_PDF_CONCURRENCY,
+      availableParallelism,
+      constrainedMemoryBytes,
+      availableMemoryBytes,
+      memoryBudgetBytes,
+      cpuSlots,
+      memorySlots,
+    };
+  }
+
+  private getAvailableParallelism(): number {
+    return typeof os.availableParallelism === 'function'
+      ? os.availableParallelism()
+      : os.cpus().length;
+  }
+
+  private getConstrainedMemoryBytes(): number {
+    return typeof process.constrainedMemory === 'function'
+      ? process.constrainedMemory()
+      : 0;
+  }
+
+  private getAvailableMemoryBytes(): number {
+    return typeof process.availableMemory === 'function'
+      ? process.availableMemory()
+      : 0;
   }
 
   private resolveFromPath(commands: string[]): string | null {

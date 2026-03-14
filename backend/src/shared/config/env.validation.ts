@@ -38,7 +38,7 @@ export interface AppEnv {
   AUTH_OIDC_AUDIENCE: string;
   AUTH_OIDC_JWKS_URI: string;
   PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: string;
-  PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: number;
+  PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: number | null;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -91,6 +91,35 @@ function readIntegerInRange(
   const value = readNumber(config, key, options.fallback);
 
   if (value >= options.min && value <= options.max) {
+    return value;
+  }
+
+  throw new Error(
+    `Environment variable ${key} must be an integer between ${options.min} and ${options.max}.`,
+  );
+}
+
+function readOptionalIntegerInRange(
+  config: Record<string, unknown>,
+  key: string,
+  options: {
+    min: number;
+    max: number;
+  },
+): number | null {
+  const rawValue = config[key];
+
+  if (typeof rawValue !== 'string' || rawValue.trim().length === 0) {
+    return null;
+  }
+
+  const value = Number(rawValue);
+
+  if (
+    Number.isInteger(value) &&
+    value >= options.min &&
+    value <= options.max
+  ) {
     return value;
   }
 
@@ -372,11 +401,10 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH',
       '',
     ),
-    PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: readIntegerInRange(
+    PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: readOptionalIntegerInRange(
       config,
       'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS',
       {
-        fallback: 2,
         min: 1,
         max: 8,
       },
