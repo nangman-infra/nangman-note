@@ -1,6 +1,7 @@
 import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { loadSecrets } from './shared/aws/secrets-manager/secrets-loader';
 import { AppModule } from './app.module';
 import {
   isAllowedCorsOrigin,
@@ -13,6 +14,9 @@ import { HttpRequestLoggingInterceptor } from './shared/interceptors/http-reques
 import { ResponseInterceptor } from './shared/interceptors/response.interceptor';
 
 async function bootstrap() {
+  // Secrets Manager에서 민감정보를 process.env에 주입 (production only)
+  await loadSecrets();
+
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });

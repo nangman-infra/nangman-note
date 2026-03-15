@@ -2,10 +2,12 @@
 # network_mode: host — Linux에서 127.0.0.1:9912 credential endpoint 접근 필수
 #
 # 사용법:
-#   ./start.sh          # 시크릿 로딩 + docker compose up
+#   docker compose up -d
 #   docker compose logs -f
 #
-# 모든 민감 정보는 .env + 호스트 환경변수(start.sh)로 관리합니다.
+# 민감정보(DB_PASSWORD, ENCRYPTION_KEY, NEXTAUTH_SECRET, AUTHENTIK_CLIENT_SECRET)는
+# 앱이 런타임에 AWS Secrets Manager에서 동적으로 로딩합니다.
+# SECRET_*_ID 환경변수로 시크릿 이름만 전달합니다.
 
 services:
   backend:
@@ -27,11 +29,14 @@ services:
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL: "true"
       DB_SSL_REJECT_UNAUTHORIZED: "false"
       DB_MIGRATIONS_RUN: "true"
       DB_POOL_MAX: "10"
+
+      # ─── Secrets Manager (시크릿 ID — 앱이 런타임에 동적 로딩) ───
+      SECRET_DB_PASSWORD_ID: rds!db-cc9fc3c0-4598-4c25-9c95-8ddf3ff7b9e3
+      SECRET_ENCRYPTION_KEY_ID: nangman-note/encryption-key
 
       # ─── AWS (IAM Roles Anywhere via credential endpoint) ───
       AWS_REGION: ap-northeast-2
@@ -69,6 +74,13 @@ services:
       NODE_ENV: production
       PORT: "3002"
       HOSTNAME: "0.0.0.0"
+
+      # ─── Secrets Manager (시크릿 ID — 앱이 런타임에 동적 로딩) ───
+      SECRET_AUTH_ID: nangman-note/auth-secrets
+
+      # ─── AWS (IAM Roles Anywhere via credential endpoint) ───
+      AWS_REGION: ap-northeast-2
+      AWS_EC2_METADATA_SERVICE_ENDPOINT: http://127.0.0.1:9912
 
       # ─── 백엔드 프록시 (proxy.ts 런타임) ───
       BACKEND_URL: http://localhost:9999

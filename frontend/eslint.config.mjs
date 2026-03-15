@@ -54,6 +54,18 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["instrumentation.ts"],
+    rules: {
+      "no-restricted-properties": "off",
+    },
+  },
+  {
+    files: ["lib/config/secrets-loader.ts"],
+    rules: {
+      "no-restricted-properties": "off",
+    },
+  },
+  {
     files: [
       "**/*.spec.ts",
       "**/*.spec.tsx",
