@@ -1,11 +1,11 @@
-# nangman-note 온프렘 (라즈베리파이 5) Docker Compose
+# nangman-note 온프렘 Docker Compose
 # network_mode: host — Linux에서 127.0.0.1:9912 credential endpoint 접근 필수
 #
 # 사용법:
-#   docker compose up --build -d
+#   ./start.sh          # 시크릿 로딩 + docker compose up
 #   docker compose logs -f
 #
-# 모든 민감 정보는 .env에서 관리합니다.
+# 모든 민감 정보는 .env + 호스트 환경변수(start.sh)로 관리합니다.
 
 services:
   backend:
@@ -15,9 +15,7 @@ services:
     container_name: nangman-note-backend
     network_mode: host
     restart: unless-stopped
-    env_file:
-      - .env
-      - .env.secrets
+    env_file: .env
     environment:
       # ─── 서버 ───
       NODE_ENV: production
@@ -29,6 +27,7 @@ services:
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_SSL: "true"
       DB_SSL_REJECT_UNAUTHORIZED: "false"
       DB_MIGRATIONS_RUN: "true"
@@ -65,9 +64,7 @@ services:
     container_name: nangman-note-frontend
     network_mode: host
     restart: unless-stopped
-    env_file:
-      - .env
-      - .env.secrets
+    env_file: .env
     environment:
       NODE_ENV: production
       PORT: "3002"
