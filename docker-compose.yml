@@ -15,7 +15,9 @@ services:
     container_name: nangman-note-backend
     network_mode: host
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
+      - .env.secrets
     environment:
       # ─── 서버 ───
       NODE_ENV: production
@@ -63,7 +65,9 @@ services:
     container_name: nangman-note-frontend
     network_mode: host
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
+      - .env.secrets
     environment:
       NODE_ENV: production
       PORT: "3002"
