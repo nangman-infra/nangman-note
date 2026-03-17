@@ -73,14 +73,16 @@ export class BackfillMeetingLifecycleState20260317150000
           WHEN latest_job."status" = 'failed' THEN true
           ELSE false
         END
-      FROM LATERAL (
-        SELECT tj."status"
+      FROM (
+        SELECT DISTINCT ON (tj."meeting_id")
+          tj."meeting_id",
+          tj."status"
         FROM "transcription_job" AS tj
-        WHERE tj."meeting_id" = m."id"
-        ORDER BY tj."created_at" DESC
-        LIMIT 1
+        ORDER BY tj."meeting_id", tj."created_at" DESC, tj."id" DESC
       ) AS latest_job
       WHERE
+        latest_job."meeting_id" = m."id"
+        AND
         m."status" = 'processing'
         AND m."transcription_mode" = 'batch'
         AND latest_job."status" IN ('completed', 'failed')
@@ -91,14 +93,16 @@ export class BackfillMeetingLifecycleState20260317150000
       SET
         "processing_phase" = 'transcribing',
         "needs_attention" = false
-      FROM LATERAL (
-        SELECT tj."status"
+      FROM (
+        SELECT DISTINCT ON (tj."meeting_id")
+          tj."meeting_id",
+          tj."status"
         FROM "transcription_job" AS tj
-        WHERE tj."meeting_id" = m."id"
-        ORDER BY tj."created_at" DESC
-        LIMIT 1
+        ORDER BY tj."meeting_id", tj."created_at" DESC, tj."id" DESC
       ) AS latest_job
       WHERE
+        latest_job."meeting_id" = m."id"
+        AND
         m."status" = 'processing'
         AND m."transcription_mode" = 'batch'
         AND latest_job."status" IN ('queued', 'processing')
