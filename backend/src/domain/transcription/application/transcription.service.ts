@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { CreateBatchTranscriptionJobDto } from './dto/create-batch-transcription-job.dto';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 import { BATCH_TRANSCRIPTION_PROVIDER } from './ports/batch-transcription-provider.port';
@@ -85,6 +85,7 @@ export class TranscriptionService {
     private readonly transcriptionJobRepository: Repository<TranscriptionJobEntity>,
     @InjectRepository(TranscriptionUploadEntity)
     private readonly transcriptionUploadRepository: Repository<TranscriptionUploadEntity>,
+    private readonly dataSource: DataSource,
     private readonly meetingService: MeetingService,
     @Inject(BATCH_TRANSCRIPTION_PROVIDER)
     private readonly batchTranscriptionProvider: BatchTranscriptionProvider,
@@ -322,62 +323,16 @@ export class TranscriptionService {
     ownerSub?: string,
   ): Promise<TranscriptionJobEntity> {
     const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
-    const upload = await this.loadUploadOrThrow(meeting.id, uploadId);
-
-    const existingJob = await this.findExistingUploadJob(upload);
-    if (existingJob) {
-      if (
-        existingJob.status === TranscriptionJobStatus.QUEUED ||
-        existingJob.status === TranscriptionJobStatus.PROCESSING
-      ) {
-        this.startBatchPolling(meeting.id, existingJob.id);
-      }
-      return existingJob;
-    }
-
-    const objectExists = await this.s3AudioService.objectExists(
-      upload.bucket,
-      upload.s3Key,
-    );
-    if (!objectExists) {
-      this.logger.warn('transcription.batch.upload.confirm_missing_object', {
-        meetingId,
-        uploadId,
-        ownerSub,
-        s3Key: upload.s3Key,
-      });
+    const result = await this.processBatchUpload(meeting, uploadId, ownerSub, {
+      markMissingObjectAsFailed: false,
+      throwOnMissingObject: true,
+    });
+    if (!result.job) {
       throw new BadRequestException(
         'Uploaded audio file is not available yet. Retry after the upload finishes.',
       );
     }
-
-    upload.status = TranscriptionUploadStatus.UPLOADED;
-    upload.confirmedAt = upload.confirmedAt ?? new Date();
-    upload.errorMessage = null;
-    await this.transcriptionUploadRepository.save(upload);
-
-    try {
-      const job = await this.queueBatchJobForMeeting(
-        meeting,
-        upload.mediaUri,
-        meeting.languageCode,
-        ownerSub,
-      );
-      upload.status = TranscriptionUploadStatus.JOB_QUEUED;
-      upload.transcriptionJobId = job.id;
-      upload.jobQueuedAt = new Date();
-      upload.errorMessage = null;
-      await this.transcriptionUploadRepository.save(upload);
-      return job;
-    } catch (error) {
-      upload.status = TranscriptionUploadStatus.FAILED;
-      upload.errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to queue AWS transcription job';
-      await this.transcriptionUploadRepository.save(upload);
-      throw error;
-    }
+    return result.job;
   }
 
   async recoverPendingBatchUpload(
@@ -386,64 +341,32 @@ export class TranscriptionService {
     ownerSub?: string,
   ): Promise<{ queued: boolean; objectPresent: boolean; jobId?: string }> {
     const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
-    const upload = await this.loadUploadOrThrow(meeting.id, uploadId);
+    const result = await this.processBatchUpload(meeting, uploadId, ownerSub, {
+      markMissingObjectAsFailed: true,
+      throwOnMissingObject: false,
+    });
+    return {
+      queued: Boolean(result.job),
+      objectPresent: result.objectPresent,
+      jobId: result.job?.id,
+    };
+  }
 
-    const existingJob = await this.findExistingUploadJob(upload);
-    if (existingJob) {
-      if (
-        existingJob.status === TranscriptionJobStatus.QUEUED ||
-        existingJob.status === TranscriptionJobStatus.PROCESSING
-      ) {
-        this.startBatchPolling(meeting.id, existingJob.id);
-      }
-      return { queued: true, objectPresent: true, jobId: existingJob.id };
-    }
-
-    const objectExists = await this.s3AudioService.objectExists(
-      upload.bucket,
-      upload.s3Key,
-    );
-    if (!objectExists) {
-      upload.status = TranscriptionUploadStatus.FAILED;
-      upload.errorMessage =
-        upload.errorMessage ?? 'Uploaded audio file not found during recovery';
-      await this.transcriptionUploadRepository.save(upload);
-      this.logger.warn('transcription.batch.upload.recovery_missing_object', {
-        meetingId,
-        uploadId,
-        ownerSub,
-        s3Key: upload.s3Key,
-      });
-      return { queued: false, objectPresent: false };
-    }
-
-    upload.status = TranscriptionUploadStatus.UPLOADED;
-    upload.confirmedAt = upload.confirmedAt ?? new Date();
-    upload.errorMessage = null;
-    await this.transcriptionUploadRepository.save(upload);
-
-    try {
-      const job = await this.queueBatchJobForMeeting(
-        meeting,
-        upload.mediaUri,
-        meeting.languageCode,
-        ownerSub,
-      );
-      upload.status = TranscriptionUploadStatus.JOB_QUEUED;
-      upload.transcriptionJobId = job.id;
-      upload.jobQueuedAt = new Date();
-      upload.errorMessage = null;
-      await this.transcriptionUploadRepository.save(upload);
-      return { queued: true, objectPresent: true, jobId: job.id };
-    } catch (error) {
-      upload.status = TranscriptionUploadStatus.FAILED;
-      upload.errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to queue AWS transcription job';
-      await this.transcriptionUploadRepository.save(upload);
-      throw error;
-    }
+  async reconcilePendingBatchUpload(
+    meetingId: string,
+    uploadId: string,
+    ownerSub?: string,
+  ): Promise<{ queued: boolean; objectPresent: boolean; jobId?: string }> {
+    const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
+    const result = await this.processBatchUpload(meeting, uploadId, ownerSub, {
+      markMissingObjectAsFailed: false,
+      throwOnMissingObject: false,
+    });
+    return {
+      queued: Boolean(result.job),
+      objectPresent: result.objectPresent,
+      jobId: result.job?.id,
+    };
   }
 
   async queueBatchJob(
@@ -721,6 +644,120 @@ export class TranscriptionService {
     }
 
     return upload;
+  }
+
+  private async processBatchUpload(
+    meeting: MeetingEntity,
+    uploadId: string,
+    ownerSub: string | undefined,
+    options: {
+      markMissingObjectAsFailed: boolean;
+      throwOnMissingObject: boolean;
+    },
+  ): Promise<{
+    job: TranscriptionJobEntity | null;
+    objectPresent: boolean;
+  }> {
+    return this.withUploadLock(uploadId, async () => {
+      const upload = await this.loadUploadOrThrow(meeting.id, uploadId);
+
+      const existingJob = await this.findExistingUploadJob(upload);
+      if (existingJob) {
+        if (
+          existingJob.status === TranscriptionJobStatus.QUEUED ||
+          existingJob.status === TranscriptionJobStatus.PROCESSING
+        ) {
+          this.startBatchPolling(meeting.id, existingJob.id);
+        }
+        return { job: existingJob, objectPresent: true };
+      }
+
+      const objectExists = await this.s3AudioService.objectExists(
+        upload.bucket,
+        upload.s3Key,
+      );
+      if (!objectExists) {
+        if (options.markMissingObjectAsFailed) {
+          upload.status = TranscriptionUploadStatus.FAILED;
+          upload.errorMessage =
+            upload.errorMessage ?? 'Uploaded audio file not found during recovery';
+          await this.transcriptionUploadRepository.save(upload);
+          this.logger.warn('transcription.batch.upload.recovery_missing_object', {
+            meetingId: meeting.id,
+            uploadId,
+            ownerSub,
+            s3Key: upload.s3Key,
+          });
+        } else {
+          this.logger.debug('transcription.batch.upload.not_ready', {
+            meetingId: meeting.id,
+            uploadId,
+            ownerSub,
+            s3Key: upload.s3Key,
+          });
+        }
+
+        if (options.throwOnMissingObject) {
+          throw new BadRequestException(
+            'Uploaded audio file is not available yet. Retry after the upload finishes.',
+          );
+        }
+
+        return { job: null, objectPresent: false };
+      }
+
+      upload.status = TranscriptionUploadStatus.UPLOADED;
+      upload.confirmedAt = upload.confirmedAt ?? new Date();
+      upload.errorMessage = null;
+      await this.transcriptionUploadRepository.save(upload);
+
+      try {
+        const job = await this.queueBatchJobForMeeting(
+          meeting,
+          upload.mediaUri,
+          meeting.languageCode,
+          ownerSub,
+        );
+        upload.status = TranscriptionUploadStatus.JOB_QUEUED;
+        upload.transcriptionJobId = job.id;
+        upload.jobQueuedAt = new Date();
+        upload.errorMessage = null;
+        await this.transcriptionUploadRepository.save(upload);
+        return { job, objectPresent: true };
+      } catch (error) {
+        upload.status = TranscriptionUploadStatus.FAILED;
+        upload.errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Failed to queue AWS transcription job';
+        await this.transcriptionUploadRepository.save(upload);
+        throw error;
+      }
+    });
+  }
+
+  private async withUploadLock<T>(
+    uploadId: string,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    const dbType = this.dataSource.options.type;
+    if (dbType !== 'postgres') {
+      return task();
+    }
+
+    await this.dataSource.query(
+      'SELECT pg_advisory_lock(hashtext($1))',
+      [`transcription-upload:${uploadId}`],
+    );
+
+    try {
+      return await task();
+    } finally {
+      await this.dataSource.query(
+        'SELECT pg_advisory_unlock(hashtext($1))',
+        [`transcription-upload:${uploadId}`],
+      );
+    }
   }
 
   private async findExistingUploadJob(

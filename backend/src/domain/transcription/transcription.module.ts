@@ -4,6 +4,7 @@ import { MeetingModule } from '../meeting/meeting.module';
 import { ResultModule } from '../result/result.module';
 import { MeetingEntity } from '../meeting/domain/meeting.entity';
 import { ResultEntity } from '../result/domain/result.entity';
+import { PendingUploadReconciliationService } from './application/pending-upload-reconciliation.service';
 import { TranscriptionService } from './application/transcription.service';
 import { StalledMeetingRecoveryService } from './application/stalled-meeting-recovery.service';
 import { TranscriptionResultCollectorService } from './application/transcription-result-collector.service';
@@ -34,6 +35,7 @@ import { TranslateService } from '../../shared/aws/translate/translate.service';
   controllers: [TranscriptionController],
   providers: [
     TranscriptionService,
+    PendingUploadReconciliationService,
     StalledMeetingRecoveryService,
     TranscriptionResultCollectorService,
     TranscriptionGateway,

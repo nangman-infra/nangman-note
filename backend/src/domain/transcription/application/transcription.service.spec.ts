@@ -1,5 +1,5 @@
 import { BadGatewayException, BadRequestException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
@@ -49,6 +49,7 @@ describe('TranscriptionService', () => {
   let transcriptionResultCollectorService: jest.Mocked<
     Pick<TranscriptionResultCollectorService, 'pollAndCollect'>
   >;
+  let dataSource: jest.Mocked<Pick<DataSource, 'options' | 'query'>>;
   let s3AudioService: jest.Mocked<
     Pick<
       S3AudioService,
@@ -151,6 +152,10 @@ describe('TranscriptionService', () => {
         segmentCount: 0,
       }),
     };
+    dataSource = {
+      options: { type: 'sqlite' } as DataSource['options'],
+      query: jest.fn(),
+    };
     s3AudioService = {
       generateUploadUrl: jest.fn(),
       objectExists: jest.fn().mockResolvedValue(true),
@@ -162,6 +167,7 @@ describe('TranscriptionService', () => {
       transcriptRepository as unknown as Repository<TranscriptSegmentEntity>,
       transcriptionJobRepository as unknown as Repository<TranscriptionJobEntity>,
       transcriptionUploadRepository as unknown as Repository<TranscriptionUploadEntity>,
+      dataSource as unknown as DataSource,
       meetingService as unknown as MeetingService,
       batchTranscriptionProvider,
       streamingProvider,
@@ -697,6 +703,65 @@ describe('TranscriptionService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(batchTranscriptionProvider.submitBatchJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reconcilePendingBatchUpload', () => {
+    it('queues batch job when the object is present without client confirm', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      transcriptionUploadRepository.findOne.mockResolvedValue(buildUpload());
+      batchTranscriptionProvider.submitBatchJob.mockResolvedValue({
+        providerJobId: 'aws-job-queued',
+        status: TranscriptionJobStatus.QUEUED,
+      });
+      transcriptionJobRepository.create.mockImplementation(
+        (entity) => entity as TranscriptionJobEntity,
+      );
+      transcriptionJobRepository.save.mockImplementation((entity) =>
+        Promise.resolve({
+          ...(entity as object),
+          id: (entity as TranscriptionJobEntity).id ?? 'job-1',
+        } as TranscriptionJobEntity),
+      );
+      transcriptionUploadRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as TranscriptionUploadEntity),
+      );
+
+      const result = await service.reconcilePendingBatchUpload(
+        'meeting-1',
+        'upload-1',
+      );
+
+      expect(result).toEqual({
+        queued: true,
+        objectPresent: true,
+        jobId: 'job-1',
+      });
+    });
+
+    it('does not fail early when the object is not present yet', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      transcriptionUploadRepository.findOne.mockResolvedValue(buildUpload());
+      s3AudioService.objectExists.mockResolvedValue(false);
+      transcriptionUploadRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as TranscriptionUploadEntity),
+      );
+
+      const result = await service.reconcilePendingBatchUpload(
+        'meeting-1',
+        'upload-1',
+      );
+
+      expect(result).toEqual({
+        queued: false,
+        objectPresent: false,
+        jobId: undefined,
+      });
+      expect(transcriptionUploadRepository.save).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: TranscriptionUploadStatus.FAILED,
+        }),
+      );
     });
   });
 
