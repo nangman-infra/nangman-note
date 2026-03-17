@@ -4,4 +4,8 @@ export class CompleteMeetingDto {
   @IsOptional()
   @IsBoolean()
   skipTranscription?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  markAttentionRequired?: boolean;
 }

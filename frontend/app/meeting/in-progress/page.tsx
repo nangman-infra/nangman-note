@@ -396,7 +396,10 @@ export default function InProgressMeetingPage() {
             mediaUri: uploadResult.mediaUri,
           });
         } catch {
-          await endMeeting({ skipTranscription: true });
+          await endMeeting({
+            skipTranscription: true,
+            markAttentionRequired: true,
+          });
           setShowProcessing(false);
           pushToast({
             title: '배치 전사 잡 생성에 실패했습니다',
@@ -408,7 +411,10 @@ export default function InProgressMeetingPage() {
           navigateHome();
         }
       } else {
-        await endMeeting({ skipTranscription: true });
+        await endMeeting({
+          skipTranscription: true,
+          markAttentionRequired: true,
+        });
         setShowProcessing(false);
         pushToast({
           title: '오디오 업로드에 실패했습니다',

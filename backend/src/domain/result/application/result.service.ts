@@ -8,6 +8,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
+import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { NoteEntity } from '../../note/domain/note.entity';
 import { PromptService } from '../../prompt/application/prompt.service';
@@ -156,6 +157,15 @@ export class ResultService {
     existing.metadata = generated.metadata;
 
     const saved = await this.resultRepository.save(existing);
+    await this.meetingService.updateProcessingPhase(
+      meetingId,
+      null,
+      ownerSub,
+      {
+        status: MeetingStatus.COMPLETED,
+        needsAttention: generated.needsAttention,
+      },
+    );
     await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
     return saved;
   }
@@ -188,6 +198,12 @@ export class ResultService {
 
     // 중복 방지 잠금 + started 이벤트
     this.regeneratingMeetings.add(meetingId);
+    await this.meetingService.updateProcessingPhase(
+      meetingId,
+      MeetingProcessingPhase.REGENERATING,
+      ownerSub,
+      { status: MeetingStatus.COMPLETED },
+    );
     this.logger.log('result.regeneration.started', {
       meetingId,
       promptId: dto.promptId,
@@ -242,6 +258,15 @@ export class ResultService {
 
           await this.resultRepository.save(existing);
           await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
+          await this.meetingService.updateProcessingPhase(
+            meetingId,
+            null,
+            ownerSub,
+            {
+              status: MeetingStatus.COMPLETED,
+              needsAttention: generated.needsAttention,
+            },
+          );
 
           this.logger.log('result.regeneration.completed', {
             meetingId,
@@ -261,6 +286,12 @@ export class ResultService {
             promptId,
             ownerSub,
           });
+          await this.meetingService.updateProcessingPhase(
+            meetingId,
+            null,
+            ownerSub,
+            { status: MeetingStatus.COMPLETED },
+          );
 
           this.eventEmitter.emit(
             ResultRegenerateEvent.EVENT_NAME,
@@ -304,6 +335,15 @@ export class ResultService {
           content: payload.content,
           metadata: payload.metadata,
         }),
+      );
+      await this.meetingService.updateProcessingPhase(
+        meetingId,
+        null,
+        ownerSub,
+        {
+          status: MeetingStatus.COMPLETED,
+          needsAttention: payload.needsAttention,
+        },
       );
       await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
       return saved;
@@ -387,6 +427,7 @@ export class ResultService {
   ): Promise<{
     promptId: string;
     content: string;
+    needsAttention: boolean;
     metadata: {
       title?: string;
       generatedAt: string;
@@ -441,6 +482,7 @@ export class ResultService {
             transcripts,
           })
         : this.buildEmptyContentNotice(meeting),
+      needsAttention: !hasContent,
       metadata: {
         title: meeting.title,
         generatedAt: new Date().toISOString(),

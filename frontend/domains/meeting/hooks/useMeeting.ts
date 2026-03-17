@@ -42,6 +42,7 @@ export function useMeetings() {
     bulkRestoreMeetings,
     bulkPurgeMeetings,
     applyMeetingStatusUpdate,
+    applyResultRegenerateUpdate,
   } = useMeetingStore();
 
   return {
@@ -59,5 +60,6 @@ export function useMeetings() {
     bulkRestoreMeetings,
     bulkPurgeMeetings,
     applyMeetingStatusUpdate,
+    applyResultRegenerateUpdate,
   };
 }

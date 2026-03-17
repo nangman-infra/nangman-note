@@ -104,6 +104,7 @@ export class MeetingStatusGateway
       meetingId: event.meetingId,
       status: event.status,
       phase: event.phase,
+      needsAttention: event.needsAttention,
     });
   }
 

@@ -4,6 +4,7 @@ import { MeetingTranscriptionMode } from '../types/meeting.types';
 
 interface CompleteMeetingOptions {
   skipTranscription?: boolean;
+  markAttentionRequired?: boolean;
 }
 
 export const meetingApi = {

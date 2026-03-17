@@ -16,6 +16,7 @@ import {
   type MeetingStatusPhase,
 } from '../../../shared/events/meeting-status-changed.event';
 import { MeetingEntity } from '../domain/meeting.entity';
+import { MeetingProcessingPhase } from '../domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
 import { ResultEntity } from '../../result/domain/result.entity';
@@ -34,6 +35,8 @@ export interface MeetingSearchResult {
   meetingId: string;
   title?: string;
   status: MeetingStatus;
+  processingPhase?: MeetingProcessingPhase | null;
+  needsAttention: boolean;
   transcriptionMode: MeetingTranscriptionMode;
   matchedIn: SearchMatchedIn;
   snippet: string;
@@ -279,11 +282,12 @@ export class MeetingService {
 
   async complete(
     id: string,
-    options?: { skipTranscription?: boolean },
+    options?: { skipTranscription?: boolean; markAttentionRequired?: boolean },
     ownerSub?: string,
   ): Promise<MeetingEntity> {
     const meeting = await this.findById(id, ownerSub);
     const skipTranscription = options?.skipTranscription ?? false;
+    const markAttentionRequired = options?.markAttentionRequired ?? false;
 
     const isBatchWithTranscription =
       meeting.transcriptionMode === MeetingTranscriptionMode.BATCH &&
@@ -293,9 +297,16 @@ export class MeetingService {
     // 실시간 모드: PROCESSING (AI 결과 생성 대기)
     // skipTranscription(전사 없음): COMPLETED
     if (isBatchWithTranscription) {
-      meeting.status = MeetingStatus.PROCESSING;
-      meeting.endedAt = new Date();
-      const updated = await this.meetingRepository.save(meeting);
+      const updated = await this.updateLifecycle(
+        meeting,
+        {
+          status: MeetingStatus.PROCESSING,
+          processingPhase: MeetingProcessingPhase.UPLOADING,
+          needsAttention: false,
+          endedAt: new Date(),
+        },
+        'meeting.completed.awaiting_upload',
+      );
       this.logger.log('meeting.completed.awaiting_transcription', {
         meetingId: updated.id,
         ownerSub: updated.ownerSub,
@@ -304,27 +315,37 @@ export class MeetingService {
       this.emitStatusChanged(
         updated.id,
         updated.status,
-        'transcribing',
+        MeetingProcessingPhase.UPLOADING,
         updated.ownerSub,
+        updated.needsAttention,
       );
       return updated;
     }
 
     // 실시간 모드 또는 전사 없음 → PROCESSING 후 결과 생성 시 COMPLETED
-    meeting.status = MeetingStatus.PROCESSING;
-    meeting.endedAt = new Date();
-    const updated = await this.meetingRepository.save(meeting);
+    const updated = await this.updateLifecycle(
+      meeting,
+      {
+        status: MeetingStatus.PROCESSING,
+        processingPhase: MeetingProcessingPhase.GENERATING,
+        needsAttention: meeting.needsAttention || markAttentionRequired,
+        endedAt: new Date(),
+      },
+      'meeting.completed.awaiting_generation',
+    );
     this.logger.log('meeting.completed.awaiting_generation', {
       meetingId: updated.id,
       ownerSub: updated.ownerSub,
       transcriptionMode: updated.transcriptionMode,
       skipTranscription,
+      markAttentionRequired,
     });
     this.emitStatusChanged(
       updated.id,
       updated.status,
-      'generating',
+      MeetingProcessingPhase.GENERATING,
       updated.ownerSub,
+      updated.needsAttention,
     );
     return updated;
   }
@@ -335,20 +356,35 @@ export class MeetingService {
     ownerSub?: string,
   ): Promise<MeetingEntity> {
     const meeting = await this.findById(id, ownerSub);
-    meeting.status = status;
-    const updated = await this.meetingRepository.save(meeting);
-    this.logger.log('meeting.status.updated', {
-      meetingId: updated.id,
-      ownerSub: updated.ownerSub,
-      status: updated.status,
+    return this.updateLifecycleStatus(meeting, {
+      status,
+      processingPhase: status === MeetingStatus.COMPLETED ? null : undefined,
     });
-    this.emitStatusChanged(
-      updated.id,
-      updated.status,
-      status === MeetingStatus.COMPLETED ? 'completed' : undefined,
-      updated.ownerSub,
-    );
-    return updated;
+  }
+
+  async updateProcessingPhase(
+    id: string,
+    processingPhase: MeetingProcessingPhase | null,
+    ownerSub?: string,
+    options?: { needsAttention?: boolean; status?: MeetingStatus },
+  ): Promise<MeetingEntity> {
+    const meeting = await this.findById(id, ownerSub);
+    return this.updateLifecycleStatus(meeting, {
+      status: options?.status,
+      processingPhase,
+      needsAttention: options?.needsAttention,
+    });
+  }
+
+  async markNeedsAttention(
+    id: string,
+    ownerSub?: string,
+  ): Promise<MeetingEntity> {
+    const meeting = await this.findById(id, ownerSub);
+    return this.updateLifecycleStatus(meeting, {
+      needsAttention: true,
+      processingPhase: null,
+    });
   }
 
   async remove(id: string, ownerSub?: string): Promise<void> {
@@ -616,6 +652,8 @@ export class MeetingService {
       meetingId: meeting.id,
       title: meeting.title,
       status: meeting.status,
+      processingPhase: meeting.processingPhase,
+      needsAttention: meeting.needsAttention,
       transcriptionMode: meeting.transcriptionMode,
       matchedIn: matched.matchedIn,
       snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
@@ -675,6 +713,8 @@ export class MeetingService {
       meetingId: row.meetingId,
       title: row.title,
       status: row.status as MeetingStatus,
+      processingPhase: (row.processingPhase as MeetingProcessingPhase | null | undefined) ?? null,
+      needsAttention: Boolean(row.needsAttention),
       transcriptionMode: row.transcriptionMode as MeetingTranscriptionMode,
       matchedIn: matched.matchedIn,
       snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
@@ -742,10 +782,71 @@ export class MeetingService {
     status: MeetingStatus,
     phase?: MeetingStatusPhase,
     ownerSub?: string,
+    needsAttention?: boolean,
   ): void {
     this.eventEmitter.emit(
       MeetingStatusChangedEvent.EVENT_NAME,
-      new MeetingStatusChangedEvent(meetingId, status, phase, ownerSub),
+      new MeetingStatusChangedEvent(
+        meetingId,
+        status,
+        phase,
+        ownerSub,
+        needsAttention,
+      ),
     );
+  }
+
+  private async updateLifecycleStatus(
+    meeting: MeetingEntity,
+    next: {
+      status?: MeetingStatus;
+      processingPhase?: MeetingProcessingPhase | null;
+      needsAttention?: boolean;
+    },
+  ): Promise<MeetingEntity> {
+    const updated = await this.updateLifecycle(meeting, next, 'meeting.status.updated');
+    this.emitStatusChanged(
+      updated.id,
+      updated.status,
+      updated.status === MeetingStatus.COMPLETED
+        ? 'completed'
+        : updated.processingPhase ?? undefined,
+      updated.ownerSub,
+      updated.needsAttention,
+    );
+    return updated;
+  }
+
+  private async updateLifecycle(
+    meeting: MeetingEntity,
+    next: {
+      status?: MeetingStatus;
+      processingPhase?: MeetingProcessingPhase | null;
+      needsAttention?: boolean;
+      endedAt?: Date;
+    },
+    logEvent: string,
+  ): Promise<MeetingEntity> {
+    if (next.status !== undefined) {
+      meeting.status = next.status;
+    }
+    if (next.processingPhase !== undefined) {
+      meeting.processingPhase = next.processingPhase;
+    }
+    if (next.needsAttention !== undefined) {
+      meeting.needsAttention = next.needsAttention;
+    }
+    if (next.endedAt !== undefined) {
+      meeting.endedAt = next.endedAt;
+    }
+    const updated = await this.meetingRepository.save(meeting);
+    this.logger.log(logEvent, {
+      meetingId: updated.id,
+      ownerSub: updated.ownerSub,
+      status: updated.status,
+      processingPhase: updated.processingPhase,
+      needsAttention: updated.needsAttention,
+    });
+    return updated;
   }
 }

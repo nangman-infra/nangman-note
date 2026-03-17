@@ -6,10 +6,13 @@ import { Socket } from 'socket.io-client';
 import { createSocket } from '@/lib/api/websocket';
 import { isSocketAuthError } from '@/lib/api/socketAuth';
 
+import { MeetingProcessingPhase } from '@/domains/meeting/types/meeting-processing-phase.enum';
+
 interface MeetingStatusMessage {
   meetingId: string;
   status: string;
-  phase?: 'transcribing' | 'generating' | 'completed';
+  phase?: MeetingProcessingPhase | 'completed';
+  needsAttention?: boolean;
 }
 
 interface ResultRegenerateMessage {

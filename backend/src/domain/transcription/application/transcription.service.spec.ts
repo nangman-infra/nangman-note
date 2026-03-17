@@ -29,7 +29,10 @@ describe('TranscriptionService', () => {
     Pick<Repository<TranscriptionJobEntity>, 'find' | 'create' | 'save'>
   >;
   let meetingService: jest.Mocked<
-    Pick<MeetingService, 'findById' | 'updatePrompt'>
+    Pick<
+      MeetingService,
+      'findById' | 'updatePrompt' | 'updateProcessingPhase' | 'markNeedsAttention'
+    >
   >;
   let batchTranscriptionProvider: jest.Mocked<BatchTranscriptionProvider>;
   let streamingProvider: jest.Mocked<StreamingTranscriptionProvider>;
@@ -82,6 +85,8 @@ describe('TranscriptionService', () => {
     meetingService = {
       findById: jest.fn(),
       updatePrompt: jest.fn(),
+      updateProcessingPhase: jest.fn(),
+      markNeedsAttention: jest.fn(),
     };
     batchTranscriptionProvider = {
       submitBatchJob: jest.fn(),

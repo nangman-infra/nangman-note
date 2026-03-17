@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { meetingApi } from '../api/meetingApi';
+import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import {
   type CreateMeetingDto,
   type Meeting,
@@ -21,7 +22,10 @@ interface MeetingState {
   isLoading: boolean;
   error: string | null;
   startMeeting: (dto: CreateMeetingDto) => Promise<Meeting | null>;
-  endMeeting: (options?: { skipTranscription?: boolean }) => Promise<boolean>;
+  endMeeting: (options?: {
+    skipTranscription?: boolean;
+    markAttentionRequired?: boolean;
+  }) => Promise<boolean>;
   updatePrompt: (promptId: string) => Promise<Meeting | null>;
   fetchMeetings: (options?: { silent?: boolean }) => Promise<void>;
   fetchTrashMeetings: (options?: { silent?: boolean }) => Promise<void>;
@@ -36,6 +40,12 @@ interface MeetingState {
   applyMeetingStatusUpdate: (update: {
     meetingId: string;
     status: Meeting['status'];
+    phase?: Meeting['processingPhase'];
+    needsAttention?: boolean;
+  }) => void;
+  applyResultRegenerateUpdate: (update: {
+    meetingId: string;
+    phase: 'started' | 'completed' | 'failed';
   }) => void;
 }
 
@@ -45,6 +55,8 @@ function mapSearchResultToMeeting(result: SearchResult): Meeting {
     title: result.title || result.snippet,
     promptId: DEFAULT_PROMPT_ID,
     status: result.status,
+    processingPhase: result.processingPhase ?? null,
+    needsAttention: result.needsAttention,
     transcriptionMode: result.transcriptionMode,
     startedAt: result.startedAt,
     createdAt: result.startedAt,
@@ -289,13 +301,15 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     set({ currentMeeting: meeting });
   },
 
-  applyMeetingStatusUpdate: ({ meetingId, status }) => {
+  applyMeetingStatusUpdate: ({ meetingId, status, phase, needsAttention }) => {
     set((state) => {
       const nextMeetings = state.meetings.map((meeting) =>
         meeting.id === meetingId
           ? {
               ...meeting,
               status,
+              processingPhase: phase ?? (status === 'completed' ? null : meeting.processingPhase),
+              needsAttention: needsAttention ?? meeting.needsAttention,
             }
           : meeting,
       );
@@ -305,6 +319,39 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
           ? {
               ...state.currentMeeting,
               status,
+              processingPhase:
+                phase ?? (status === 'completed' ? null : state.currentMeeting.processingPhase),
+              needsAttention:
+                needsAttention ?? state.currentMeeting.needsAttention,
+            }
+          : state.currentMeeting;
+
+      return {
+        meetings: nextMeetings,
+        currentMeeting: nextCurrentMeeting,
+      };
+    });
+  },
+
+  applyResultRegenerateUpdate: ({ meetingId, phase }) => {
+    set((state) => {
+      const nextProcessingPhase =
+        phase === 'started' ? MeetingProcessingPhase.REGENERATING : null;
+
+      const nextMeetings = state.meetings.map((meeting) =>
+        meeting.id === meetingId
+          ? {
+              ...meeting,
+              processingPhase: nextProcessingPhase,
+            }
+          : meeting,
+      );
+
+      const nextCurrentMeeting =
+        state.currentMeeting?.id === meetingId
+          ? {
+              ...state.currentMeeting,
+              processingPhase: nextProcessingPhase,
             }
           : state.currentMeeting;
 

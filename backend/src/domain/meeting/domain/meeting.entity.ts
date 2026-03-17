@@ -15,6 +15,7 @@ import { PromptEntity } from '../../prompt/domain/prompt.entity';
 import { ResultEntity } from '../../result/domain/result.entity';
 import { TranscriptionJobEntity } from '../../transcription/domain/transcription-job.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
+import { MeetingProcessingPhase } from './meeting-processing-phase.enum';
 import { MeetingStatus } from './meeting-status.enum';
 import { MeetingTranscriptionMode } from './meeting-transcription-mode.enum';
 
@@ -41,6 +42,21 @@ export class MeetingEntity {
     default: MeetingStatus.RECORDING,
   })
   status: MeetingStatus;
+
+  @Column({
+    name: 'processing_phase',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
+  processingPhase?: MeetingProcessingPhase | null;
+
+  @Column({
+    name: 'needs_attention',
+    type: 'boolean',
+    default: false,
+  })
+  needsAttention: boolean;
 
   @Column({
     name: 'transcription_mode',

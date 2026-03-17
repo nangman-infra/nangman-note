@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
 import { meetingApi } from '../api/meetingApi';
 import { useMeetingStatus } from '@/hooks/useMeetingStatus';
+import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import { MeetingStatus } from '../types/meeting.types';
 
 type UploadState =
@@ -35,8 +36,8 @@ export function ProcessingProgress({
   onContinueWithoutAudio,
 }: ProcessingProgressProps) {
   const [backendStep, setBackendStep] = useState<
-    'transcribing' | 'generating' | 'completed'
-  >('transcribing');
+    'uploading' | 'transcribing' | 'generating' | 'completed'
+  >('uploading');
   const completeNotifiedRef = useRef(false);
 
   const notifyComplete = useCallback(() => {
@@ -54,7 +55,7 @@ export function ProcessingProgress({
     (message: {
       meetingId: string;
       status: string;
-      phase?: 'transcribing' | 'generating' | 'completed';
+      phase?: MeetingProcessingPhase | 'completed';
     }) => {
       if (
         message.status === MeetingStatus.COMPLETED ||
@@ -62,6 +63,11 @@ export function ProcessingProgress({
       ) {
         setBackendStep('completed');
         notifyComplete();
+        return;
+      }
+
+      if (message.phase === MeetingProcessingPhase.UPLOADING) {
+        setBackendStep('uploading');
         return;
       }
 

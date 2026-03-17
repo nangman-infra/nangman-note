@@ -1,13 +1,13 @@
 import { Repository } from 'typeorm';
 import { ResultService } from '../../result/application/result.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
+import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { S3AudioService } from '../../../shared/aws/s3/s3.service';
 import type { BatchTranscriptionProvider } from './ports/batch-transcription-provider.port';
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 
 describe('TranscriptionResultCollectorService', () => {
@@ -22,13 +22,18 @@ describe('TranscriptionResultCollectorService', () => {
     Pick<BatchTranscriptionProvider, 'getJobStatus'>
   >;
   let meetingService: jest.Mocked<
-    Pick<MeetingService, 'findById' | 'updateStatus'>
+    Pick<
+      MeetingService,
+      | 'findById'
+      | 'updateStatus'
+      | 'updateProcessingPhase'
+      | 'markNeedsAttention'
+    >
   >;
   let resultService: jest.Mocked<Pick<ResultService, 'generateForPipeline'>>;
   let s3AudioService: jest.Mocked<
     Pick<S3AudioService, 'getObjectAsStringFromBucket' | 'deleteAudioFile'>
   >;
-  let eventEmitter: jest.Mocked<Pick<EventEmitter2, 'emit'>>;
 
   const buildJob = (
     overrides: Partial<TranscriptionJobEntity> = {},
@@ -62,8 +67,17 @@ describe('TranscriptionResultCollectorService', () => {
       findById: jest.fn().mockResolvedValue({
         id: 'meeting-1',
         ownerSub: 'user-1',
-      }),
+      } as never),
       updateStatus: jest.fn(),
+      updateProcessingPhase: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        processingPhase: MeetingProcessingPhase.GENERATING,
+        needsAttention: false,
+      } as never),
+      markNeedsAttention: jest.fn().mockResolvedValue({
+        id: 'meeting-1',
+        needsAttention: true,
+      } as never),
     };
     resultService = {
       generateForPipeline: jest.fn(),
@@ -71,9 +85,6 @@ describe('TranscriptionResultCollectorService', () => {
     s3AudioService = {
       getObjectAsStringFromBucket: jest.fn(),
       deleteAudioFile: jest.fn(),
-    };
-    eventEmitter = {
-      emit: jest.fn(),
     };
 
     service = new TranscriptionResultCollectorService(
@@ -83,7 +94,6 @@ describe('TranscriptionResultCollectorService', () => {
       meetingService as unknown as MeetingService,
       resultService as unknown as ResultService,
       s3AudioService as unknown as S3AudioService,
-      eventEmitter as unknown as EventEmitter2,
     );
   });
 
@@ -150,13 +160,13 @@ describe('TranscriptionResultCollectorService', () => {
     );
     expect(meetingService.updateStatus).not.toHaveBeenCalled();
     expect(resultService.generateForPipeline).not.toHaveBeenCalled();
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      'meeting.status.changed',
+    expect(meetingService.markNeedsAttention).not.toHaveBeenCalled();
+    expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+      'meeting-1',
+      MeetingProcessingPhase.GENERATING,
+      'user-1',
       expect.objectContaining({
-        meetingId: 'meeting-1',
         status: MeetingStatus.PROCESSING,
-        phase: 'generating',
-        ownerSub: 'user-1',
       }),
     );
   });
@@ -183,13 +193,16 @@ describe('TranscriptionResultCollectorService', () => {
     );
     expect(meetingService.updateStatus).not.toHaveBeenCalled();
     expect(resultService.generateForPipeline).not.toHaveBeenCalled();
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      'meeting.status.changed',
+    expect(meetingService.markNeedsAttention).toHaveBeenCalledWith(
+      'meeting-1',
+      'user-1',
+    );
+    expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+      'meeting-1',
+      MeetingProcessingPhase.GENERATING,
+      'user-1',
       expect.objectContaining({
-        meetingId: 'meeting-1',
         status: MeetingStatus.PROCESSING,
-        phase: 'generating',
-        ownerSub: 'user-1',
       }),
     );
   });
@@ -201,7 +214,7 @@ describe('TranscriptionResultCollectorService', () => {
     await service.handleGeneratingPhase({
       meetingId: 'meeting-1',
       status: MeetingStatus.PROCESSING,
-      phase: 'generating',
+      phase: MeetingProcessingPhase.GENERATING,
     } as never);
 
     expect(resultService.generateForPipeline).toHaveBeenCalledWith('meeting-1');
@@ -253,11 +266,13 @@ describe('TranscriptionResultCollectorService', () => {
 
     expect(result).toEqual({ success: true, segmentCount: 1 });
     expect(segmentRepository.save).toHaveBeenCalledTimes(1);
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      'meeting.status.changed',
+    expect(meetingService.markNeedsAttention).not.toHaveBeenCalled();
+    expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+      'meeting-1',
+      MeetingProcessingPhase.GENERATING,
+      'user-1',
       expect.objectContaining({
-        meetingId: 'meeting-1',
-        phase: 'generating',
+        status: MeetingStatus.PROCESSING,
       }),
     );
   });
@@ -288,11 +303,16 @@ describe('TranscriptionResultCollectorService', () => {
         errorMessage: 'Batch transcription stalled for over 1 hour',
       }),
     );
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
-      'meeting.status.changed',
+    expect(meetingService.markNeedsAttention).toHaveBeenCalledWith(
+      'meeting-1',
+      'user-1',
+    );
+    expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+      'meeting-1',
+      MeetingProcessingPhase.GENERATING,
+      'user-1',
       expect.objectContaining({
-        meetingId: 'meeting-1',
-        phase: 'generating',
+        status: MeetingStatus.PROCESSING,
       }),
     );
   });
@@ -306,7 +326,7 @@ describe('TranscriptionResultCollectorService', () => {
     await service.handleGeneratingPhase({
       meetingId: 'meeting-1',
       status: MeetingStatus.PROCESSING,
-      phase: 'generating',
+      phase: MeetingProcessingPhase.GENERATING,
     } as never);
 
     expect(meetingService.updateStatus).toHaveBeenCalledWith(

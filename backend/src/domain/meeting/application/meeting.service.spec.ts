@@ -5,6 +5,7 @@ import { PromptService } from '../../prompt/application/prompt.service';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
 import { MeetingSearchDocumentService } from './meeting-search-document.service';
 import { MeetingEntity } from '../domain/meeting.entity';
+import { MeetingProcessingPhase } from '../domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
@@ -93,7 +94,8 @@ describe('MeetingService', () => {
         expect.objectContaining({
           meetingId: meeting.id,
           status: MeetingStatus.PROCESSING,
-          phase: 'transcribing',
+          phase: MeetingProcessingPhase.UPLOADING,
+          needsAttention: false,
         }),
       );
     });
@@ -116,7 +118,7 @@ describe('MeetingService', () => {
         expect.objectContaining({
           meetingId: meeting.id,
           status: MeetingStatus.PROCESSING,
-          phase: 'generating',
+          phase: MeetingProcessingPhase.GENERATING,
         }),
       );
     });
@@ -141,7 +143,7 @@ describe('MeetingService', () => {
         expect.objectContaining({
           meetingId: meeting.id,
           status: MeetingStatus.PROCESSING,
-          phase: 'generating',
+          phase: MeetingProcessingPhase.GENERATING,
         }),
       );
     });

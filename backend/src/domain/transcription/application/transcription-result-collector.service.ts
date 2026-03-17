@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -8,6 +7,7 @@ import {
   type BatchTranscriptionProvider,
 } from './ports/batch-transcription-provider.port';
 import { MeetingService } from '../../meeting/application/meeting.service';
+import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
@@ -73,7 +73,6 @@ export class TranscriptionResultCollectorService {
     private readonly meetingService: MeetingService,
     private readonly resultService: ResultService,
     private readonly s3AudioService: S3AudioService,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -211,7 +210,8 @@ export class TranscriptionResultCollectorService {
           meetingId,
           ownerSub,
         });
-        this.emitGeneratingPhase(meetingId, ownerSub);
+        await this.meetingService.markNeedsAttention(meetingId, ownerSub);
+        await this.emitGeneratingPhase(meetingId, ownerSub);
       },
     );
   }
@@ -236,7 +236,8 @@ export class TranscriptionResultCollectorService {
             jobId,
             ownerSub,
           });
-          this.emitGeneratingPhase(meetingId, ownerSub);
+          await this.meetingService.markNeedsAttention(meetingId, ownerSub);
+          await this.emitGeneratingPhase(meetingId, ownerSub);
           return { success: false, segmentCount: 0 };
         }
 
@@ -265,7 +266,7 @@ export class TranscriptionResultCollectorService {
               result.transcriptUri,
             );
             await this.deleteAudioFile(job.mediaUri);
-            this.emitGeneratingPhase(meetingId, ownerSub);
+            await this.emitGeneratingPhase(meetingId, ownerSub);
             return { success: true, segmentCount };
           }
 
@@ -576,14 +577,21 @@ export class TranscriptionResultCollectorService {
     }
   }
 
-  private async updateMeetingStatus(meetingId: string): Promise<void> {
+  private async updateMeetingStatus(
+    meetingId: string,
+    options?: { needsAttention?: boolean },
+  ): Promise<void> {
     try {
-      await this.meetingService.updateStatus(
+      const meeting = await this.meetingService.updateStatus(
         meetingId,
         MeetingStatus.COMPLETED,
       );
+      if (options?.needsAttention && !meeting.needsAttention) {
+        await this.meetingService.markNeedsAttention(meetingId);
+      }
       this.logger.log('meeting.status.completed_after_transcription', {
         meetingId,
+        needsAttention: Boolean(options?.needsAttention),
       });
     } catch (error) {
       this.logger.warn('meeting.status.complete_failed', {
@@ -615,7 +623,8 @@ export class TranscriptionResultCollectorService {
     ownerSub?: string,
   ): Promise<void> {
     await this.deleteAudioFile(mediaUri);
-    this.emitGeneratingPhase(meetingId, ownerSub);
+    await this.meetingService.markNeedsAttention(meetingId, ownerSub);
+    await this.emitGeneratingPhase(meetingId, ownerSub);
   }
 
   private sleep(ms: number): Promise<void> {
@@ -639,7 +648,9 @@ export class TranscriptionResultCollectorService {
 
     try {
       await this.triggerResultGeneration(event.meetingId);
-      await this.updateMeetingStatus(event.meetingId);
+      await this.updateMeetingStatus(event.meetingId, {
+        needsAttention: event.needsAttention,
+      });
     } catch (error) {
       this.logger.error('result.generation.phase_failed', error, {
         meetingId: event.meetingId,
@@ -647,23 +658,26 @@ export class TranscriptionResultCollectorService {
         phase: event.phase,
       });
       // 실패해도 COMPLETED로 전환 (사용자가 결과 페이지에서 재생성 가능)
-      await this.updateMeetingStatus(event.meetingId);
+      await this.updateMeetingStatus(event.meetingId, {
+        needsAttention: true,
+      });
     }
   }
 
-  private emitGeneratingPhase(meetingId: string, ownerSub?: string): void {
+  private async emitGeneratingPhase(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<void> {
+    const updated = await this.meetingService.updateProcessingPhase(
+      meetingId,
+      MeetingProcessingPhase.GENERATING,
+      ownerSub,
+      { status: MeetingStatus.PROCESSING },
+    );
     this.logger.log('meeting.phase.generating.emitted', {
       meetingId,
       ownerSub,
+      needsAttention: updated.needsAttention,
     });
-    this.eventEmitter.emit(
-      MeetingStatusChangedEvent.EVENT_NAME,
-      new MeetingStatusChangedEvent(
-        meetingId,
-        MeetingStatus.PROCESSING,
-        'generating',
-        ownerSub,
-      ),
-    );
   }
 }

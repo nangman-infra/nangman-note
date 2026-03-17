@@ -19,6 +19,7 @@ import {
   type TranslationProvider,
 } from './ports/translation-provider.port';
 import { MeetingService } from '../../meeting/application/meeting.service';
+import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobProvider } from '../domain/transcription-job-provider.enum';
@@ -291,8 +292,14 @@ export class TranscriptionService {
         mediaUri: dto.mediaUri,
         languageCode,
       });
-
-      return this.transcriptionJobRepository.save(queuedJob);
+      const savedJob = await this.transcriptionJobRepository.save(queuedJob);
+      await this.meetingService.updateProcessingPhase(
+        meetingId,
+        MeetingProcessingPhase.TRANSCRIBING,
+        ownerSub,
+        { status: meeting.status, needsAttention: false },
+      );
+      return savedJob;
     } catch (error) {
       const failedJob = this.transcriptionJobRepository.create({
         meetingId,
@@ -307,6 +314,7 @@ export class TranscriptionService {
             : 'Failed to queue AWS transcription job',
       });
       await this.transcriptionJobRepository.save(failedJob);
+      await this.meetingService.markNeedsAttention(meetingId, ownerSub);
 
       throw new BadGatewayException(
         error instanceof Error

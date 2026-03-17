@@ -1,3 +1,5 @@
+import { MeetingProcessingPhase } from './meeting-processing-phase.enum';
+
 export enum MeetingStatus {
   RECORDING = 'recording',
   PROCESSING = 'processing',
@@ -15,6 +17,8 @@ export interface Meeting {
   agenda?: string;
   promptId: string;
   status: MeetingStatus;
+  processingPhase?: MeetingProcessingPhase | null;
+  needsAttention?: boolean;
   transcriptionMode: MeetingTranscriptionMode;
   /** 전사 언어 코드 (e.g. 'ko-KR'). undefined면 자동 감지 */
   languageCode?: string;
@@ -40,6 +44,8 @@ export interface SearchResult {
   meetingId: string;
   title?: string;
   status: MeetingStatus;
+  processingPhase?: MeetingProcessingPhase | null;
+  needsAttention?: boolean;
   transcriptionMode: MeetingTranscriptionMode;
   matchedIn: 'title' | 'result' | 'transcript' | 'note';
   snippet: string;

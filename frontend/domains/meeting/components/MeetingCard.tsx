@@ -1,7 +1,8 @@
 'use client';
 
 import { memo } from 'react';
-import { Check, Clock3, Hourglass, Loader2, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, Clock3, Hourglass, Loader2, RotateCcw, Sparkles, Trash2, Upload } from 'lucide-react';
+import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import type { Meeting } from '../types/meeting.types';
 import { formatDate, formatDuration } from '@/lib/utils/date';
 
@@ -36,6 +37,29 @@ const statusConfig = {
   },
 } as const;
 
+const processingPhaseConfig = {
+  [MeetingProcessingPhase.UPLOADING]: {
+    label: '업로드 중',
+    className: 'bg-sky-100 text-sky-700',
+    icon: Upload,
+  },
+  [MeetingProcessingPhase.TRANSCRIBING]: {
+    label: '전사 중',
+    className: 'bg-amber-100 text-amber-700',
+    icon: Hourglass,
+  },
+  [MeetingProcessingPhase.GENERATING]: {
+    label: '정리 중',
+    className: 'bg-amber-100 text-amber-700',
+    icon: Hourglass,
+  },
+  [MeetingProcessingPhase.REGENERATING]: {
+    label: '재생성 중',
+    className: 'bg-brand/10 text-brand',
+    icon: Loader2,
+  },
+} as const;
+
 export const MeetingCard = memo(
   ({
     meeting,
@@ -53,7 +77,23 @@ export const MeetingCard = memo(
       ? (new Date(meeting.endedAt).getTime() - new Date(meeting.startedAt).getTime()) / 1000
       : 0;
 
-    const config = statusConfig[meeting.status];
+    const baseConfig = statusConfig[meeting.status];
+    const phaseConfig =
+      meeting.processingPhase &&
+      meeting.processingPhase in processingPhaseConfig
+        ? processingPhaseConfig[
+            meeting.processingPhase as keyof typeof processingPhaseConfig
+          ]
+        : null;
+    const config = meeting.needsAttention
+      ? {
+          label: '확인 필요',
+          className: 'bg-rose-100 text-rose-700',
+          icon: AlertTriangle,
+        }
+      : meeting.status === 'processing' && phaseConfig
+        ? phaseConfig
+        : baseConfig;
     const StatusIcon = config.icon;
 
     const handleCardClick = () => {
@@ -113,9 +153,22 @@ export const MeetingCard = memo(
               </button>
             ) : null}
             <span className={`status-pill inline-flex items-center gap-1 ${config.className}`}>
-              <StatusIcon className="h-3 w-3" />
+              <StatusIcon
+                className={`h-3 w-3 ${
+                  meeting.processingPhase === MeetingProcessingPhase.REGENERATING
+                    ? 'animate-spin'
+                    : ''
+                }`}
+              />
               {config.label}
             </span>
+            {meeting.status === 'completed' &&
+            meeting.processingPhase === MeetingProcessingPhase.REGENERATING ? (
+              <span className="status-pill inline-flex items-center gap-1 bg-brand/10 text-brand">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                재생성 중
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -131,10 +184,26 @@ export const MeetingCard = memo(
           </div>
         </button>
 
-        {meeting.status === 'processing' && (
-          <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            처리 중...
+        {(meeting.status === 'processing' || meeting.needsAttention) && (
+          <div
+            className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
+              meeting.needsAttention
+                ? 'bg-rose-50 text-rose-700'
+                : 'bg-amber-50 text-amber-700'
+            }`}
+          >
+            {meeting.needsAttention ? (
+              <AlertTriangle className="h-3.5 w-3.5" />
+            ) : (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            )}
+            {meeting.needsAttention
+              ? '확인이 필요한 처리 이슈가 있습니다.'
+              : meeting.processingPhase === MeetingProcessingPhase.UPLOADING
+                ? '오디오 업로드 중...'
+                : meeting.processingPhase === MeetingProcessingPhase.TRANSCRIBING
+                  ? '전사 처리 중...'
+                  : '회의록 생성 중...'}
           </div>
         )}
 

@@ -17,6 +17,7 @@ import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useMeetings } from '../hooks/useMeeting';
 import { useMeetingStatus } from '@/hooks/useMeetingStatus';
+import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import { MeetingStatus } from '../types/meeting.types';
 import {
   MeetingActionDialog,
@@ -107,6 +108,7 @@ export function MeetingList({
     bulkRestoreMeetings,
     bulkPurgeMeetings,
     applyMeetingStatusUpdate,
+    applyResultRegenerateUpdate,
   } = useMeetings();
   const { pushToast } = useFeedback();
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,7 +148,15 @@ export function MeetingList({
       applyMeetingStatusUpdate({
         meetingId: message.meetingId,
         status: message.status,
+        phase:
+          message.phase === 'completed'
+            ? null
+            : (message.phase as MeetingProcessingPhase | undefined),
+        needsAttention: message.needsAttention,
       });
+    },
+    onResultRegenerate: (message) => {
+      applyResultRegenerateUpdate(message);
     },
   });
 

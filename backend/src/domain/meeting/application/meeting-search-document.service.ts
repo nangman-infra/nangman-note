@@ -6,6 +6,7 @@ import { ResultEntity } from '../../result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingSearchDocumentEntity } from '../domain/meeting-search-document.entity';
+import { MeetingProcessingPhase } from '../domain/meeting-processing-phase.enum';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const MAX_TRANSCRIPT_CONTENT_LENGTH = 40_000;
@@ -27,6 +28,8 @@ export interface MeetingSearchDocumentRow {
   resultContent: string;
   transcriptContent: string;
   status: string;
+  processingPhase?: MeetingProcessingPhase | null;
+  needsAttention: boolean;
   transcriptionMode: string;
   startedAt: Date;
 }
@@ -215,6 +218,8 @@ export class MeetingSearchDocumentService {
         'doc.result_content AS "resultContent"',
         'doc.transcript_content AS "transcriptContent"',
         'meeting.status AS "status"',
+        'meeting.processing_phase AS "processingPhase"',
+        'meeting.needs_attention AS "needsAttention"',
         'meeting.transcription_mode AS "transcriptionMode"',
         'meeting.started_at AS "startedAt"',
       ])

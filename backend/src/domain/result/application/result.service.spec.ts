@@ -24,7 +24,7 @@ describe('ResultService', () => {
     Pick<Repository<TranscriptSegmentEntity>, 'find'>
   >;
   let meetingService: jest.Mocked<
-    Pick<MeetingService, 'findById' | 'updatePrompt'>
+    Pick<MeetingService, 'findById' | 'updatePrompt' | 'updateProcessingPhase'>
   >;
   let promptService: jest.Mocked<
     Pick<PromptService, 'ensureExists' | 'findById'>
@@ -100,6 +100,7 @@ describe('ResultService', () => {
     meetingService = {
       findById: jest.fn(),
       updatePrompt: jest.fn(),
+      updateProcessingPhase: jest.fn(),
     };
     promptService = {
       ensureExists: jest.fn(),
