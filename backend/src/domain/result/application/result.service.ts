@@ -8,6 +8,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
+import { MeetingCompletionState } from '../../meeting/domain/meeting-completion-state.enum';
 import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { NoteEntity } from '../../note/domain/note.entity';
@@ -164,6 +165,7 @@ export class ResultService {
       {
         status: MeetingStatus.COMPLETED,
         needsAttention: generated.needsAttention,
+        completionState: generated.completionState,
       },
     );
     await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
@@ -265,6 +267,7 @@ export class ResultService {
             {
               status: MeetingStatus.COMPLETED,
               needsAttention: generated.needsAttention,
+              completionState: generated.completionState,
             },
           );
 
@@ -343,6 +346,7 @@ export class ResultService {
         {
           status: MeetingStatus.COMPLETED,
           needsAttention: payload.needsAttention,
+          completionState: payload.completionState,
         },
       );
       await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
@@ -428,6 +432,7 @@ export class ResultService {
     promptId: string;
     content: string;
     needsAttention: boolean;
+    completionState: MeetingCompletionState;
     metadata: {
       title?: string;
       generatedAt: string;
@@ -451,6 +456,10 @@ export class ResultService {
     ]);
 
     const noteContent = note?.content?.trim() ?? '';
+    const hasNoteContent = noteContent.length > 0;
+    const hasTranscriptContent = transcripts.some(
+      (segment) => (segment.text?.trim().length ?? 0) > 0,
+    );
     const transcriptWordCount = transcripts
       .map((segment) => segment.text)
       .join(' ')
@@ -470,7 +479,12 @@ export class ResultService {
       ...transcripts.map((segment) => Math.floor(segment.endTime)),
     );
 
-    const hasContent = noteContent.length > 0 || transcripts.length > 0;
+    const completionState = this.determineCompletionState({
+      hasNoteContent,
+      hasTranscriptContent,
+    });
+    const hasContent =
+      completionState !== MeetingCompletionState.ATTENTION_REQUIRED;
 
     return {
       promptId,
@@ -482,7 +496,9 @@ export class ResultService {
             transcripts,
           })
         : this.buildEmptyContentNotice(meeting),
-      needsAttention: !hasContent,
+      needsAttention:
+        completionState === MeetingCompletionState.ATTENTION_REQUIRED,
+      completionState,
       metadata: {
         title: meeting.title,
         generatedAt: new Date().toISOString(),
@@ -491,6 +507,23 @@ export class ResultService {
         noteLength: noteContent.length,
       },
     };
+  }
+
+  private determineCompletionState(params: {
+    hasNoteContent: boolean;
+    hasTranscriptContent: boolean;
+  }): MeetingCompletionState {
+    const { hasNoteContent, hasTranscriptContent } = params;
+
+    if (hasNoteContent && hasTranscriptContent) {
+      return MeetingCompletionState.SUCCEEDED;
+    }
+
+    if (hasNoteContent || hasTranscriptContent) {
+      return MeetingCompletionState.PARTIAL;
+    }
+
+    return MeetingCompletionState.ATTENTION_REQUIRED;
   }
 
   private async generateContentWithAI(params: {

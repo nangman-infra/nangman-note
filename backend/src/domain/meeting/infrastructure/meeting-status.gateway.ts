@@ -99,12 +99,14 @@ export class MeetingStatusGateway
       status: event.status,
       phase: event.phase,
       ownerSub,
+      completionState: event.completionState,
     });
     this.server.to(this.userRoom(ownerSub)).emit('meeting:status', {
       meetingId: event.meetingId,
       status: event.status,
       phase: event.phase,
       needsAttention: event.needsAttention,
+      completionState: event.completionState,
     });
   }
 

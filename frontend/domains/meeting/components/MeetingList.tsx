@@ -153,6 +153,7 @@ export function MeetingList({
             ? null
             : (message.phase as MeetingProcessingPhase | undefined),
         needsAttention: message.needsAttention,
+        completionState: message.completionState,
       });
     },
     onResultRegenerate: (message) => {

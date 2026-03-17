@@ -1,3 +1,4 @@
+import { MeetingCompletionState } from './meeting-completion-state.enum';
 import { MeetingProcessingPhase } from './meeting-processing-phase.enum';
 
 export enum MeetingStatus {
@@ -19,6 +20,7 @@ export interface Meeting {
   status: MeetingStatus;
   processingPhase?: MeetingProcessingPhase | null;
   needsAttention?: boolean;
+  completionState?: MeetingCompletionState | null;
   transcriptionMode: MeetingTranscriptionMode;
   /** 전사 언어 코드 (e.g. 'ko-KR'). undefined면 자동 감지 */
   languageCode?: string;
@@ -46,6 +48,7 @@ export interface SearchResult {
   status: MeetingStatus;
   processingPhase?: MeetingProcessingPhase | null;
   needsAttention?: boolean;
+  completionState?: MeetingCompletionState | null;
   transcriptionMode: MeetingTranscriptionMode;
   matchedIn: 'title' | 'result' | 'transcript' | 'note';
   snippet: string;

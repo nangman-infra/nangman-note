@@ -16,6 +16,7 @@ import { ResultEntity } from '../../result/domain/result.entity';
 import { TranscriptionJobEntity } from '../../transcription/domain/transcription-job.entity';
 import { TranscriptionUploadEntity } from '../../transcription/domain/transcription-upload.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
+import { MeetingCompletionState } from './meeting-completion-state.enum';
 import { MeetingProcessingPhase } from './meeting-processing-phase.enum';
 import { MeetingStatus } from './meeting-status.enum';
 import { MeetingTranscriptionMode } from './meeting-transcription-mode.enum';
@@ -58,6 +59,14 @@ export class MeetingEntity {
     default: false,
   })
   needsAttention: boolean;
+
+  @Column({
+    name: 'completion_state',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
+  completionState?: MeetingCompletionState | null;
 
   @Column({
     name: 'transcription_mode',

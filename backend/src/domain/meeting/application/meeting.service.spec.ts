@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
 import { MeetingSearchDocumentService } from './meeting-search-document.service';
+import { MeetingCompletionState } from '../domain/meeting-completion-state.enum';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingProcessingPhase } from '../domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../domain/meeting-status.enum';
@@ -209,6 +210,34 @@ describe('MeetingService', () => {
           title: 'trimmed title',
           promptId: 'prompt_user_custom',
           transcriptionMode: MeetingTranscriptionMode.REALTIME,
+        }),
+      );
+    });
+  });
+
+  describe('markNeedsAttention', () => {
+    it('sets completion state for completed meetings', async () => {
+      const meeting = buildMeeting({
+        status: MeetingStatus.COMPLETED,
+      });
+      meetingRepository.findOne.mockResolvedValue(meeting);
+      meetingRepository.save.mockImplementation((value) =>
+        Promise.resolve(value as MeetingEntity),
+      );
+
+      const result = await service.markNeedsAttention(meeting.id);
+
+      expect(result.needsAttention).toBe(true);
+      expect(result.completionState).toBe(
+        MeetingCompletionState.ATTENTION_REQUIRED,
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        MeetingStatusChangedEvent.EVENT_NAME,
+        expect.objectContaining({
+          meetingId: meeting.id,
+          status: MeetingStatus.COMPLETED,
+          completionState: MeetingCompletionState.ATTENTION_REQUIRED,
+          needsAttention: true,
         }),
       );
     });

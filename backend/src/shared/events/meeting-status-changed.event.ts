@@ -1,3 +1,4 @@
+import { MeetingCompletionState } from '../../domain/meeting/domain/meeting-completion-state.enum';
 import { MeetingProcessingPhase } from '../../domain/meeting/domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../../domain/meeting/domain/meeting-status.enum';
 
@@ -16,5 +17,6 @@ export class MeetingStatusChangedEvent {
     public readonly phase?: MeetingStatusPhase,
     public readonly ownerSub?: string,
     public readonly needsAttention?: boolean,
+    public readonly completionState?: MeetingCompletionState | null,
   ) {}
 }

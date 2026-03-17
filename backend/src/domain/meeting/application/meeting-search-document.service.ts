@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { NoteEntity } from '../../note/domain/note.entity';
 import { ResultEntity } from '../../result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
+import { MeetingCompletionState } from '../domain/meeting-completion-state.enum';
 import { MeetingEntity } from '../domain/meeting.entity';
 import { MeetingSearchDocumentEntity } from '../domain/meeting-search-document.entity';
 import { MeetingProcessingPhase } from '../domain/meeting-processing-phase.enum';
@@ -30,6 +31,7 @@ export interface MeetingSearchDocumentRow {
   status: string;
   processingPhase?: MeetingProcessingPhase | null;
   needsAttention: boolean;
+  completionState?: MeetingCompletionState | null;
   transcriptionMode: string;
   startedAt: Date;
 }
@@ -220,6 +222,7 @@ export class MeetingSearchDocumentService {
         'meeting.status AS "status"',
         'meeting.processing_phase AS "processingPhase"',
         'meeting.needs_attention AS "needsAttention"',
+        'meeting.completion_state AS "completionState"',
         'meeting.transcription_mode AS "transcriptionMode"',
         'meeting.started_at AS "startedAt"',
       ])

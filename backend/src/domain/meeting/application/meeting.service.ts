@@ -25,6 +25,7 @@ import { ListMeetingsQueryDto } from './dto/list-meetings-query.dto';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
 import { UpdateMeetingDto } from './dto/update-meeting.dto';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
+import { MeetingCompletionState } from '../domain/meeting-completion-state.enum';
 
 const DEFAULT_PROMPT_ID = 'prompt_default_meeting';
 const SEARCH_SCOPES = ['all', 'title', 'result', 'transcript', 'note'] as const;
@@ -37,6 +38,7 @@ export interface MeetingSearchResult {
   status: MeetingStatus;
   processingPhase?: MeetingProcessingPhase | null;
   needsAttention: boolean;
+  completionState?: MeetingCompletionState | null;
   transcriptionMode: MeetingTranscriptionMode;
   matchedIn: SearchMatchedIn;
   snippet: string;
@@ -303,6 +305,7 @@ export class MeetingService {
           status: MeetingStatus.PROCESSING,
           processingPhase: MeetingProcessingPhase.UPLOADING,
           needsAttention: false,
+          completionState: null,
           endedAt: new Date(),
         },
         'meeting.completed.awaiting_upload',
@@ -318,6 +321,7 @@ export class MeetingService {
         MeetingProcessingPhase.UPLOADING,
         updated.ownerSub,
         updated.needsAttention,
+        updated.completionState,
       );
       return updated;
     }
@@ -329,6 +333,7 @@ export class MeetingService {
         status: MeetingStatus.PROCESSING,
         processingPhase: MeetingProcessingPhase.GENERATING,
         needsAttention: meeting.needsAttention || markAttentionRequired,
+        completionState: null,
         endedAt: new Date(),
       },
       'meeting.completed.awaiting_generation',
@@ -346,6 +351,7 @@ export class MeetingService {
       MeetingProcessingPhase.GENERATING,
       updated.ownerSub,
       updated.needsAttention,
+      updated.completionState,
     );
     return updated;
   }
@@ -366,13 +372,18 @@ export class MeetingService {
     id: string,
     processingPhase: MeetingProcessingPhase | null,
     ownerSub?: string,
-    options?: { needsAttention?: boolean; status?: MeetingStatus },
+    options?: {
+      needsAttention?: boolean;
+      status?: MeetingStatus;
+      completionState?: MeetingCompletionState | null;
+    },
   ): Promise<MeetingEntity> {
     const meeting = await this.findById(id, ownerSub);
     return this.updateLifecycleStatus(meeting, {
       status: options?.status,
       processingPhase,
       needsAttention: options?.needsAttention,
+      completionState: options?.completionState,
     });
   }
 
@@ -384,6 +395,10 @@ export class MeetingService {
     return this.updateLifecycleStatus(meeting, {
       needsAttention: true,
       processingPhase: null,
+      completionState:
+        meeting.status === MeetingStatus.COMPLETED
+          ? MeetingCompletionState.ATTENTION_REQUIRED
+          : undefined,
     });
   }
 
@@ -654,6 +669,7 @@ export class MeetingService {
       status: meeting.status,
       processingPhase: meeting.processingPhase,
       needsAttention: meeting.needsAttention,
+      completionState: meeting.completionState,
       transcriptionMode: meeting.transcriptionMode,
       matchedIn: matched.matchedIn,
       snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
@@ -715,6 +731,9 @@ export class MeetingService {
       status: row.status as MeetingStatus,
       processingPhase: (row.processingPhase as MeetingProcessingPhase | null | undefined) ?? null,
       needsAttention: Boolean(row.needsAttention),
+      completionState:
+        (row.completionState as MeetingCompletionState | null | undefined) ??
+        null,
       transcriptionMode: row.transcriptionMode as MeetingTranscriptionMode,
       matchedIn: matched.matchedIn,
       snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
@@ -783,6 +802,7 @@ export class MeetingService {
     phase?: MeetingStatusPhase,
     ownerSub?: string,
     needsAttention?: boolean,
+    completionState?: MeetingCompletionState | null,
   ): void {
     this.eventEmitter.emit(
       MeetingStatusChangedEvent.EVENT_NAME,
@@ -792,6 +812,7 @@ export class MeetingService {
         phase,
         ownerSub,
         needsAttention,
+        completionState,
       ),
     );
   }
@@ -802,6 +823,7 @@ export class MeetingService {
       status?: MeetingStatus;
       processingPhase?: MeetingProcessingPhase | null;
       needsAttention?: boolean;
+      completionState?: MeetingCompletionState | null;
     },
   ): Promise<MeetingEntity> {
     const updated = await this.updateLifecycle(meeting, next, 'meeting.status.updated');
@@ -813,6 +835,7 @@ export class MeetingService {
         : updated.processingPhase ?? undefined,
       updated.ownerSub,
       updated.needsAttention,
+      updated.completionState,
     );
     return updated;
   }
@@ -823,6 +846,7 @@ export class MeetingService {
       status?: MeetingStatus;
       processingPhase?: MeetingProcessingPhase | null;
       needsAttention?: boolean;
+      completionState?: MeetingCompletionState | null;
       endedAt?: Date;
     },
     logEvent: string,
@@ -836,6 +860,9 @@ export class MeetingService {
     if (next.needsAttention !== undefined) {
       meeting.needsAttention = next.needsAttention;
     }
+    if (next.completionState !== undefined) {
+      meeting.completionState = next.completionState;
+    }
     if (next.endedAt !== undefined) {
       meeting.endedAt = next.endedAt;
     }
@@ -846,6 +873,7 @@ export class MeetingService {
       status: updated.status,
       processingPhase: updated.processingPhase,
       needsAttention: updated.needsAttention,
+      completionState: updated.completionState,
     });
     return updated;
   }

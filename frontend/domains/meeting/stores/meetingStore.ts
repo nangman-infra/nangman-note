@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { meetingApi } from '../api/meetingApi';
+import { MeetingCompletionState } from '../types/meeting-completion-state.enum';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import {
   type CreateMeetingDto,
@@ -42,6 +43,7 @@ interface MeetingState {
     status: Meeting['status'];
     phase?: Meeting['processingPhase'];
     needsAttention?: boolean;
+    completionState?: Meeting['completionState'];
   }) => void;
   applyResultRegenerateUpdate: (update: {
     meetingId: string;
@@ -50,6 +52,14 @@ interface MeetingState {
 }
 
 function mapSearchResultToMeeting(result: SearchResult): Meeting {
+  const fallbackCompletionState =
+    result.completionState ??
+    (result.needsAttention
+      ? MeetingCompletionState.ATTENTION_REQUIRED
+      : result.status === 'completed'
+        ? MeetingCompletionState.SUCCEEDED
+        : null);
+
   return {
     id: result.meetingId,
     title: result.title || result.snippet,
@@ -57,6 +67,7 @@ function mapSearchResultToMeeting(result: SearchResult): Meeting {
     status: result.status,
     processingPhase: result.processingPhase ?? null,
     needsAttention: result.needsAttention,
+    completionState: fallbackCompletionState,
     transcriptionMode: result.transcriptionMode,
     startedAt: result.startedAt,
     createdAt: result.startedAt,
@@ -301,7 +312,13 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     set({ currentMeeting: meeting });
   },
 
-  applyMeetingStatusUpdate: ({ meetingId, status, phase, needsAttention }) => {
+  applyMeetingStatusUpdate: ({
+    meetingId,
+    status,
+    phase,
+    needsAttention,
+    completionState,
+  }) => {
     set((state) => {
       const nextMeetings = state.meetings.map((meeting) =>
         meeting.id === meetingId
@@ -310,6 +327,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
               status,
               processingPhase: phase ?? (status === 'completed' ? null : meeting.processingPhase),
               needsAttention: needsAttention ?? meeting.needsAttention,
+              completionState: completionState ?? meeting.completionState,
             }
           : meeting,
       );
@@ -323,6 +341,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
                 phase ?? (status === 'completed' ? null : state.currentMeeting.processingPhase),
               needsAttention:
                 needsAttention ?? state.currentMeeting.needsAttention,
+              completionState:
+                completionState ?? state.currentMeeting.completionState,
             }
           : state.currentMeeting;
 

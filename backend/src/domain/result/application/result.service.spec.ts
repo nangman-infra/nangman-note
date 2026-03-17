@@ -2,6 +2,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
+import { MeetingCompletionState } from '../../meeting/domain/meeting-completion-state.enum';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
@@ -215,7 +216,88 @@ describe('ResultService', () => {
       expect(
         meetingSearchDocumentService.refreshByMeetingId,
       ).toHaveBeenCalledWith('meeting-1');
+      expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+        'meeting-1',
+        null,
+        undefined,
+        expect.objectContaining({
+          status: MeetingStatus.COMPLETED,
+          completionState: MeetingCompletionState.SUCCEEDED,
+          needsAttention: false,
+        }),
+      );
       expect(result.content).toContain('안건 공유와 후속 작업을 정리했다.');
+    });
+
+    it('marks note-only results as partial completion', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue({
+        id: 'note-1',
+        meetingId: 'meeting-1',
+        content: '메모만 있습니다',
+      } as NoteEntity);
+      transcriptRepository.find.mockResolvedValue([]);
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        summary: '메모 기반 요약',
+        participants: [],
+        agendaItems: [],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      });
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+
+      await service.findByMeetingId('meeting-1');
+
+      expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+        'meeting-1',
+        null,
+        undefined,
+        expect.objectContaining({
+          status: MeetingStatus.COMPLETED,
+          completionState: MeetingCompletionState.PARTIAL,
+          needsAttention: false,
+        }),
+      );
+    });
+
+    it('marks empty results as attention required', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue(null);
+      transcriptRepository.find.mockResolvedValue([]);
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+
+      const result = await service.findByMeetingId('meeting-1');
+
+      expect(result.content).toContain(
+        '작성된 노트와 수집된 전사 데이터가 없습니다',
+      );
+      expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+        'meeting-1',
+        null,
+        undefined,
+        expect.objectContaining({
+          status: MeetingStatus.COMPLETED,
+          completionState: MeetingCompletionState.ATTENTION_REQUIRED,
+          needsAttention: true,
+        }),
+      );
     });
 
     it('preserves short utterances when speaker changes in AI transcript input', async () => {

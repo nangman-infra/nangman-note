@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { AlertTriangle, Check, Clock3, Hourglass, Loader2, RotateCcw, Sparkles, Trash2, Upload } from 'lucide-react';
+import { MeetingCompletionState } from '../types/meeting-completion-state.enum';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import type { Meeting } from '../types/meeting.types';
 import { formatDate, formatDuration } from '@/lib/utils/date';
@@ -60,6 +61,29 @@ const processingPhaseConfig = {
   },
 } as const;
 
+const completionStateConfig = {
+  [MeetingCompletionState.SUCCEEDED]: {
+    label: '완료',
+    className: 'bg-emerald-100 text-emerald-700',
+    icon: Clock3,
+  },
+  [MeetingCompletionState.PARTIAL]: {
+    label: '부분 완료',
+    className: 'bg-orange-100 text-orange-700',
+    icon: AlertTriangle,
+  },
+  [MeetingCompletionState.ATTENTION_REQUIRED]: {
+    label: '확인 필요',
+    className: 'bg-rose-100 text-rose-700',
+    icon: AlertTriangle,
+  },
+  [MeetingCompletionState.FAILED]: {
+    label: '실패',
+    className: 'bg-rose-100 text-rose-700',
+    icon: AlertTriangle,
+  },
+} as const;
+
 export const MeetingCard = memo(
   ({
     meeting,
@@ -85,15 +109,28 @@ export const MeetingCard = memo(
             meeting.processingPhase as keyof typeof processingPhaseConfig
           ]
         : null;
-    const config = meeting.needsAttention
-      ? {
-          label: '확인 필요',
-          className: 'bg-rose-100 text-rose-700',
-          icon: AlertTriangle,
-        }
-      : meeting.status === 'processing' && phaseConfig
-        ? phaseConfig
-        : baseConfig;
+    const completionConfig =
+      meeting.status === 'completed' &&
+      meeting.completionState &&
+      meeting.completionState in completionStateConfig
+        ? completionStateConfig[
+            meeting.completionState as keyof typeof completionStateConfig
+          ]
+        : null;
+    const config =
+      meeting.status === 'processing' && meeting.needsAttention
+        ? {
+            label: '확인 필요',
+            className: 'bg-rose-100 text-rose-700',
+            icon: AlertTriangle,
+          }
+        : meeting.status === 'processing' && phaseConfig
+          ? phaseConfig
+          : meeting.status === 'completed' && meeting.needsAttention
+            ? completionStateConfig[MeetingCompletionState.ATTENTION_REQUIRED]
+        : meeting.status === 'completed' && completionConfig
+          ? completionConfig
+          : baseConfig;
     const StatusIcon = config.icon;
 
     const handleCardClick = () => {
