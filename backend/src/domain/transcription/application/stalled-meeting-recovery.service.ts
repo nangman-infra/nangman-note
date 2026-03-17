@@ -11,7 +11,9 @@ import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
 import { MeetingService } from '../../meeting/application/meeting.service';
+import { TranscriptionService } from './transcription.service';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 import { runWithRequestContext } from '../../../shared/logging/request-context.storage';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
@@ -37,7 +39,10 @@ export class StalledMeetingRecoveryService
     private readonly resultRepository: Repository<ResultEntity>,
     @InjectRepository(TranscriptionJobEntity)
     private readonly transcriptionJobRepository: Repository<TranscriptionJobEntity>,
+    @InjectRepository(TranscriptionUploadEntity)
+    private readonly transcriptionUploadRepository: Repository<TranscriptionUploadEntity>,
     private readonly meetingService: MeetingService,
+    private readonly transcriptionService: TranscriptionService,
     private readonly transcriptionResultCollectorService: TranscriptionResultCollectorService,
     private readonly dataSource: DataSource,
   ) {}
@@ -120,6 +125,46 @@ export class StalledMeetingRecoveryService
         });
 
         if (!latestJob) {
+          const latestUpload = await this.transcriptionUploadRepository.findOne({
+            where: { meetingId: meeting.id },
+            order: { createdAt: 'DESC' },
+          });
+          if (latestUpload) {
+            this.logger.warn('meeting.recovery.pending_upload_detected', {
+              meetingId: meeting.id,
+              uploadId: latestUpload.id,
+              uploadStatus: latestUpload.status,
+            });
+            try {
+              const recovery =
+                await this.transcriptionService.recoverPendingBatchUpload(
+                  meeting.id,
+                  latestUpload.id,
+                  meeting.ownerSub,
+                );
+              if (recovery.queued) {
+                return;
+              }
+              if (!recovery.objectPresent) {
+                await this.transcriptionResultCollectorService.recoverMissingBatchJob(
+                  meeting.id,
+                  meeting.ownerSub,
+                );
+                return;
+              }
+            } catch (error) {
+              this.logger.error('meeting.recovery.pending_upload_failed', error, {
+                meetingId: meeting.id,
+                uploadId: latestUpload.id,
+              });
+              await this.transcriptionResultCollectorService.recoverMissingBatchJob(
+                meeting.id,
+                meeting.ownerSub,
+              );
+              return;
+            }
+          }
+
           this.logger.warn('meeting.recovery.missing_transcription_job', {
             meetingId: meeting.id,
           });

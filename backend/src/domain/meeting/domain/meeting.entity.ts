@@ -14,6 +14,7 @@ import { NoteEntity } from '../../note/domain/note.entity';
 import { PromptEntity } from '../../prompt/domain/prompt.entity';
 import { ResultEntity } from '../../result/domain/result.entity';
 import { TranscriptionJobEntity } from '../../transcription/domain/transcription-job.entity';
+import { TranscriptionUploadEntity } from '../../transcription/domain/transcription-upload.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
 import { MeetingProcessingPhase } from './meeting-processing-phase.enum';
 import { MeetingStatus } from './meeting-status.enum';
@@ -116,4 +117,7 @@ export class MeetingEntity {
 
   @OneToMany(() => TranscriptionJobEntity, (job) => job.meeting)
   transcriptionJobs?: TranscriptionJobEntity[];
+
+  @OneToMany(() => TranscriptionUploadEntity, (upload) => upload.meeting)
+  transcriptionUploads?: TranscriptionUploadEntity[];
 }

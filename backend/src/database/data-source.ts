@@ -7,6 +7,7 @@ import { PromptEntity } from '../domain/prompt/domain/prompt.entity';
 import { ResultEntity } from '../domain/result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../domain/transcription/domain/transcript-segment.entity';
 import { TranscriptionJobEntity } from '../domain/transcription/domain/transcription-job.entity';
+import { TranscriptionUploadEntity } from '../domain/transcription/domain/transcription-upload.entity';
 import { validateEnv } from '../shared/config/env.validation';
 import { buildTypeOrmDataSourceOptions } from '../shared/config/typeorm-options.factory';
 
@@ -40,5 +41,6 @@ export default new DataSource({
     ResultEntity,
     TranscriptSegmentEntity,
     TranscriptionJobEntity,
+    TranscriptionUploadEntity,
   ],
 });

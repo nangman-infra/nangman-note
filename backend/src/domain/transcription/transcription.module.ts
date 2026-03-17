@@ -11,6 +11,7 @@ import { BATCH_TRANSCRIPTION_PROVIDER } from './application/ports/batch-transcri
 import { STREAMING_TRANSCRIPTION_PROVIDER } from './application/ports/streaming-transcription-provider.port';
 import { TRANSLATION_PROVIDER } from './application/ports/translation-provider.port';
 import { TranscriptionJobEntity } from './domain/transcription-job.entity';
+import { TranscriptionUploadEntity } from './domain/transcription-upload.entity';
 import { TranscriptSegmentEntity } from './domain/transcript-segment.entity';
 import { AwsBatchTranscriptionProvider } from './infrastructure/aws-batch-transcription.provider';
 import { AwsStreamingTranscriptionProvider } from './infrastructure/aws-streaming-transcription.provider';
@@ -23,6 +24,7 @@ import { TranslateService } from '../../shared/aws/translate/translate.service';
     TypeOrmModule.forFeature([
       TranscriptSegmentEntity,
       TranscriptionJobEntity,
+      TranscriptionUploadEntity,
       MeetingEntity,
       ResultEntity,
     ]),

@@ -9,21 +9,12 @@ import {
 } from '@nestjs/common';
 import { CreateBatchTranscriptionJobDto } from '../application/dto/create-batch-transcription-job.dto';
 import { TranscriptionService } from '../application/transcription.service';
-import { TranscriptionResultCollectorService } from '../application/transcription-result-collector.service';
-import { S3AudioService } from '../../../shared/aws/s3/s3.service';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import type { AuthUser } from '../../../shared/auth/auth-user.interface';
-import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 @Controller('api/v1/meetings/:meetingId/transcripts')
 export class TranscriptionController {
-  private readonly logger = new StructuredLogger(TranscriptionController.name);
-
-  constructor(
-    private readonly transcriptionService: TranscriptionService,
-    private readonly resultCollectorService: TranscriptionResultCollectorService,
-    private readonly s3AudioService: S3AudioService,
-  ) {}
+  constructor(private readonly transcriptionService: TranscriptionService) {}
 
   @Post('upload-url')
   @HttpCode(HttpStatus.OK)
@@ -31,9 +22,7 @@ export class TranscriptionController {
     @Param('meetingId') meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
-    // 회의 존재 여부 확인 (내부에서 NotFoundException 발생)
-    await this.transcriptionService.listByMeetingId(meetingId, user?.sub);
-    return this.s3AudioService.generateUploadUrl(meetingId);
+    return this.transcriptionService.issueBatchUpload(meetingId, user?.sub);
   }
 
   @Get()
@@ -67,30 +56,22 @@ export class TranscriptionController {
     @Body() dto: CreateBatchTranscriptionJobDto,
     @CurrentUser() user?: AuthUser,
   ) {
-    const job = await this.transcriptionService.queueBatchJob(
+    const job = await this.transcriptionService.queueBatchJob(meetingId, dto, user?.sub);
+    return { job };
+  }
+
+  @Post('uploads/:uploadId/confirm')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async confirmBatchUpload(
+    @Param('meetingId') meetingId: string,
+    @Param('uploadId') uploadId: string,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    const job = await this.transcriptionService.confirmBatchUpload(
       meetingId,
-      dto,
+      uploadId,
       user?.sub,
     );
-
-    // 서버 측 비동기 폴링 시작 (프론트엔드 이탈 OK)
-    this.resultCollectorService
-      .pollAndCollect(meetingId, job.id)
-      .then((result) => {
-        this.logger.log('transcription.batch.poll.completed', {
-          meetingId,
-          jobId: job.id,
-          success: result.success,
-          segmentCount: result.segmentCount,
-        });
-      })
-      .catch((err: Error) => {
-        this.logger.error('transcription.batch.poll.failed', err, {
-          meetingId,
-          jobId: job.id,
-        });
-      });
-
     return { job };
   }
 }

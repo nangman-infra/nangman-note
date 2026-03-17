@@ -390,11 +390,9 @@ export default function InProgressMeetingPage() {
       await cleanupChunks();
 
       if (uploadResult) {
-        // 배치 전사 잡 트리거
+        // 업로드 완료를 서버가 확인한 뒤 배치 전사 잡 생성
         try {
-          await transcriptionApi.queueBatchJob(meetingId, {
-            mediaUri: uploadResult.mediaUri,
-          });
+          await transcriptionApi.confirmUpload(meetingId, uploadResult.uploadId);
         } catch {
           await endMeeting({
             skipTranscription: true,

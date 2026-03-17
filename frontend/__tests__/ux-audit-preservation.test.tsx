@@ -226,9 +226,9 @@ describe('Preservation 3.8 — Batch transcription completion triggers AI result
     const filePath = path.resolve(__dirname, '../app/meeting/in-progress/page.tsx');
     const source = await fs.readFile(filePath, 'utf-8');
 
-    // After meeting end, should upload audio and queue batch job
+    // After meeting end, should upload audio and ask the server to confirm/queue the batch job
     expect(source).toContain('uploadAudio');
-    expect(source).toContain('queueBatchJob');
+    expect(source).toContain('confirmUpload');
     expect(source).toContain('shouldRunBatchTranscription');
   });
 

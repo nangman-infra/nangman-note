@@ -6,6 +6,7 @@ import { transcriptionApi } from '../api/transcriptionApi';
 export type UploadState = 'idle' | 'requesting-url' | 'uploading' | 'completed' | 'failed';
 
 export interface UploadResult {
+  uploadId: string;
   s3Key: string;
   bucket: string;
   mediaUri: string;
@@ -74,15 +75,19 @@ export function useAudioUpload(): UseAudioUploadReturn {
       // 1. Presigned URL 요청
       setUploadState('requesting-url');
       let uploadUrl: string;
+      let uploadId: string;
       let key: string;
 
       let bucketName: string;
+      let mediaUri: string;
 
       try {
         const result = await transcriptionApi.getUploadUrl(meetingId);
+        uploadId = result.uploadId;
         uploadUrl = result.uploadUrl;
         key = result.s3Key;
         bucketName = result.bucket;
+        mediaUri = result.mediaUri;
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Presigned URL 요청에 실패했습니다.';
@@ -103,9 +108,10 @@ export function useAudioUpload(): UseAudioUploadReturn {
           setBucket(bucketName);
           setUploadState('completed');
           return {
+            uploadId,
             s3Key: key,
             bucket: bucketName,
-            mediaUri: `s3://${bucketName}/${key}`,
+            mediaUri,
           };
         }
 

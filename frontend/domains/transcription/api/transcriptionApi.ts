@@ -2,9 +2,11 @@ import { apiClient } from '@/lib/api/client';
 import type { TranscriptSegment, TranscriptionJob } from '../types/transcription.types';
 
 interface UploadUrlResponse {
+  uploadId: string;
   uploadUrl: string;
   s3Key: string;
   bucket: string;
+  mediaUri: string;
   expiresInSeconds: number;
 }
 
@@ -30,6 +32,16 @@ export const transcriptionApi = {
       `/api/v1/meetings/${meetingId}/transcripts/jobs`
     );
     return response.data.data.jobs;
+  },
+
+  confirmUpload: async (
+    meetingId: string,
+    uploadId: string,
+  ): Promise<TranscriptionJob> => {
+    const response = await apiClient.post<{ data: { job: TranscriptionJob } }>(
+      `/api/v1/meetings/${meetingId}/transcripts/uploads/${uploadId}/confirm`,
+    );
+    return response.data.data.job;
   },
 
   queueBatchJob: async (

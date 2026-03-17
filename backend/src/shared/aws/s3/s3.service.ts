@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -35,6 +36,7 @@ export class S3AudioService {
     uploadUrl: string;
     s3Key: string;
     bucket: string;
+    mediaUri: string;
     expiresInSeconds: number;
   }> {
     if (!this.bucket) {
@@ -60,6 +62,7 @@ export class S3AudioService {
       uploadUrl,
       s3Key,
       bucket: this.bucket,
+      mediaUri: this.buildMediaUri(s3Key),
       expiresInSeconds: PRESIGNED_URL_EXPIRY_SECONDS,
     };
   }
@@ -95,5 +98,51 @@ export class S3AudioService {
     const response = await this.s3Client.send(command);
     const body = await response.Body?.transformToString('utf-8');
     return body ?? '';
+  }
+
+  parseMediaUri(mediaUri: string): { bucket: string; s3Key: string } {
+    const normalized = mediaUri.trim();
+    if (!normalized.startsWith('s3://')) {
+      throw new BadRequestException('mediaUri must start with s3://');
+    }
+
+    const withoutScheme = normalized.slice('s3://'.length);
+    const slashIndex = withoutScheme.indexOf('/');
+    if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
+      throw new BadRequestException('mediaUri must be a valid s3://bucket/key URI');
+    }
+
+    return {
+      bucket: withoutScheme.slice(0, slashIndex),
+      s3Key: withoutScheme.slice(slashIndex + 1),
+    };
+  }
+
+  isManagedMediaUri(mediaUri: string): boolean {
+    try {
+      const { bucket, s3Key } = this.parseMediaUri(mediaUri);
+      return bucket === this.bucket && s3Key.startsWith(`${this.keyPrefix}/`);
+    } catch {
+      return false;
+    }
+  }
+
+  async objectExists(bucket: string, s3Key: string): Promise<boolean> {
+    const command = new HeadObjectCommand({
+      Bucket: bucket,
+      Key: s3Key,
+    });
+
+    try {
+      await this.s3Client.send(command);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async objectExistsForMediaUri(mediaUri: string): Promise<boolean> {
+    const { bucket, s3Key } = this.parseMediaUri(mediaUri);
+    return this.objectExists(bucket, s3Key);
   }
 }

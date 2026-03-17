@@ -6,7 +6,10 @@ import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
+import { TranscriptionUploadStatus } from '../domain/transcription-upload-status.enum';
 import { StalledMeetingRecoveryService } from './stalled-meeting-recovery.service';
+import { TranscriptionService } from './transcription.service';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 
 describe('StalledMeetingRecoveryService', () => {
@@ -18,7 +21,13 @@ describe('StalledMeetingRecoveryService', () => {
   let transcriptionJobRepository: jest.Mocked<
     Pick<Repository<TranscriptionJobEntity>, 'findOne'>
   >;
+  let transcriptionUploadRepository: jest.Mocked<
+    Pick<Repository<TranscriptionUploadEntity>, 'findOne'>
+  >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'updateStatus'>>;
+  let transcriptionService: jest.Mocked<
+    Pick<TranscriptionService, 'recoverPendingBatchUpload'>
+  >;
   let transcriptionResultCollectorService: jest.Mocked<
     Pick<
       TranscriptionResultCollectorService,
@@ -59,6 +68,22 @@ describe('StalledMeetingRecoveryService', () => {
       ...overrides,
     }) as TranscriptionJobEntity;
 
+  const buildUpload = (
+    overrides: Partial<TranscriptionUploadEntity> = {},
+  ): TranscriptionUploadEntity =>
+    ({
+      id: 'upload-1',
+      meetingId: 'meeting-1',
+      bucket: 'bucket',
+      s3Key: 'audio/meeting-1/file.webm',
+      mediaUri: 's3://bucket/audio/meeting-1/file.webm',
+      status: TranscriptionUploadStatus.ISSUED,
+      contentType: 'audio/webm',
+      createdAt: new Date('2026-03-13T10:30:00.000Z'),
+      updatedAt: new Date('2026-03-13T10:30:00.000Z'),
+      ...overrides,
+    }) as TranscriptionUploadEntity;
+
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(now);
 
@@ -71,8 +96,14 @@ describe('StalledMeetingRecoveryService', () => {
     transcriptionJobRepository = {
       findOne: jest.fn(),
     };
+    transcriptionUploadRepository = {
+      findOne: jest.fn(),
+    };
     meetingService = {
       updateStatus: jest.fn(),
+    };
+    transcriptionService = {
+      recoverPendingBatchUpload: jest.fn(),
     };
     transcriptionResultCollectorService = {
       recoverMissingBatchJob: jest.fn(),
@@ -87,7 +118,9 @@ describe('StalledMeetingRecoveryService', () => {
       meetingRepository as unknown as Repository<MeetingEntity>,
       resultRepository as unknown as Repository<ResultEntity>,
       transcriptionJobRepository as unknown as Repository<TranscriptionJobEntity>,
+      transcriptionUploadRepository as unknown as Repository<TranscriptionUploadEntity>,
       meetingService as unknown as MeetingService,
+      transcriptionService as unknown as TranscriptionService,
       transcriptionResultCollectorService as unknown as TranscriptionResultCollectorService,
       dataSource as unknown as DataSource,
     );
@@ -102,6 +135,49 @@ describe('StalledMeetingRecoveryService', () => {
     meetingRepository.find.mockResolvedValue([buildMeeting()]);
     resultRepository.findOne.mockResolvedValue(null);
     transcriptionJobRepository.findOne.mockResolvedValue(null);
+    transcriptionUploadRepository.findOne.mockResolvedValue(null);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (service as any).recoverStalledMeetings();
+
+    expect(
+      transcriptionResultCollectorService.recoverMissingBatchJob,
+    ).toHaveBeenCalledWith('meeting-1', 'user-1');
+  });
+
+  it('recovers stale meetings through the latest upload session when no job exists', async () => {
+    meetingRepository.find.mockResolvedValue([buildMeeting()]);
+    resultRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.findOne.mockResolvedValue(null);
+    transcriptionUploadRepository.findOne.mockResolvedValue(buildUpload());
+    transcriptionService.recoverPendingBatchUpload.mockResolvedValue({
+      queued: true,
+      objectPresent: true,
+      jobId: 'job-1',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (service as any).recoverStalledMeetings();
+
+    expect(transcriptionService.recoverPendingBatchUpload).toHaveBeenCalledWith(
+      'meeting-1',
+      'upload-1',
+      'user-1',
+    );
+    expect(
+      transcriptionResultCollectorService.recoverMissingBatchJob,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('falls back to missing-job recovery when uploaded object is still missing', async () => {
+    meetingRepository.find.mockResolvedValue([buildMeeting()]);
+    resultRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.findOne.mockResolvedValue(null);
+    transcriptionUploadRepository.findOne.mockResolvedValue(buildUpload());
+    transcriptionService.recoverPendingBatchUpload.mockResolvedValue({
+      queued: false,
+      objectPresent: false,
+    });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
@@ -145,6 +221,7 @@ describe('StalledMeetingRecoveryService', () => {
         updatedAt: new Date('2026-03-13T11:25:00.000Z'),
       }),
     );
+    transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
@@ -163,6 +240,7 @@ describe('StalledMeetingRecoveryService', () => {
         updatedAt: new Date('2026-03-13T10:40:00.000Z'),
       }),
     );
+    transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();

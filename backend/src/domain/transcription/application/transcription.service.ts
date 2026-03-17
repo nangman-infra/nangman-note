@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateBatchTranscriptionJobDto } from './dto/create-batch-transcription-job.dto';
+import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 import { BATCH_TRANSCRIPTION_PROVIDER } from './ports/batch-transcription-provider.port';
 import type { BatchTranscriptionProvider } from './ports/batch-transcription-provider.port';
 import {
@@ -19,12 +20,17 @@ import {
   type TranslationProvider,
 } from './ports/translation-provider.port';
 import { MeetingService } from '../../meeting/application/meeting.service';
+import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
+import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobProvider } from '../domain/transcription-job-provider.enum';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
+import { TranscriptionUploadStatus } from '../domain/transcription-upload-status.enum';
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
+import { S3AudioService } from '../../../shared/aws/s3/s3.service';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 /** 프론트에 emit할 partial/final 이벤트 페이로드 */
@@ -52,6 +58,15 @@ export type RealtimeTranscriptPayload =
   | RealtimeTranscriptContentPayload
   | RealtimeTranslationPayload;
 
+export interface IssuedBatchUpload {
+  uploadId: string;
+  uploadUrl: string;
+  s3Key: string;
+  bucket: string;
+  mediaUri: string;
+  expiresInSeconds: number;
+}
+
 @Injectable()
 export class TranscriptionService {
   private readonly logger = new StructuredLogger(TranscriptionService.name);
@@ -68,6 +83,8 @@ export class TranscriptionService {
     private readonly transcriptRepository: Repository<TranscriptSegmentEntity>,
     @InjectRepository(TranscriptionJobEntity)
     private readonly transcriptionJobRepository: Repository<TranscriptionJobEntity>,
+    @InjectRepository(TranscriptionUploadEntity)
+    private readonly transcriptionUploadRepository: Repository<TranscriptionUploadEntity>,
     private readonly meetingService: MeetingService,
     @Inject(BATCH_TRANSCRIPTION_PROVIDER)
     private readonly batchTranscriptionProvider: BatchTranscriptionProvider,
@@ -75,6 +92,8 @@ export class TranscriptionService {
     private readonly streamingProvider: StreamingTranscriptionProvider,
     @Inject(TRANSLATION_PROVIDER)
     private readonly translationProvider: TranslationProvider,
+    private readonly transcriptionResultCollectorService: TranscriptionResultCollectorService,
+    private readonly s3AudioService: S3AudioService,
   ) {}
 
   async listByMeetingId(
@@ -263,65 +282,212 @@ export class TranscriptionService {
     });
   }
 
+  async issueBatchUpload(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<IssuedBatchUpload> {
+    const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
+    const upload = await this.s3AudioService.generateUploadUrl(meeting.id);
+    const issuedUpload = this.transcriptionUploadRepository.create({
+      meetingId: meeting.id,
+      bucket: upload.bucket,
+      s3Key: upload.s3Key,
+      mediaUri: upload.mediaUri,
+      status: TranscriptionUploadStatus.ISSUED,
+      contentType: 'audio/webm',
+    });
+    const savedUpload =
+      await this.transcriptionUploadRepository.save(issuedUpload);
+
+    this.logger.log('transcription.batch.upload.issued', {
+      meetingId: meeting.id,
+      uploadId: savedUpload.id,
+      ownerSub,
+      s3Key: savedUpload.s3Key,
+    });
+
+    return {
+      uploadId: savedUpload.id,
+      uploadUrl: upload.uploadUrl,
+      s3Key: upload.s3Key,
+      bucket: upload.bucket,
+      mediaUri: upload.mediaUri,
+      expiresInSeconds: upload.expiresInSeconds,
+    };
+  }
+
+  async confirmBatchUpload(
+    meetingId: string,
+    uploadId: string,
+    ownerSub?: string,
+  ): Promise<TranscriptionJobEntity> {
+    const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
+    const upload = await this.loadUploadOrThrow(meeting.id, uploadId);
+
+    const existingJob = await this.findExistingUploadJob(upload);
+    if (existingJob) {
+      if (
+        existingJob.status === TranscriptionJobStatus.QUEUED ||
+        existingJob.status === TranscriptionJobStatus.PROCESSING
+      ) {
+        this.startBatchPolling(meeting.id, existingJob.id);
+      }
+      return existingJob;
+    }
+
+    const objectExists = await this.s3AudioService.objectExists(
+      upload.bucket,
+      upload.s3Key,
+    );
+    if (!objectExists) {
+      this.logger.warn('transcription.batch.upload.confirm_missing_object', {
+        meetingId,
+        uploadId,
+        ownerSub,
+        s3Key: upload.s3Key,
+      });
+      throw new BadRequestException(
+        'Uploaded audio file is not available yet. Retry after the upload finishes.',
+      );
+    }
+
+    upload.status = TranscriptionUploadStatus.UPLOADED;
+    upload.confirmedAt = upload.confirmedAt ?? new Date();
+    upload.errorMessage = null;
+    await this.transcriptionUploadRepository.save(upload);
+
+    try {
+      const job = await this.queueBatchJobForMeeting(
+        meeting,
+        upload.mediaUri,
+        meeting.languageCode,
+        ownerSub,
+      );
+      upload.status = TranscriptionUploadStatus.JOB_QUEUED;
+      upload.transcriptionJobId = job.id;
+      upload.jobQueuedAt = new Date();
+      upload.errorMessage = null;
+      await this.transcriptionUploadRepository.save(upload);
+      return job;
+    } catch (error) {
+      upload.status = TranscriptionUploadStatus.FAILED;
+      upload.errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to queue AWS transcription job';
+      await this.transcriptionUploadRepository.save(upload);
+      throw error;
+    }
+  }
+
+  async recoverPendingBatchUpload(
+    meetingId: string,
+    uploadId: string,
+    ownerSub?: string,
+  ): Promise<{ queued: boolean; objectPresent: boolean; jobId?: string }> {
+    const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
+    const upload = await this.loadUploadOrThrow(meeting.id, uploadId);
+
+    const existingJob = await this.findExistingUploadJob(upload);
+    if (existingJob) {
+      if (
+        existingJob.status === TranscriptionJobStatus.QUEUED ||
+        existingJob.status === TranscriptionJobStatus.PROCESSING
+      ) {
+        this.startBatchPolling(meeting.id, existingJob.id);
+      }
+      return { queued: true, objectPresent: true, jobId: existingJob.id };
+    }
+
+    const objectExists = await this.s3AudioService.objectExists(
+      upload.bucket,
+      upload.s3Key,
+    );
+    if (!objectExists) {
+      upload.status = TranscriptionUploadStatus.FAILED;
+      upload.errorMessage =
+        upload.errorMessage ?? 'Uploaded audio file not found during recovery';
+      await this.transcriptionUploadRepository.save(upload);
+      this.logger.warn('transcription.batch.upload.recovery_missing_object', {
+        meetingId,
+        uploadId,
+        ownerSub,
+        s3Key: upload.s3Key,
+      });
+      return { queued: false, objectPresent: false };
+    }
+
+    upload.status = TranscriptionUploadStatus.UPLOADED;
+    upload.confirmedAt = upload.confirmedAt ?? new Date();
+    upload.errorMessage = null;
+    await this.transcriptionUploadRepository.save(upload);
+
+    try {
+      const job = await this.queueBatchJobForMeeting(
+        meeting,
+        upload.mediaUri,
+        meeting.languageCode,
+        ownerSub,
+      );
+      upload.status = TranscriptionUploadStatus.JOB_QUEUED;
+      upload.transcriptionJobId = job.id;
+      upload.jobQueuedAt = new Date();
+      upload.errorMessage = null;
+      await this.transcriptionUploadRepository.save(upload);
+      return { queued: true, objectPresent: true, jobId: job.id };
+    } catch (error) {
+      upload.status = TranscriptionUploadStatus.FAILED;
+      upload.errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to queue AWS transcription job';
+      await this.transcriptionUploadRepository.save(upload);
+      throw error;
+    }
+  }
+
   async queueBatchJob(
     meetingId: string,
     dto: CreateBatchTranscriptionJobDto,
     ownerSub?: string,
   ): Promise<TranscriptionJobEntity> {
-    const meeting = await this.meetingService.findById(meetingId, ownerSub);
+    const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
 
-    if (meeting.transcriptionMode !== MeetingTranscriptionMode.BATCH) {
+    if (!this.s3AudioService.isManagedMediaUri(dto.mediaUri)) {
       throw new BadRequestException(
-        'Batch transcription is only available for meetings in batch mode',
+        'mediaUri must reference a managed audio upload for this service',
       );
     }
 
-    const languageCode = dto.languageCode?.trim() || 'ko-KR';
-    try {
-      const submission = await this.batchTranscriptionProvider.submitBatchJob({
-        meetingId,
-        mediaUri: dto.mediaUri,
-        languageCode,
-      });
-
-      const queuedJob = this.transcriptionJobRepository.create({
-        meetingId,
-        provider: TranscriptionJobProvider.AWS_TRANSCRIBE,
-        providerJobId: submission.providerJobId,
-        status: submission.status,
-        mediaUri: dto.mediaUri,
-        languageCode,
-      });
-      const savedJob = await this.transcriptionJobRepository.save(queuedJob);
-      await this.meetingService.updateProcessingPhase(
-        meetingId,
-        MeetingProcessingPhase.TRANSCRIBING,
-        ownerSub,
-        { status: meeting.status, needsAttention: false },
-      );
-      return savedJob;
-    } catch (error) {
-      const failedJob = this.transcriptionJobRepository.create({
-        meetingId,
-        provider: TranscriptionJobProvider.AWS_TRANSCRIBE,
-        providerJobId: this.buildFallbackProviderJobId(meetingId),
-        status: TranscriptionJobStatus.FAILED,
-        mediaUri: dto.mediaUri,
-        languageCode,
-        errorMessage:
-          error instanceof Error
-            ? error.message
-            : 'Failed to queue AWS transcription job',
-      });
-      await this.transcriptionJobRepository.save(failedJob);
-      await this.meetingService.markNeedsAttention(meetingId, ownerSub);
-
-      throw new BadGatewayException(
-        error instanceof Error
-          ? error.message
-          : 'Failed to queue AWS transcription job',
+    const objectExists =
+      await this.s3AudioService.objectExistsForMediaUri(dto.mediaUri);
+    if (!objectExists) {
+      throw new BadRequestException(
+        'Uploaded audio file is not available yet. Retry after the upload finishes.',
       );
     }
+
+    const job = await this.queueBatchJobForMeeting(
+      meeting,
+      dto.mediaUri,
+      dto.languageCode,
+      ownerSub,
+    );
+
+    const existingUpload = await this.transcriptionUploadRepository.findOne({
+      where: { meetingId: meeting.id, mediaUri: dto.mediaUri },
+      order: { createdAt: 'DESC' },
+    });
+    if (existingUpload) {
+      existingUpload.status = TranscriptionUploadStatus.JOB_QUEUED;
+      existingUpload.transcriptionJobId = job.id;
+      existingUpload.confirmedAt = existingUpload.confirmedAt ?? new Date();
+      existingUpload.jobQueuedAt = new Date();
+      existingUpload.errorMessage = null;
+      await this.transcriptionUploadRepository.save(existingUpload);
+    }
+
+    return job;
   }
 
   /**
@@ -519,5 +685,130 @@ export class TranscriptionService {
 
   private buildFallbackProviderJobId(meetingId: string): string {
     return `aws-transcribe-${meetingId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}-${Date.now().toString(36)}`;
+  }
+
+  private async ensureBatchMeeting(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<MeetingEntity> {
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
+
+    if (meeting.status === MeetingStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Batch transcription can no longer be queued for completed meetings',
+      );
+    }
+
+    if (meeting.transcriptionMode !== MeetingTranscriptionMode.BATCH) {
+      throw new BadRequestException(
+        'Batch transcription is only available for meetings in batch mode',
+      );
+    }
+
+    return meeting;
+  }
+
+  private async loadUploadOrThrow(
+    meetingId: string,
+    uploadId: string,
+  ): Promise<TranscriptionUploadEntity> {
+    const upload = await this.transcriptionUploadRepository.findOne({
+      where: { id: uploadId, meetingId },
+    });
+
+    if (!upload) {
+      throw new BadRequestException('Upload session not found for this meeting');
+    }
+
+    return upload;
+  }
+
+  private async findExistingUploadJob(
+    upload: TranscriptionUploadEntity,
+  ): Promise<TranscriptionJobEntity | null> {
+    if (!upload.transcriptionJobId) {
+      return null;
+    }
+
+    return (
+      (await this.transcriptionJobRepository.findOne({
+        where: { id: upload.transcriptionJobId },
+      })) ?? null
+    );
+  }
+
+  private async queueBatchJobForMeeting(
+    meeting: MeetingEntity,
+    mediaUri: string,
+    requestedLanguageCode?: string | null,
+    ownerSub?: string,
+  ): Promise<TranscriptionJobEntity> {
+    const languageCode = requestedLanguageCode?.trim() || 'ko-KR';
+
+    try {
+      const submission = await this.batchTranscriptionProvider.submitBatchJob({
+        meetingId: meeting.id,
+        mediaUri,
+        languageCode,
+      });
+
+      const queuedJob = this.transcriptionJobRepository.create({
+        meetingId: meeting.id,
+        provider: TranscriptionJobProvider.AWS_TRANSCRIBE,
+        providerJobId: submission.providerJobId,
+        status: submission.status,
+        mediaUri,
+        languageCode,
+      });
+      const savedJob = await this.transcriptionJobRepository.save(queuedJob);
+      await this.meetingService.updateProcessingPhase(
+        meeting.id,
+        MeetingProcessingPhase.TRANSCRIBING,
+        ownerSub,
+        { status: meeting.status, needsAttention: false },
+      );
+      this.startBatchPolling(meeting.id, savedJob.id);
+      return savedJob;
+    } catch (error) {
+      const failedJob = this.transcriptionJobRepository.create({
+        meetingId: meeting.id,
+        provider: TranscriptionJobProvider.AWS_TRANSCRIBE,
+        providerJobId: this.buildFallbackProviderJobId(meeting.id),
+        status: TranscriptionJobStatus.FAILED,
+        mediaUri,
+        languageCode,
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : 'Failed to queue AWS transcription job',
+      });
+      await this.transcriptionJobRepository.save(failedJob);
+      await this.meetingService.markNeedsAttention(meeting.id, ownerSub);
+
+      throw new BadGatewayException(
+        error instanceof Error
+          ? error.message
+          : 'Failed to queue AWS transcription job',
+      );
+    }
+  }
+
+  private startBatchPolling(meetingId: string, jobId: string): void {
+    this.transcriptionResultCollectorService
+      .pollAndCollect(meetingId, jobId)
+      .then((result) => {
+        this.logger.log('transcription.batch.poll.completed', {
+          meetingId,
+          jobId,
+          success: result.success,
+          segmentCount: result.segmentCount,
+        });
+      })
+      .catch((error: Error) => {
+        this.logger.error('transcription.batch.poll.failed', error, {
+          meetingId,
+          jobId,
+        });
+      });
   }
 }
