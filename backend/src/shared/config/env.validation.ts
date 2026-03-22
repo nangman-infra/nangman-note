@@ -9,6 +9,7 @@ export interface AppEnv {
   DB_NAME: string;
   DB_USER: string;
   DB_PASSWORD: string;
+  DB_IAM_AUTH: boolean;
   DB_SSL: boolean;
   DB_SSL_REJECT_UNAUTHORIZED: boolean;
   DB_POOL_MAX: number;
@@ -115,11 +116,7 @@ function readOptionalIntegerInRange(
 
   const value = Number(rawValue);
 
-  if (
-    Number.isInteger(value) &&
-    value >= options.min &&
-    value <= options.max
-  ) {
+  if (Number.isInteger(value) && value >= options.min && value <= options.max) {
     return value;
   }
 
@@ -233,13 +230,17 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     'AUTH_ENABLED',
     typedNodeEnv === 'production',
   );
+  const dbIamAuth =
+    dbEngine === 'postgres' ? readBoolean(config, 'DB_IAM_AUTH', false) : false;
+
   const postgresDefaults =
     typedNodeEnv === 'production'
       ? {
           hostFallback: undefined,
           nameFallback: undefined,
           userFallback: undefined,
-          passwordFallback: undefined,
+          // IAM DB auth 사용 시 비밀번호 불필요
+          passwordFallback: dbIamAuth ? '' : undefined,
         }
       : {
           hostFallback: 'localhost',
@@ -288,6 +289,7 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       dbEngine === 'postgres'
         ? readString(config, 'DB_PASSWORD', postgresDefaults.passwordFallback)
         : '',
+    DB_IAM_AUTH: dbIamAuth,
     DB_SSL:
       dbEngine === 'postgres'
         ? readBoolean(config, 'DB_SSL', typedNodeEnv === 'production')

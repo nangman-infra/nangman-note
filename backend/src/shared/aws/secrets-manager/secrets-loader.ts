@@ -75,13 +75,6 @@ type SecretInjection =
 
 const SECRET_MAPPINGS: SecretMapping[] = [
   {
-    secretIdEnvKey: 'SECRET_DB_PASSWORD_ID',
-    inject: {
-      type: 'json',
-      fields: [{ jsonKey: 'password', envKey: 'DB_PASSWORD' }],
-    },
-  },
-  {
     secretIdEnvKey: 'SECRET_ENCRYPTION_KEY_ID',
     inject: { type: 'plain', envKey: 'ENCRYPTION_KEY' },
   },

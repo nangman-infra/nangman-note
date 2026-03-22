@@ -23,6 +23,8 @@ const dataSourceOptions = buildTypeOrmDataSourceOptions({
   DB_NAME: env.DB_NAME,
   DB_USER: env.DB_USER,
   DB_PASSWORD: env.DB_PASSWORD,
+  DB_IAM_AUTH: env.DB_IAM_AUTH,
+  AWS_REGION: env.AWS_REGION,
   DB_SSL: env.DB_SSL,
   DB_SSL_REJECT_UNAUTHORIZED: env.DB_SSL_REJECT_UNAUTHORIZED,
   DB_POOL_MAX: env.DB_POOL_MAX,

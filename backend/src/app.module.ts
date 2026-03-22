@@ -40,6 +40,8 @@ import { buildTypeOrmModuleOptions } from './shared/config/typeorm-options.facto
           DB_NAME: configService.get('DB_NAME', { infer: true }),
           DB_USER: configService.get('DB_USER', { infer: true }),
           DB_PASSWORD: configService.get('DB_PASSWORD', { infer: true }),
+          DB_IAM_AUTH: configService.get('DB_IAM_AUTH', { infer: true }),
+          AWS_REGION: configService.get('AWS_REGION', { infer: true }),
           DB_SSL: configService.get('DB_SSL', { infer: true }),
           DB_SSL_REJECT_UNAUTHORIZED: configService.get(
             'DB_SSL_REJECT_UNAUTHORIZED',
