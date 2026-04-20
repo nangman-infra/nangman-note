@@ -1,4 +1,4 @@
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultService } from '../../result/application/result.service';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
@@ -16,8 +16,10 @@ describe('TranscriptionResultCollectorService', () => {
     Pick<Repository<TranscriptionJobEntity>, 'findOne' | 'save'>
   >;
   let segmentRepository: jest.Mocked<
-    Pick<Repository<TranscriptSegmentEntity>, 'create' | 'save'>
+    Pick<Repository<TranscriptSegmentEntity>, 'create'>
   >;
+  let dataSource: DataSource;
+  let transactionManager: jest.Mocked<Pick<EntityManager, 'delete' | 'save'>>;
   let batchProvider: jest.Mocked<
     Pick<BatchTranscriptionProvider, 'getJobStatus'>
   >;
@@ -58,8 +60,18 @@ describe('TranscriptionResultCollectorService', () => {
     };
     segmentRepository = {
       create: jest.fn(),
+    };
+    transactionManager = {
+      delete: jest.fn(),
       save: jest.fn(),
     };
+    dataSource = {
+      options: { type: 'sqljs' },
+      transaction: jest.fn(
+        async (task: (entityManager: EntityManager) => Promise<unknown>) =>
+          task(transactionManager as unknown as EntityManager),
+      ),
+    } as unknown as DataSource;
     batchProvider = {
       getJobStatus: jest.fn(),
     };
@@ -94,6 +106,7 @@ describe('TranscriptionResultCollectorService', () => {
       meetingService as unknown as MeetingService,
       resultService as unknown as ResultService,
       s3AudioService as unknown as S3AudioService,
+      dataSource,
     );
   });
 
@@ -104,6 +117,23 @@ describe('TranscriptionResultCollectorService', () => {
 
     expect(result).toEqual({ success: false, segmentCount: 0 });
     expect(batchProvider.getJobStatus.mock.calls).toHaveLength(0);
+  });
+
+  it('skips collection when a job was already collected', async () => {
+    jobRepository.findOne.mockResolvedValue(
+      buildJob({
+        status: TranscriptionJobStatus.COMPLETED,
+        collectedAt: new Date('2026-03-01T00:05:00.000Z'),
+      }),
+    );
+
+    const result = await service.pollAndCollect('meeting-1', 'job-1');
+
+    expect(result).toEqual({ success: true, segmentCount: 0 });
+    expect(batchProvider.getJobStatus).not.toHaveBeenCalled();
+    expect(transactionManager.delete).not.toHaveBeenCalled();
+    expect(transactionManager.save).not.toHaveBeenCalled();
+    expect(s3AudioService.deleteAudioFile).not.toHaveBeenCalled();
   });
 
   it('collects completed batch transcription and finalizes meeting', async () => {
@@ -143,7 +173,7 @@ describe('TranscriptionResultCollectorService', () => {
     segmentRepository.create.mockImplementation(
       (entity) => entity as TranscriptSegmentEntity,
     );
-    segmentRepository.save.mockImplementation((entity) =>
+    transactionManager.save.mockImplementation((_target, entity) =>
       Promise.resolve(entity as TranscriptSegmentEntity),
     );
     meetingService.updateStatus.mockResolvedValue({} as never);
@@ -154,7 +184,11 @@ describe('TranscriptionResultCollectorService', () => {
 
     expect(result).toEqual({ success: true, segmentCount: 2 });
     expect(jobRepository.save.mock.calls.length).toBeGreaterThanOrEqual(1);
-    expect(segmentRepository.save).toHaveBeenCalledTimes(1);
+    expect(transactionManager.delete).toHaveBeenCalledWith(
+      TranscriptSegmentEntity,
+      { meetingId: 'meeting-1' },
+    );
+    expect(transactionManager.save).toHaveBeenCalledTimes(1);
     expect(s3AudioService.deleteAudioFile).toHaveBeenCalledWith(
       'meeting-1/audio.webm',
     );
@@ -253,7 +287,7 @@ describe('TranscriptionResultCollectorService', () => {
     segmentRepository.create.mockImplementation(
       (entity) => entity as TranscriptSegmentEntity,
     );
-    segmentRepository.save.mockImplementation((entity) =>
+    transactionManager.save.mockImplementation((_target, entity) =>
       Promise.resolve(entity as TranscriptSegmentEntity),
     );
     s3AudioService.deleteAudioFile.mockResolvedValue(undefined);
@@ -265,7 +299,11 @@ describe('TranscriptionResultCollectorService', () => {
     );
 
     expect(result).toEqual({ success: true, segmentCount: 1 });
-    expect(segmentRepository.save).toHaveBeenCalledTimes(1);
+    expect(transactionManager.delete).toHaveBeenCalledWith(
+      TranscriptSegmentEntity,
+      { meetingId: 'meeting-1' },
+    );
+    expect(transactionManager.save).toHaveBeenCalledTimes(1);
     expect(meetingService.markNeedsAttention).not.toHaveBeenCalled();
     expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
       'meeting-1',

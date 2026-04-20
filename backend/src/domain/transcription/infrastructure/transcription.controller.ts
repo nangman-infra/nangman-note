@@ -10,8 +10,19 @@ import {
 } from '@nestjs/common';
 import { CreateBatchTranscriptionJobDto } from '../application/dto/create-batch-transcription-job.dto';
 import { TranscriptionService } from '../application/transcription.service';
+import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
 import type { AuthUser } from '../../../shared/auth/auth-user.interface';
+
+interface TranscriptionJobResponse {
+  id: string;
+  meetingId: string;
+  provider: string;
+  status: string;
+  languageCode: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 @Controller('api/v1/meetings/:meetingId/transcripts')
 export class TranscriptionController {
@@ -47,7 +58,7 @@ export class TranscriptionController {
       meetingId,
       user?.sub,
     );
-    return { jobs };
+    return { jobs: jobs.map((job) => this.toJobResponse(job)) };
   }
 
   @Post('jobs')
@@ -62,7 +73,7 @@ export class TranscriptionController {
       dto,
       user?.sub,
     );
-    return { job };
+    return { job: this.toJobResponse(job) };
   }
 
   @Post('uploads/:uploadId/confirm')
@@ -77,6 +88,18 @@ export class TranscriptionController {
       uploadId,
       user?.sub,
     );
-    return { job };
+    return { job: this.toJobResponse(job) };
+  }
+
+  private toJobResponse(job: TranscriptionJobEntity): TranscriptionJobResponse {
+    return {
+      id: job.id,
+      meetingId: job.meetingId,
+      provider: job.provider,
+      status: job.status,
+      languageCode: job.languageCode,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    };
   }
 }

@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { chromium } from 'playwright-core';
+import type { AppEnv } from '../../../shared/config/env.validation';
 import { PlaywrightPdfRenderer } from './playwright-pdf-renderer';
 
 jest.mock('playwright-core', () => ({
@@ -9,22 +10,24 @@ jest.mock('playwright-core', () => ({
 }));
 
 describe('PlaywrightPdfRenderer', () => {
-  const launchMock = chromium.launch as jest.MockedFunction<typeof chromium.launch>;
-  let configService: jest.Mocked<Pick<ConfigService, 'get'>>;
+  const launchMock = chromium.launch as jest.MockedFunction<
+    typeof chromium.launch
+  >;
+  let configGet: jest.Mock;
+  let configService: ConfigService<AppEnv, true>;
   let renderer: PlaywrightPdfRenderer;
   beforeEach(() => {
     jest.clearAllMocks();
+    configGet = jest.fn((key: string) => {
+      if (key === 'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS') {
+        return 2;
+      }
+      return '/bin/echo';
+    });
     configService = {
-      get: jest.fn((key: string) => {
-        if (key === 'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS') {
-          return 2;
-        }
-        return '/bin/echo';
-      }),
-    };
-    renderer = new PlaywrightPdfRenderer(
-      configService as unknown as ConfigService,
-    );
+      get: configGet,
+    } as unknown as ConfigService<AppEnv, true>;
+    renderer = new PlaywrightPdfRenderer(configService);
   });
 
   it('reuses one browser across multiple renders and closes contexts per render', async () => {
@@ -76,7 +79,9 @@ describe('PlaywrightPdfRenderer', () => {
     expect(first.toString('utf-8')).toBe('pdf-a');
     expect(second.toString('utf-8')).toBe('pdf-b');
     expect(launchMock).toHaveBeenCalledTimes(1);
-    expect(launchMock.mock.calls[0]?.[0].args).not.toContain('--single-process');
+    expect(launchMock.mock.calls[0]?.[0]?.args ?? []).not.toContain(
+      '--single-process',
+    );
     expect(browser.newContext).toHaveBeenCalledTimes(2);
     expect(contextA.close).toHaveBeenCalledTimes(1);
     expect(contextB.close).toHaveBeenCalledTimes(1);
@@ -89,7 +94,11 @@ describe('PlaywrightPdfRenderer', () => {
 
   it('aborts external requests while keeping inline resources available', async () => {
     let capturedHandler:
-      | ((route: { request: () => { url: () => string }; continue: () => unknown; abort: () => unknown }) => unknown)
+      | ((route: {
+          request: () => { url: () => string };
+          continue: () => unknown;
+          abort: () => unknown;
+        }) => unknown)
       | undefined;
     const page = {
       route: jest.fn().mockImplementation((_pattern, handler) => {
@@ -143,7 +152,7 @@ describe('PlaywrightPdfRenderer', () => {
   });
 
   it('computes dynamic concurrency from cpu and memory when env override is missing', () => {
-    configService.get.mockImplementation((key: string) => {
+    configGet.mockImplementation((key: string) => {
       if (key === 'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS') {
         return null;
       }
@@ -155,9 +164,7 @@ describe('PlaywrightPdfRenderer', () => {
       getAvailableMemoryBytes: () => number;
       getMaxConcurrentRenders: () => number;
     };
-    jest
-      .spyOn(privateRenderer, 'getAvailableParallelism')
-      .mockReturnValue(8);
+    jest.spyOn(privateRenderer, 'getAvailableParallelism').mockReturnValue(8);
     jest
       .spyOn(privateRenderer, 'getConstrainedMemoryBytes')
       .mockReturnValue(2 * 512 * 1024 * 1024);

@@ -80,6 +80,28 @@ describe('validateEnv', () => {
     ).toThrow('Environment variable AUTH_ENABLED must be true in production.');
   });
 
+  it('throws when production CORS origin includes a wildcard', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        PORT: '9999',
+        ENCRYPTION_KEY:
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        DB_HOST: 'db.example.local',
+        DB_PORT: '5432',
+        DB_NAME: 'nangman_note',
+        DB_USER: 'app_user',
+        DB_PASSWORD: 'secure-password',
+        DB_SSL: 'true',
+        CORS_ORIGIN: 'https://app.example.com,*',
+        AUTH_OIDC_ISSUER: 'https://auth.example.com/application/o/transnote/',
+        AUTH_OIDC_AUDIENCE: 'transnote-api',
+      }),
+    ).toThrow(
+      'Environment variable CORS_ORIGIN must not include * in production.',
+    );
+  });
+
   it('throws when production DB_ENGINE is not postgres', () => {
     expect(() =>
       validateEnv({

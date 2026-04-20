@@ -34,7 +34,7 @@ describe('DocumentOutputController', () => {
       'meeting-1',
       'pdf',
       response as Response,
-      { sub: 'user-1' },
+      { sub: 'user-1', scope: [], raw: { sub: 'user-1' } },
     );
 
     expect(documentOutputService.exportResult).toHaveBeenCalledWith(

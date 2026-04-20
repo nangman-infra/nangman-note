@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   TranscribeStreamingClient,
@@ -121,7 +121,7 @@ class AudioChunkQueue {
 
 @Injectable()
 export class AwsStreamingTranscriptionProvider
-  implements StreamingTranscriptionProvider, OnModuleInit
+  implements StreamingTranscriptionProvider, OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new StructuredLogger(
     AwsStreamingTranscriptionProvider.name,
@@ -146,10 +146,17 @@ export class AwsStreamingTranscriptionProvider
   onModuleInit(): void {
     void this.awsClientFactory.warmCredentials().catch((error: unknown) => {
       this.logger.warn('transcription.streaming.credentials_warm_failed', {
-        errorMessage:
-          error instanceof Error ? error.message : String(error),
+        errorMessage: error instanceof Error ? error.message : String(error),
       });
     });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    const activeMeetingIds = [...this.sessions.keys()];
+    await Promise.all(
+      activeMeetingIds.map((meetingId) => this.stopSession(meetingId)),
+    );
+    this.client.destroy();
   }
 
   async startSession(options: StreamingSessionOptions): Promise<void> {

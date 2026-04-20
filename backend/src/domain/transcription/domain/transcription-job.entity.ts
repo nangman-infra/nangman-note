@@ -6,10 +6,16 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  type ColumnType,
 } from 'typeorm';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { TranscriptionJobProvider } from './transcription-job-provider.enum';
 import { TranscriptionJobStatus } from './transcription-job-status.enum';
+
+const nullableDateColumnType: ColumnType =
+  process.env.DB_ENGINE === 'postgres' || process.env.NODE_ENV === 'production'
+    ? 'timestamp'
+    : 'datetime';
 
 @Entity('transcription_job')
 export class TranscriptionJobEntity {
@@ -56,7 +62,14 @@ export class TranscriptionJobEntity {
   transcriptUri?: string;
 
   @Column({ name: 'error_message', type: 'text', nullable: true })
-  errorMessage?: string;
+  errorMessage?: string | null;
+
+  @Column({
+    name: 'collected_at',
+    type: nullableDateColumnType,
+    nullable: true,
+  })
+  collectedAt?: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

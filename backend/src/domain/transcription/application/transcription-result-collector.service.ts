@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import {
   BATCH_TRANSCRIPTION_PROVIDER,
   type BatchTranscriptionProvider,
@@ -23,6 +23,7 @@ import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const POLL_INTERVAL_MS = 5_000; // 5초
 const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10분
+const JOB_COLLECTION_LOCK_PREFIX = 'transcription-job-collection';
 
 interface TranscribeResultItem {
   start_time?: string;
@@ -73,6 +74,7 @@ export class TranscriptionResultCollectorService {
     private readonly meetingService: MeetingService,
     private readonly resultService: ResultService,
     private readonly s3AudioService: S3AudioService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -101,11 +103,23 @@ export class TranscriptionResultCollectorService {
       async () => {
         const job = await this.jobRepository.findOne({ where: { id: jobId } });
         if (!job) {
-          this.logger.error('transcription.batch.job.missing', new Error('Transcription job not found'), {
+          this.logger.error(
+            'transcription.batch.job.missing',
+            new Error('Transcription job not found'),
+            {
+              meetingId,
+              jobId,
+            },
+          );
+          return { success: false, segmentCount: 0 };
+        }
+
+        if (job.collectedAt) {
+          this.logger.log('transcription.batch.job.collection_already_done', {
             meetingId,
             jobId,
           });
-          return { success: false, segmentCount: 0 };
+          return { success: true, segmentCount: 0 };
         }
 
         const startTime = Date.now();
@@ -132,13 +146,11 @@ export class TranscriptionResultCollectorService {
                 providerJobId: job.providerJobId,
               });
 
-              const segmentCount = await this.parseAndSaveResults(
-                meetingId,
+              const segmentCount = await this.collectCompletedJob(
+                job.id,
                 result.transcriptUri,
+                meetingOwnerSub,
               );
-
-              await this.deleteAudioFile(job.mediaUri);
-              this.emitGeneratingPhase(meetingId, meetingOwnerSub);
 
               return { success: true, segmentCount };
             }
@@ -146,7 +158,9 @@ export class TranscriptionResultCollectorService {
             if (result.status === TranscriptionJobStatus.FAILED) {
               this.logger.error(
                 'transcription.batch.job.failed',
-                new Error(result.errorMessage ?? 'Batch transcription job failed'),
+                new Error(
+                  result.errorMessage ?? 'Batch transcription job failed',
+                ),
                 {
                   meetingId,
                   jobId,
@@ -261,12 +275,11 @@ export class TranscriptionResultCollectorService {
               jobId,
               providerJobId: job.providerJobId,
             });
-            const segmentCount = await this.parseAndSaveResults(
-              meetingId,
+            const segmentCount = await this.collectCompletedJob(
+              job.id,
               result.transcriptUri,
+              ownerSub,
             );
-            await this.deleteAudioFile(job.mediaUri);
-            await this.emitGeneratingPhase(meetingId, ownerSub);
             return { success: true, segmentCount };
           }
 
@@ -338,13 +351,7 @@ export class TranscriptionResultCollectorService {
       const speakerLookup = this.buildSpeakerLookup(parsedUnknown);
       const segments = this.itemsToSegments(meetingId, items, speakerLookup);
 
-      if (segments.length > 0) {
-        await this.segmentRepository.save(segments);
-        this.logger.log('transcription.segment.saved', {
-          meetingId,
-          segmentCount: segments.length,
-        });
-      }
+      await this.replaceMeetingSegments(meetingId, segments);
 
       return segments.length;
     } catch (error) {
@@ -354,6 +361,89 @@ export class TranscriptionResultCollectorService {
       });
       return 0;
     }
+  }
+
+  private async collectCompletedJob(
+    jobId: string,
+    transcriptUri: string | undefined,
+    ownerSub?: string,
+  ): Promise<number> {
+    return this.withJobCollectionLock(jobId, async () => {
+      const job = await this.jobRepository.findOne({ where: { id: jobId } });
+      if (!job) {
+        this.logger.warn('transcription.batch.job.collection_missing_record', {
+          jobId,
+        });
+        return 0;
+      }
+
+      if (job.collectedAt) {
+        this.logger.log('transcription.batch.job.collection_skipped', {
+          meetingId: job.meetingId,
+          jobId,
+        });
+        return 0;
+      }
+
+      const effectiveTranscriptUri = transcriptUri ?? job.transcriptUri;
+      const segmentCount = await this.parseAndSaveResults(
+        job.meetingId,
+        effectiveTranscriptUri,
+      );
+
+      job.status = TranscriptionJobStatus.COMPLETED;
+      if (effectiveTranscriptUri) {
+        job.transcriptUri = effectiveTranscriptUri;
+      }
+      job.errorMessage = null;
+      job.collectedAt = new Date();
+      await this.jobRepository.save(job);
+
+      await this.deleteAudioFile(job.mediaUri);
+      await this.emitGeneratingPhase(job.meetingId, ownerSub);
+
+      return segmentCount;
+    });
+  }
+
+  private async withJobCollectionLock<T>(
+    jobId: string,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    if (this.dataSource.options.type !== 'postgres') {
+      return task();
+    }
+
+    const lockKey = `${JOB_COLLECTION_LOCK_PREFIX}:${jobId}`;
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.query('SELECT pg_advisory_lock(hashtext($1))', [lockKey]);
+
+    try {
+      return await task();
+    } finally {
+      await queryRunner.query('SELECT pg_advisory_unlock(hashtext($1))', [
+        lockKey,
+      ]);
+      await queryRunner.release();
+    }
+  }
+
+  private async replaceMeetingSegments(
+    meetingId: string,
+    segments: TranscriptSegmentEntity[],
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(TranscriptSegmentEntity, { meetingId });
+      if (segments.length > 0) {
+        await manager.save(TranscriptSegmentEntity, segments);
+      }
+    });
+
+    this.logger.log('transcription.segment.replaced', {
+      meetingId,
+      segmentCount: segments.length,
+    });
   }
 
   /**
@@ -571,8 +661,7 @@ export class TranscriptionResultCollectorService {
     } catch (error) {
       this.logger.warn('transcription.audio.delete_failed', {
         mediaUri,
-        errorMessage:
-          error instanceof Error ? error.message : 'Unknown error',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -596,8 +685,7 @@ export class TranscriptionResultCollectorService {
     } catch (error) {
       this.logger.warn('meeting.status.complete_failed', {
         meetingId,
-        errorMessage:
-          error instanceof Error ? error.message : 'Unknown error',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -611,8 +699,7 @@ export class TranscriptionResultCollectorService {
     } catch (error) {
       this.logger.warn('result.auto_generate_failed', {
         meetingId,
-        errorMessage:
-          error instanceof Error ? error.message : 'Unknown error',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }

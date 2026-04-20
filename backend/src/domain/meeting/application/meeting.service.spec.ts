@@ -256,6 +256,7 @@ describe('MeetingService', () => {
             transcriptContent: '',
             status: MeetingStatus.COMPLETED,
             transcriptionMode: MeetingTranscriptionMode.BATCH,
+            needsAttention: false,
             startedAt: new Date('2026-03-01T00:00:00.000Z'),
           },
         ],

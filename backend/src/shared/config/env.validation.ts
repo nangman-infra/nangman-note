@@ -260,6 +260,21 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     );
   }
 
+  const corsOrigin = readString(
+    config,
+    'CORS_ORIGIN',
+    'http://localhost:3000,http://127.0.0.1:3000',
+  );
+  const corsOrigins = corsOrigin
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (typedNodeEnv === 'production' && corsOrigins.includes('*')) {
+    throw new Error(
+      'Environment variable CORS_ORIGIN must not include * in production.',
+    );
+  }
+
   const authIssuer = authEnabled
     ? readString(config, 'AUTH_OIDC_ISSUER')
     : readString(config, 'AUTH_OIDC_ISSUER', '');
@@ -414,10 +429,6 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       },
     ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
-    CORS_ORIGIN: readString(
-      config,
-      'CORS_ORIGIN',
-      'http://localhost:3000,http://127.0.0.1:3000',
-    ),
+    CORS_ORIGIN: corsOrigin,
   };
 }
