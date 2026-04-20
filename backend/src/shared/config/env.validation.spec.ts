@@ -31,13 +31,53 @@ describe('validateEnv', () => {
     });
 
     expect(env.DB_ENGINE).toBe('postgres');
-    expect(env.DB_MIGRATIONS_RUN).toBe(true);
+    expect(env.DB_MIGRATIONS_RUN).toBe(false);
     expect(env.DB_SSL_REJECT_UNAUTHORIZED).toBe(true);
     expect(env.DB_POOL_MAX).toBe(10);
     expect(env.DB_CONNECTION_TIMEOUT_MS).toBe(5000);
     expect(env.DB_IDLE_TIMEOUT_MS).toBe(30000);
     expect(env.DB_STATEMENT_TIMEOUT_MS).toBe(15000);
     expect(env.AUTH_ENABLED).toBe(true);
+  });
+
+  it('allows explicit production migration auto-run when configured', () => {
+    const env = validateEnv({
+      NODE_ENV: 'production',
+      PORT: '9999',
+      ENCRYPTION_KEY:
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      DB_HOST: 'db.example.local',
+      DB_PORT: '5432',
+      DB_NAME: 'nangman_note',
+      DB_USER: 'app_user',
+      DB_PASSWORD: 'secure-password',
+      DB_SSL: 'true',
+      DB_MIGRATIONS_RUN: 'true',
+      AUTH_OIDC_ISSUER: 'https://auth.example.com/application/o/transnote/',
+      AUTH_OIDC_AUDIENCE: 'transnote-api',
+    });
+
+    expect(env.DB_MIGRATIONS_RUN).toBe(true);
+  });
+
+  it('throws when production auth is explicitly disabled', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        PORT: '9999',
+        ENCRYPTION_KEY:
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        DB_HOST: 'db.example.local',
+        DB_PORT: '5432',
+        DB_NAME: 'nangman_note',
+        DB_USER: 'app_user',
+        DB_PASSWORD: 'secure-password',
+        DB_SSL: 'true',
+        AUTH_ENABLED: 'false',
+        AUTH_OIDC_ISSUER: 'https://auth.example.com/application/o/transnote/',
+        AUTH_OIDC_AUDIENCE: 'transnote-api',
+      }),
+    ).toThrow('Environment variable AUTH_ENABLED must be true in production.');
   });
 
   it('throws when production DB_ENGINE is not postgres', () => {

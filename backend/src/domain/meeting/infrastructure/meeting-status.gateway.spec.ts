@@ -76,8 +76,11 @@ describe('MeetingStatusGateway', () => {
 
   it('rejects query token when auth is enabled', async () => {
     tokenVerifier.isAuthEnabled.mockReturnValue(true);
-    const socket = createSocket('meeting-1');
-    socket.handshake.query = { meetingId: 'meeting-1', token: 'query-token' };
+    const socket = createSocket('11111111-1111-4111-8111-111111111111');
+    socket.handshake.query = {
+      meetingId: '11111111-1111-4111-8111-111111111111',
+      token: 'query-token',
+    };
 
     await gateway.handleConnection(socket as unknown as Socket);
 
@@ -95,20 +98,23 @@ describe('MeetingStatusGateway', () => {
       },
     } as AuthUser);
 
-    const socket = createSocket('meeting-1');
+    const socket = createSocket('11111111-1111-4111-8111-111111111111');
     socket.handshake.auth = { token: 'auth-token' };
 
     await gateway.handleConnection(socket as unknown as Socket);
 
     expect(tokenVerifier.verifyAccessToken).toHaveBeenCalledWith('auth-token');
-    expect(meetingService.findById).toHaveBeenCalledWith('meeting-1', 'user-1');
+    expect(meetingService.findById).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      'user-1',
+    );
     expect(socket.join).toHaveBeenNthCalledWith(
       1,
       'meeting-status:user:user-1',
     );
     expect(socket.join).toHaveBeenNthCalledWith(
       2,
-      'meeting-status:meeting:meeting-1',
+      'meeting-status:meeting:11111111-1111-4111-8111-111111111111',
     );
     expect(socket.disconnect).not.toHaveBeenCalled();
 
@@ -117,12 +123,18 @@ describe('MeetingStatusGateway', () => {
 
   it('broadcasts result regenerate events to the meeting room', () => {
     gateway.handleResultRegenerate(
-      new ResultRegenerateEvent('meeting-1', 'completed', 'user-1'),
+      new ResultRegenerateEvent(
+        '11111111-1111-4111-8111-111111111111',
+        'completed',
+        'user-1',
+      ),
     );
 
-    expect(serverTo).toHaveBeenCalledWith('meeting-status:meeting:meeting-1');
+    expect(serverTo).toHaveBeenCalledWith(
+      'meeting-status:meeting:11111111-1111-4111-8111-111111111111',
+    );
     expect(serverEmit).toHaveBeenCalledWith('result:regenerate', {
-      meetingId: 'meeting-1',
+      meetingId: '11111111-1111-4111-8111-111111111111',
       phase: 'completed',
       errorMessage: undefined,
     });

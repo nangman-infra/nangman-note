@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
 } from '@nestjs/common';
@@ -25,7 +26,7 @@ export class ResultController {
 
   @Get()
   async getByMeetingId(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
     const result = await this.resultService.findByMeetingId(
@@ -37,7 +38,7 @@ export class ResultController {
 
   @Patch()
   async update(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @Body() dto: UpdateResultDto,
     @CurrentUser() user?: AuthUser,
   ) {
@@ -48,7 +49,7 @@ export class ResultController {
   @Post('regenerate')
   @HttpCode(HttpStatus.ACCEPTED)
   async regenerate(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @Body() dto: RegenerateResultDto,
     @CurrentUser() user?: AuthUser,
   ) {

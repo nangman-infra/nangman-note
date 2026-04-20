@@ -24,6 +24,10 @@ interface ApiErrorResponse {
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new StructuredLogger(AllExceptionsFilter.name);
 
+  constructor(
+    private readonly nodeEnv: string = process.env.NODE_ENV ?? 'development',
+  ) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -34,7 +38,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message = this.resolveMessage(exception);
+    const message = this.resolveMessage(exception, statusCode);
     updateRequestContext({
       method: request.method,
       path: request.originalUrl || request.url,
@@ -58,7 +62,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(statusCode).json(payload);
   }
 
-  private resolveMessage(exception: unknown): string {
+  private resolveMessage(exception: unknown, statusCode: number): string {
+    if (this.nodeEnv === 'production' && statusCode >= 500) {
+      return 'Internal server error';
+    }
+
     if (exception instanceof HttpException) {
       const response = exception.getResponse();
 
@@ -83,6 +91,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
 
       return exception.message;
+    }
+
+    if (this.nodeEnv === 'production' || statusCode >= 500) {
+      return 'Internal server error';
     }
 
     if (exception instanceof Error) {

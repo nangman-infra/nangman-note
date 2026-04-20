@@ -220,11 +220,7 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
       : typedNodeEnv === 'production'
         ? './data/prod.db'
         : './data/dev.db';
-  const dbMigrationsRun = readBoolean(
-    config,
-    'DB_MIGRATIONS_RUN',
-    dbEngine === 'postgres',
-  );
+  const dbMigrationsRun = readBoolean(config, 'DB_MIGRATIONS_RUN', false);
   const authEnabled = readBoolean(
     config,
     'AUTH_ENABLED',
@@ -255,6 +251,12 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
   ) {
     throw new Error(
       'Environment variable ENCRYPTION_KEY must be a secure 64-character hex value in production.',
+    );
+  }
+
+  if (typedNodeEnv === 'production' && !authEnabled) {
+    throw new Error(
+      'Environment variable AUTH_ENABLED must be true in production.',
     );
   }
 

@@ -13,6 +13,8 @@ interface ApiSuccessResponse<T> {
   data: T;
 }
 
+const INTERNAL_RESPONSE_KEYS = new Set(['ownerSub']);
+
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<
   T,
@@ -31,7 +33,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<
 
           return {
             success: true,
-            data: (data ?? null) as T,
+            data: this.sanitizeResponseData(data ?? null) as T,
           };
         }),
       );
@@ -51,9 +53,37 @@ export class ResponseInterceptor<T> implements NestInterceptor<
 
         return {
           success: true,
-          data: (data ?? null) as T,
+          data: this.sanitizeResponseData(data ?? null) as T,
         };
       }),
+    );
+  }
+
+  private sanitizeResponseData(value: unknown): unknown {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (
+      value instanceof Date ||
+      value instanceof StreamableFile ||
+      Buffer.isBuffer(value)
+    ) {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeResponseData(item));
+    }
+
+    if (typeof value !== 'object') {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => !INTERNAL_RESPONSE_KEYS.has(key))
+        .map(([key, entry]) => [key, this.sanitizeResponseData(entry)]),
     );
   }
 }

@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Put,
+} from '@nestjs/common';
 import { UpsertNoteDto } from '../application/dto/upsert-note.dto';
 import { NoteService } from '../application/note.service';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
@@ -10,7 +17,7 @@ export class NoteController {
 
   @Get()
   async getByMeetingId(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
     return this.noteService.findByMeetingId(meetingId, user?.sub);
@@ -18,7 +25,7 @@ export class NoteController {
 
   @Put()
   async upsert(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @Body() dto: UpsertNoteDto,
     @CurrentUser() user?: AuthUser,
   ) {

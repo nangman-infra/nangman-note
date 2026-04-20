@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { applyE2eAppConfig } from './apply-e2e-app-config';
 
 describe('Meeting Trash Flow (e2e)', () => {
   let app: INestApplication<App>;
@@ -17,6 +18,7 @@ describe('Meeting Trash Flow (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    applyE2eAppConfig(app);
     await app.init();
   });
 
@@ -34,7 +36,7 @@ describe('Meeting Trash Flow (e2e)', () => {
       })
       .expect(201);
 
-    const meetingId = (createRes.body as { id: string }).id;
+    const meetingId = (createRes.body as { data: { id: string } }).data.id;
 
     await request(app.getHttpServer())
       .delete(`/api/v1/meetings/${meetingId}`)
@@ -47,8 +49,9 @@ describe('Meeting Trash Flow (e2e)', () => {
     const trashRes = await request(app.getHttpServer())
       .get('/api/v1/meetings/trash')
       .expect(200);
-    const trashMeetings = (trashRes.body as { meetings: Array<{ id: string }> })
-      .meetings;
+    const trashMeetings = (
+      trashRes.body as { data: { meetings: Array<{ id: string }> } }
+    ).data.meetings;
     expect(trashMeetings.map((meeting) => meeting.id)).toContain(meetingId);
 
     await request(app.getHttpServer())

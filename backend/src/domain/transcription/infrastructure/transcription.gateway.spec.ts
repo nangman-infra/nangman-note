@@ -106,7 +106,7 @@ describe('TranscriptionGateway', () => {
 
   it('rejects oversized chunks with retry hint', async () => {
     const response = await gateway.handleAudio(
-      createSocket('meeting-1') as unknown as Socket,
+      createSocket('11111111-1111-4111-8111-111111111111') as unknown as Socket,
       Buffer.alloc(8192, 1),
     );
 
@@ -119,7 +119,7 @@ describe('TranscriptionGateway', () => {
     transcriptionService.feedRealtimeAudio.mockReturnValue(false);
 
     const response = await gateway.handleAudio(
-      createSocket('meeting-1') as unknown as Socket,
+      createSocket('11111111-1111-4111-8111-111111111111') as unknown as Socket,
       Buffer.from([1, 2, 3]),
     );
 
@@ -135,7 +135,7 @@ describe('TranscriptionGateway', () => {
     transcriptionService.isRealtimeSessionReady.mockReturnValue(false);
 
     const response = await gateway.handleAudio(
-      createSocket('meeting-1') as unknown as Socket,
+      createSocket('11111111-1111-4111-8111-111111111111') as unknown as Socket,
       Buffer.from([1, 2, 3]),
     );
 
@@ -152,7 +152,7 @@ describe('TranscriptionGateway', () => {
     transcriptionService.switchMeetingToBatchFallback.mockResolvedValue(true);
 
     const response = await gateway.handleAudio(
-      createSocket('meeting-1') as unknown as Socket,
+      createSocket('11111111-1111-4111-8111-111111111111') as unknown as Socket,
       Buffer.from([1, 2, 3]),
     );
 
@@ -163,9 +163,11 @@ describe('TranscriptionGateway', () => {
       mode: 'batch',
       retryAfterMs: 200,
     });
-    expect(serverTo).toHaveBeenCalledWith('meeting-1');
+    expect(serverTo).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+    );
     expect(serverEmit).toHaveBeenCalledWith('transcript:fallback', {
-      meetingId: 'meeting-1',
+      meetingId: '11111111-1111-4111-8111-111111111111',
       mode: 'batch',
       reason: 'realtime-capacity-exceeded',
     });
@@ -176,26 +178,29 @@ describe('TranscriptionGateway', () => {
     transcriptionService.getActiveRealtimeSessionCount.mockReturnValue(1);
 
     const response = await gateway.handleAudio(
-      createSocket('meeting-1') as unknown as Socket,
+      createSocket('11111111-1111-4111-8111-111111111111') as unknown as Socket,
       Buffer.from([1, 2, 3]),
     );
 
     expect(response).toEqual({ ok: true });
     expect(transcriptionService.startRealtimeSession).toHaveBeenCalledTimes(1);
     expect(transcriptionService.feedRealtimeAudio).toHaveBeenCalledWith(
-      'meeting-1',
+      '11111111-1111-4111-8111-111111111111',
       expect.any(Buffer),
     );
     expect(serverEmit).toHaveBeenCalledWith('connected', {
-      meetingId: 'meeting-1',
+      meetingId: '11111111-1111-4111-8111-111111111111',
       hasActiveSession: true,
     });
   });
 
   it('rejects query token when auth is enabled', async () => {
     tokenVerifier.isAuthEnabled.mockReturnValue(true);
-    const socket = createSocket('meeting-1');
-    socket.handshake.query = { meetingId: 'meeting-1', token: 'query-token' };
+    const socket = createSocket('11111111-1111-4111-8111-111111111111');
+    socket.handshake.query = {
+      meetingId: '11111111-1111-4111-8111-111111111111',
+      token: 'query-token',
+    };
 
     await gateway.handleConnection(socket as unknown as Socket);
 
@@ -213,39 +218,44 @@ describe('TranscriptionGateway', () => {
       },
     } as AuthUser);
 
-    const socket = createSocket('meeting-1');
+    const socket = createSocket('11111111-1111-4111-8111-111111111111');
     socket.handshake.auth = { token: 'auth-token' };
 
     await gateway.handleConnection(socket as unknown as Socket);
 
     expect(tokenVerifier.verifyAccessToken).toHaveBeenCalledWith('auth-token');
-    expect(meetingService.findById).toHaveBeenCalledWith('meeting-1', 'user-1');
-    expect(socket.join).toHaveBeenCalledWith('meeting-1');
+    expect(meetingService.findById).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      'user-1',
+    );
+    expect(socket.join).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+    );
     expect(socket.disconnect).not.toHaveBeenCalled();
   });
 
   it('stops active realtime session and clears in-memory offset on explicit stop', async () => {
     const response = await gateway.handleStopSession(
-      createSocket('meeting-1') as unknown as Socket,
+      createSocket('11111111-1111-4111-8111-111111111111') as unknown as Socket,
     );
 
     expect(response).toEqual({ ok: true });
     expect(meetingService.findById).toHaveBeenCalledWith(
-      'meeting-1',
+      '11111111-1111-4111-8111-111111111111',
       undefined,
     );
     expect(transcriptionService.stopRealtimeSession).toHaveBeenCalledWith(
-      'meeting-1',
+      '11111111-1111-4111-8111-111111111111',
     );
     expect(transcriptionService.clearRealtimeTimeOffset).toHaveBeenCalledWith(
-      'meeting-1',
+      '11111111-1111-4111-8111-111111111111',
     );
     expect(serverEmit).toHaveBeenCalledWith('connected', {
-      meetingId: 'meeting-1',
+      meetingId: '11111111-1111-4111-8111-111111111111',
       hasActiveSession: false,
     });
     expect(serverEmit).toHaveBeenCalledWith('transcript:session-ended', {
-      meetingId: 'meeting-1',
+      meetingId: '11111111-1111-4111-8111-111111111111',
     });
   });
 
@@ -253,13 +263,13 @@ describe('TranscriptionGateway', () => {
     transcriptionService.hasActiveRealtimeSession.mockReturnValue(false);
 
     const response = await gateway.handleStopSession(
-      createSocket('meeting-1') as unknown as Socket,
+      createSocket('11111111-1111-4111-8111-111111111111') as unknown as Socket,
     );
 
     expect(response).toEqual({ ok: true });
     expect(transcriptionService.stopRealtimeSession).not.toHaveBeenCalled();
     expect(transcriptionService.clearRealtimeTimeOffset).toHaveBeenCalledWith(
-      'meeting-1',
+      '11111111-1111-4111-8111-111111111111',
     );
   });
 });

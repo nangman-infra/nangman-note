@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
 import { CreateBatchTranscriptionJobDto } from '../application/dto/create-batch-transcription-job.dto';
@@ -19,7 +20,7 @@ export class TranscriptionController {
   @Post('upload-url')
   @HttpCode(HttpStatus.OK)
   async generateUploadUrl(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
     return this.transcriptionService.issueBatchUpload(meetingId, user?.sub);
@@ -27,7 +28,7 @@ export class TranscriptionController {
 
   @Get()
   async list(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
     const segments = await this.transcriptionService.listByMeetingId(
@@ -39,7 +40,7 @@ export class TranscriptionController {
 
   @Get('jobs')
   async listJobs(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @CurrentUser() user?: AuthUser,
   ) {
     const jobs = await this.transcriptionService.listBatchJobsByMeetingId(
@@ -52,19 +53,23 @@ export class TranscriptionController {
   @Post('jobs')
   @HttpCode(HttpStatus.ACCEPTED)
   async queueBatchJob(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @Body() dto: CreateBatchTranscriptionJobDto,
     @CurrentUser() user?: AuthUser,
   ) {
-    const job = await this.transcriptionService.queueBatchJob(meetingId, dto, user?.sub);
+    const job = await this.transcriptionService.queueBatchJob(
+      meetingId,
+      dto,
+      user?.sub,
+    );
     return { job };
   }
 
   @Post('uploads/:uploadId/confirm')
   @HttpCode(HttpStatus.ACCEPTED)
   async confirmBatchUpload(
-    @Param('meetingId') meetingId: string,
-    @Param('uploadId') uploadId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
+    @Param('uploadId', ParseUUIDPipe) uploadId: string,
     @CurrentUser() user?: AuthUser,
   ) {
     const job = await this.transcriptionService.confirmBatchUpload(

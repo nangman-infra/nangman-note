@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Query,
   Res,
   StreamableFile,
@@ -13,13 +14,11 @@ import { DocumentOutputService } from '../application/document-output.service';
 
 @Controller('api/v1/meetings/:meetingId/result')
 export class DocumentOutputController {
-  constructor(
-    private readonly documentOutputService: DocumentOutputService,
-  ) {}
+  constructor(private readonly documentOutputService: DocumentOutputService) {}
 
   @Get('export')
   async export(
-    @Param('meetingId') meetingId: string,
+    @Param('meetingId', ParseUUIDPipe) meetingId: string,
     @Query('format') format: string | undefined,
     @Res({ passthrough: true }) response: Response,
     @CurrentUser() user?: AuthUser,
@@ -39,4 +38,3 @@ export class DocumentOutputController {
     return new StreamableFile(exported.buffer);
   }
 }
-

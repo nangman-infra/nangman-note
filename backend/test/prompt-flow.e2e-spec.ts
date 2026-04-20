@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { applyE2eAppConfig } from './apply-e2e-app-config';
 
 describe('Prompt Flow (e2e)', () => {
   let app: INestApplication<App>;
@@ -17,6 +18,7 @@ describe('Prompt Flow (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    applyE2eAppConfig(app);
     await app.init();
   });
 
@@ -30,10 +32,14 @@ describe('Prompt Flow (e2e)', () => {
       .get('/api/v1/prompts')
       .expect(200);
 
-    const listBody = listRes.body as {
-      default: Array<{ id: string; isDefault: boolean }>;
-      user: Array<{ id: string; isDefault: boolean }>;
-    };
+    const listBody = (
+      listRes.body as {
+        data: {
+          default: Array<{ id: string; isDefault: boolean }>;
+          user: Array<{ id: string; isDefault: boolean }>;
+        };
+      }
+    ).data;
 
     expect(listBody.default.length).toBeGreaterThanOrEqual(3);
     expect(listBody.default.map((prompt) => prompt.id).sort()).toEqual(
@@ -50,15 +56,20 @@ describe('Prompt Flow (e2e)', () => {
       .send({
         name: '  사용자 프롬프트  ',
         content: '  사용자 정의 내용  ',
+        documentType: 'meeting',
       })
       .expect(201);
 
-    const created = createRes.body as {
-      id: string;
-      name: string;
-      content: string;
-      isDefault: boolean;
-    };
+    const created = (
+      createRes.body as {
+        data: {
+          id: string;
+          name: string;
+          content: string;
+          isDefault: boolean;
+        };
+      }
+    ).data;
 
     expect(created.id.startsWith('prompt_user_')).toBe(true);
     expect(created.name).toBe('사용자 프롬프트');
@@ -72,7 +83,9 @@ describe('Prompt Flow (e2e)', () => {
       })
       .expect(200);
 
-    expect((updateRes.body as { name: string }).name).toBe('수정 이름');
+    expect((updateRes.body as { data: { name: string } }).data.name).toBe(
+      '수정 이름',
+    );
 
     await request(app.getHttpServer())
       .delete(`/api/v1/prompts/${created.id}`)

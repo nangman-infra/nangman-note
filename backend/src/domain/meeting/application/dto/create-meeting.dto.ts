@@ -14,6 +14,7 @@ export class CreateMeetingDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   promptId?: string;
 
   @IsOptional()

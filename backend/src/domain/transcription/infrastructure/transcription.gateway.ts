@@ -8,6 +8,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { isUUID } from 'class-validator';
 import { AppEnv } from '../../../shared/config/env.validation';
 import {
   isAllowedCorsOrigin,
@@ -289,7 +290,9 @@ export class TranscriptionGateway
               };
             }
 
-            if (!this.transcriptionService.hasActiveRealtimeSession(meetingId)) {
+            if (
+              !this.transcriptionService.hasActiveRealtimeSession(meetingId)
+            ) {
               return {
                 ok: false,
                 reason: 'session-start-failed',
@@ -512,13 +515,15 @@ export class TranscriptionGateway
     const rawValue = client.handshake.query.meetingId;
 
     if (typeof rawValue === 'string' && rawValue.trim().length > 0) {
-      return rawValue.trim();
+      const candidate = rawValue.trim();
+      return isUUID(candidate, 'all') ? candidate : undefined;
     }
 
     if (Array.isArray(rawValue) && rawValue.length > 0) {
       const candidate = rawValue[0];
       if (typeof candidate === 'string' && candidate.trim().length > 0) {
-        return candidate.trim();
+        const trimmed = candidate.trim();
+        return isUUID(trimmed, 'all') ? trimmed : undefined;
       }
     }
 

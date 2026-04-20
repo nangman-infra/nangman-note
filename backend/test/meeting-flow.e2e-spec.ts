@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { applyE2eAppConfig } from './apply-e2e-app-config';
 
 describe('Meeting Flow (e2e)', () => {
   let app: INestApplication<App>;
@@ -17,6 +18,7 @@ describe('Meeting Flow (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    applyE2eAppConfig(app);
     await app.init();
   });
 
@@ -34,14 +36,16 @@ describe('Meeting Flow (e2e)', () => {
       })
       .expect(201);
 
-    const meetingId = (createRes.body as { id: string }).id;
+    const meetingId = (createRes.body as { data: { id: string } }).data.id;
 
     const completeRes = await request(app.getHttpServer())
       .post(`/api/v1/meetings/${meetingId}/complete`)
       .send({})
       .expect(201);
 
-    expect((completeRes.body as { status: string }).status).toBe('processing');
+    expect((completeRes.body as { data: { status: string } }).data.status).toBe(
+      'processing',
+    );
   });
 
   it('transitions realtime meeting to processing on complete', async () => {
@@ -53,14 +57,16 @@ describe('Meeting Flow (e2e)', () => {
       })
       .expect(201);
 
-    const meetingId = (createRes.body as { id: string }).id;
+    const meetingId = (createRes.body as { data: { id: string } }).data.id;
 
     const completeRes = await request(app.getHttpServer())
       .post(`/api/v1/meetings/${meetingId}/complete`)
       .send({})
       .expect(201);
 
-    expect((completeRes.body as { status: string }).status).toBe('processing');
+    expect((completeRes.body as { data: { status: string } }).data.status).toBe(
+      'processing',
+    );
   });
 
   it('transitions batch meeting to processing when skipTranscription=true', async () => {
@@ -72,7 +78,7 @@ describe('Meeting Flow (e2e)', () => {
       })
       .expect(201);
 
-    const meetingId = (createRes.body as { id: string }).id;
+    const meetingId = (createRes.body as { data: { id: string } }).data.id;
 
     const completeRes = await request(app.getHttpServer())
       .post(`/api/v1/meetings/${meetingId}/complete`)
@@ -81,6 +87,8 @@ describe('Meeting Flow (e2e)', () => {
       })
       .expect(201);
 
-    expect((completeRes.body as { status: string }).status).toBe('processing');
+    expect((completeRes.body as { data: { status: string } }).data.status).toBe(
+      'processing',
+    );
   });
 });

@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -78,13 +79,16 @@ export class MeetingController {
   }
 
   @Get(':id')
-  async getById(@Param('id') id: string, @CurrentUser() user?: AuthUser) {
+  async getById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user?: AuthUser,
+  ) {
     return this.meetingService.findById(id, user?.sub);
   }
 
   @Patch(':id')
   async updatePrompt(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateMeetingDto,
     @CurrentUser() user?: AuthUser,
   ) {
@@ -93,7 +97,7 @@ export class MeetingController {
 
   @Post(':id/complete')
   async complete(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteMeetingDto,
     @CurrentUser() user?: AuthUser,
   ) {
@@ -103,7 +107,7 @@ export class MeetingController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user?: AuthUser,
   ): Promise<void> {
     await this.meetingService.remove(id, user?.sub);
@@ -112,7 +116,7 @@ export class MeetingController {
   @Post(':id/restore')
   @HttpCode(HttpStatus.NO_CONTENT)
   async restore(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user?: AuthUser,
   ): Promise<void> {
     await this.meetingService.restore(id, user?.sub);
@@ -121,7 +125,7 @@ export class MeetingController {
   @Delete(':id/permanent')
   @HttpCode(HttpStatus.NO_CONTENT)
   async purge(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user?: AuthUser,
   ): Promise<void> {
     await this.meetingService.purge(id, user?.sub);
