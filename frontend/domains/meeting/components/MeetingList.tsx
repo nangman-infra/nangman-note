@@ -67,6 +67,8 @@ const filters: Array<{ key: 'all' | MeetingStatus; label: string }> = [
 
 const MAX_RECENT_SEARCHES = 8;
 const POLL_INTERVAL_MS = 8000;
+/** 메인 뷰에서 기본적으로 보여주는 회의 개수. 초과분은 "더보기"로 펼친다. */
+const DEFAULT_VISIBLE_LIMIT = 10;
 
 function normalizeKeyword(keyword: string) {
   return keyword.trim();
@@ -141,6 +143,11 @@ export function MeetingList({
   // ── 다중 선택 상태 ──
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // ── "모두 보기" 토글 (메인 활성 뷰 전용) ──
+  // 기본값 false: 상위 DEFAULT_VISIBLE_LIMIT개만 노출. 사용자가 명시적으로
+  // 펼치면 true. 검색/휴지통/뷰 전환 시 자동으로 접힌다(아래 useEffect 참고).
+  const [showAll, setShowAll] = useState(false);
 
   useMeetingStatus({
     onStatusChange: (message) => {
@@ -259,6 +266,11 @@ export function MeetingList({
     setSelectedIds(new Set());
   }, [showTrash]);
 
+  // 뷰 전환·검색 적용 시 "모두 보기" 상태를 초기화 → 다시 상위 10개만 노출
+  useEffect(() => {
+    setShowAll(false); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [showTrash, isSearchApplied]);
+
   // Reset active descendant when dropdown closes
   useEffect(() => {
     setActiveDescendantIndex(-1); // eslint-disable-line react-hooks/set-state-in-effect
@@ -323,7 +335,7 @@ export function MeetingList({
     return result;
   }, [activeFilter, meetings, isSearchApplied, showTrash, tagFilter, timeFilter, trashMeetings]);
 
-  // 정렬 적용 (B-3)
+  // 정렬 적용
   const sortedMeetings = useMemo(() => {
     const sorted = [...filteredMeetings];
     if (sortBy === 'oldest') {
@@ -338,9 +350,20 @@ export function MeetingList({
     return sorted;
   }, [filteredMeetings, sortBy]);
 
+  // 메인(활성) 뷰에서는 기본적으로 상위 DEFAULT_VISIBLE_LIMIT개만 노출한다.
+  // 휴지통 뷰·검색 중에는 전체 노출(사용자가 의도적으로 찾고 있으므로 가리지 않는다).
+  // 사용자가 "모두 보기"를 누르면(showAll=true) 활성 뷰에서도 전체를 펼친다.
+  const shouldClampList = !showTrash && !isSearchApplied && !showAll;
+  const visibleMeetings = useMemo(
+    () =>
+      shouldClampList ? sortedMeetings.slice(0, DEFAULT_VISIBLE_LIMIT) : sortedMeetings,
+    [shouldClampList, sortedMeetings],
+  );
+  const hiddenCount = Math.max(0, sortedMeetings.length - visibleMeetings.length);
+
   const visibleMeetingIds = useMemo(
-    () => sortedMeetings.map((meeting) => meeting.id),
-    [sortedMeetings],
+    () => visibleMeetings.map((meeting) => meeting.id),
+    [visibleMeetings],
   );
 
   // Prune selection to visible meetings
@@ -517,6 +540,10 @@ export function MeetingList({
   };
 
   // ── 단건 작업 핸들러 ──
+  // 현재 메인 목록에서는 카드 내 삭제 버튼을 노출하지 않지만, 회의 상세 화면 등
+  // 향후 단건 삭제 경로에서 재사용하기 위해 핸들러는 유지한다. 이로 인한 unused
+  // 경고는 의도된 사용 지연이므로 무시한다.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDeleteMeeting = (meetingId: string) => {
     const meeting = meetings.find((item) => item.id === meetingId);
     setPendingAction({
@@ -682,17 +709,55 @@ export function MeetingList({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-[var(--line-soft)] px-4 py-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold tracking-wide text-muted">MEETINGS</p>
-            <h2 className="text-lg font-semibold">
+      <header className="px-5 py-4">
+        {/* ── Header row: title + count + action icons ── */}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="label-sm text-[var(--ink-muted)]">MEETINGS</p>
+            <h2 className="truncate font-headline text-xl font-bold tracking-tight text-slate-900">
               {showTrash ? '회의 휴지통' : '회의 아카이브'}
             </h2>
           </div>
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-muted">
-            {sortedMeetings.length}개
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="rounded-full bg-[var(--secondary-container)] px-2.5 py-1 text-xs font-bold text-[var(--on-secondary-container)]">
+              {sortedMeetings.length}개
+            </span>
+            {/* Trash toggle — small icon button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowTrash((prev) => !prev);
+                setSearchQuery('');
+                setIsSearchApplied(false);
+                setIsSuggestionOpen(false);
+                onSelectMeeting?.(null);
+              }}
+              className={`rounded-full p-2 transition ${
+                showTrash
+                  ? 'bg-rose-100 text-rose-600'
+                  : 'text-[var(--ink-muted)] hover:bg-slate-100'
+              }`}
+              title={showTrash ? '휴지통 닫기' : '휴지통'}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            {/* Selection mode toggle — 휴지통 뷰에서만 노출.
+                메인 활성 뷰에서는 단건 삭제(카드 안 🗑)만 지원해 경로를 단일화한다. */}
+            {showTrash && sortedMeetings.length > 0 ? (
+              <button
+                type="button"
+                onClick={toggleSelectionMode}
+                className={`rounded-full p-2 transition ${
+                  selectionMode
+                    ? 'bg-brand/10 text-brand'
+                    : 'text-[var(--ink-muted)] hover:bg-slate-100'
+                }`}
+                title={selectionMode ? '선택 취소' : '선택'}
+              >
+                <CheckSquare className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {error ? (
@@ -704,13 +769,14 @@ export function MeetingList({
           />
         ) : null}
 
+        {/* ── Search ── */}
         <form onSubmit={handleSearchSubmit} className="mb-3">
           <label htmlFor="meeting-search" className="sr-only">
             회의 제목 검색
           </label>
 
           <div className="relative">
-            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <Search className="h-4 w-4 text-muted" />
             </span>
 
@@ -723,7 +789,7 @@ export function MeetingList({
               onFocus={handleSearchFocus}
               onBlur={handleSearchBlur}
               onKeyDown={handleSearchKeyDown}
-              placeholder="회의 제목 또는 내용 검색"
+              placeholder="검색 (⌘K)"
               role="combobox"
               aria-expanded={isSuggestionOpen && suggestions.length > 0}
               aria-controls="meeting-search-listbox"
@@ -734,10 +800,10 @@ export function MeetingList({
               }
               aria-autocomplete="list"
               aria-haspopup="listbox"
-              className={`input-shell h-11 rounded-2xl !pl-11 !pr-28 shadow-[0_8px_20px_rgba(18,33,43,0.08)] ${
+              className={`input-shell h-9 rounded-full text-sm !pl-9 !pr-8 ${
                 showTrash
                   ? 'bg-slate-100 opacity-60 cursor-not-allowed'
-                  : 'bg-white/95'
+                  : ''
               }`}
               disabled={showTrash}
             />
@@ -747,19 +813,11 @@ export function MeetingList({
                 type="button"
                 aria-label="검색어 지우기"
                 onClick={clearSearch}
-                className="absolute right-[4.7rem] top-1/2 -translate-y-1/2 rounded-full p-1 text-muted transition hover:bg-black/5"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--ink-muted)] transition hover:bg-slate-100"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             ) : null}
-
-            <button
-              type="submit"
-              className="btn-neo inline-flex absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl px-2.5 py-1 text-xs"
-              disabled={showTrash}
-            >
-              검색
-            </button>
 
             {isSuggestionOpen && suggestions.length > 0 ? (
               <div
@@ -814,98 +872,31 @@ export function MeetingList({
               </div>
             ) : null}
           </div>
-
-          <p className="mt-1.5 text-[11px] text-muted">
-            {showTrash ? '휴지통에서는 검색이 비활성화됩니다.' : '빠른 검색: Cmd/Ctrl + K'}
-          </p>
         </form>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--line-soft)] px-2 py-1 text-xs text-muted">
-            <SlidersHorizontal className="h-3 w-3" />
-            필터
-          </span>
+        {/* ── Simple tag pill filters: 전체 | 진행 중 | 정리 중 | 완료 ── */}
+        <div className="flex items-center gap-1.5">
           {filters.map((filter) => (
             <button
               key={filter.key}
               type="button"
               onClick={() => setActiveFilter(filter.key)}
               disabled={showTrash}
-              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
                 activeFilter === filter.key && !showTrash
-                  ? 'bg-brand text-white'
-                  : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
+                  ? 'bg-brand text-white shadow-md'
+                  : 'bg-[var(--surface-container-highest)] text-[var(--ink-subtle)] hover:bg-[var(--outline-variant)]/30'
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {filter.label}
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => {
-              setShowTrash((prev) => !prev);
-              setSearchQuery('');
-              setIsSearchApplied(false);
-              setIsSuggestionOpen(false);
-              onSelectMeeting?.(null);
-            }}
-            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-              showTrash
-                ? 'bg-rose-600 text-white'
-                : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
-            }`}
-          >
-            <Trash2 className="h-3 w-3" />
-            {showTrash ? '닫기' : '휴지통'}
-          </button>
-
-          {/* 선택 모드 토글 버튼 */}
-          {sortedMeetings.length > 0 ? (
-            <button
-              type="button"
-              onClick={toggleSelectionMode}
-              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                selectionMode
-                  ? 'bg-brand text-white'
-                  : 'border border-[var(--line-soft)] bg-white text-muted hover:border-[var(--line-strong)]'
-              }`}
-            >
-              <CheckSquare className="h-3 w-3" />
-              {selectionMode ? '선택 취소' : '선택'}
-            </button>
-          ) : null}
         </div>
 
-        {/* ── 활성 필터 칩 ── */}
-        {!showTrash && (timeFilter !== 'all' || tagFilter || activeFilter !== 'all' || isSearchApplied) ? (
+        {/* ── Active filter chips (search, status) ── */}
+        {!showTrash && (activeFilter !== 'all' || isSearchApplied) ? (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-muted">적용 중:</span>
-            {timeFilter !== 'all' ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
-                {TIME_FILTER_LABEL[timeFilter]}
-                <button
-                  type="button"
-                  aria-label={`${TIME_FILTER_LABEL[timeFilter]} 필터 해제`}
-                  onClick={() => onTimeFilterChange?.('all')}
-                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-indigo-200/60"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ) : null}
-            {tagFilter ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700">
-                {TAG_LABEL_MAP[tagFilter] ?? tagFilter}
-                <button
-                  type="button"
-                  aria-label={`${TAG_LABEL_MAP[tagFilter] ?? tagFilter} 태그 해제`}
-                  onClick={() => onTagFilterChange?.(null)}
-                  className="ml-0.5 rounded-full p-0.5 transition hover:bg-teal-200/60"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ) : null}
             {activeFilter !== 'all' ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
                 {filters.find((f) => f.key === activeFilter)?.label ?? activeFilter}
@@ -935,19 +926,19 @@ export function MeetingList({
           </div>
         ) : null}
 
-        {/* 정렬 옵션 (B-3) */}
+        {/* Sort */}
         {!showTrash && (
-          <div className="mt-2 flex items-center gap-2">
-            <label htmlFor="meeting-sort" className="text-[11px] text-muted">정렬:</label>
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <p className="label-sm text-[var(--ink-muted)] tracking-widest">Sort by:</p>
             <select
               id="meeting-sort"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'longest')}
-              className="rounded-lg border border-[var(--line-soft)] bg-white px-2 py-1 text-[11px] font-semibold text-muted"
+              className="appearance-none border-none bg-transparent text-sm font-semibold text-indigo-700 focus:outline-none cursor-pointer"
             >
-              <option value="newest">최신순</option>
-              <option value="oldest">오래된순</option>
-              <option value="longest">길이순</option>
+              <option value="newest">Recent First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="longest">Longest First</option>
             </select>
           </div>
         )}
@@ -1011,7 +1002,9 @@ export function MeetingList({
         </div>
       ) : null}
 
-      <div className="scroll-muted flex-1 space-y-2 overflow-y-auto px-4 py-4">
+      <div
+        className="scroll-muted flex-1 space-y-1.5 overflow-y-auto px-4 py-3"
+      >
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }, (_, i) => (
@@ -1071,24 +1064,44 @@ export function MeetingList({
             )}
           </div>
         ) : (
-          sortedMeetings.map((meeting, index) => (
-            <div key={meeting.id} className={index < 3 ? 'motion-rise' : ''}>
-              <MeetingCard
-                meeting={meeting}
-                mode={showTrash ? 'trash' : 'active'}
-                onClick={showTrash ? undefined : () => onSelectMeeting?.(meeting.id)}
-                onDelete={showTrash ? undefined : () => handleDeleteMeeting(meeting.id)}
-                onRestore={showTrash ? () => void handleRestoreMeeting(meeting.id) : undefined}
-                onPurge={showTrash ? () => handlePurgeMeeting(meeting.id) : undefined}
-                isActive={meeting.id === selectedMeetingId}
-                selectionMode={selectionMode}
-                isSelected={selectedIds.has(meeting.id)}
-                onToggleSelect={() => toggleSelect(meeting.id)}
-              />
-            </div>
-          ))
+          <>
+            {visibleMeetings.map((meeting, index) => (
+              <div key={meeting.id} className={index < 3 ? 'motion-rise' : ''}>
+                <MeetingCard
+                  meeting={meeting}
+                  mode={showTrash ? 'trash' : 'active'}
+                  onClick={showTrash ? undefined : () => onSelectMeeting?.(meeting.id)}
+                  // 메인(활성) 뷰에서는 카드 내 삭제 버튼을 노출하지 않는다.
+                  // 삭제는 회의 상세/휴지통 뷰를 통해서만 수행해 경로를 단일화한다.
+                  onDelete={undefined}
+                  onRestore={showTrash ? () => void handleRestoreMeeting(meeting.id) : undefined}
+                  onPurge={showTrash ? () => handlePurgeMeeting(meeting.id) : undefined}
+                  isActive={meeting.id === selectedMeetingId}
+                  selectionMode={selectionMode}
+                  isSelected={selectedIds.has(meeting.id)}
+                  onToggleSelect={() => toggleSelect(meeting.id)}
+                />
+              </div>
+            ))}
+          </>
         )}
       </div>
+
+      {/* 더보기 영역 — 스크롤 컨테이너 밖에 고정 배치해 리스트 길이와 무관하게 항상 노출. */}
+      {!isLoading && hiddenCount > 0 ? (
+        <div className="shrink-0 border-t border-[var(--line-soft)] bg-[var(--bg-card)] px-4 py-2.5">
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="btn-neo inline-flex w-full justify-center rounded-xl px-3 py-2 text-xs font-semibold"
+          >
+            더보기 ({hiddenCount}개)
+          </button>
+          <p className="mt-1.5 text-center text-[11px] text-muted">
+            전체 {sortedMeetings.length}개 중 최근 {visibleMeetings.length}개 · 검색으로도 찾을 수 있어요
+          </p>
+        </div>
+      ) : null}
 
       <MeetingActionDialog
         open={Boolean(pendingAction)}
