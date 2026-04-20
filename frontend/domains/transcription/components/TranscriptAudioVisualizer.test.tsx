@@ -94,7 +94,14 @@ describe('TranscriptAudioVisualizer integration with in-progress page', () => {
       __dirname,
       '../../../app/meeting/in-progress/page.tsx',
     );
-    const source = await fs.readFile(pagePath, 'utf-8');
+    const workspacePath = path.resolve(
+      __dirname,
+      '../../../app/meeting/in-progress/_components/InProgressWorkspace.tsx',
+    );
+    const source = [
+      await fs.readFile(pagePath, 'utf-8'),
+      await fs.readFile(workspacePath, 'utf-8'),
+    ].join('\n');
 
     expect(source).toContain(
       "import { TranscriptAudioVisualizer } from '@/domains/transcription/components/TranscriptAudioVisualizer'",

@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
+import {
+  AUDIO_STREAMING_LIMITS,
+  getAckErrorMessage,
+  isCapacityFallbackAck,
+  shouldFallbackForSaturation,
+  type AudioAckResponse,
+} from './audioStreamingPolicy';
 
 export type AudioStreamingState =
   | 'idle'
@@ -9,14 +16,6 @@ export type AudioStreamingState =
   | 'stopping'
   | 'stopped'
   | 'error';
-
-interface AudioAckResponse {
-  ok: boolean;
-  reason?: string;
-  retryAfterMs?: number;
-  fallbackToBatch?: boolean;
-  mode?: 'batch';
-}
 
 interface StartStreamingOptions {
   onFallbackToBatch?: (payload?: { reason?: string }) => void;
@@ -32,21 +31,6 @@ interface UseAudioStreamingReturn {
   ) => Promise<void>;
   stopStreaming: () => void;
 }
-
-// ── Backpressure & fallback 임계값 ──
-// 업계 BP 참조 (Nabla: 10초 in-flight, Deepgram: 10초 재연결 허용)
-//
-// 200ms 청크 기준:
-// - MAX_IN_FLIGHT_ACKS 6개 → 최대 1.2초 RTT까지 실시간성 유지
-// - ACK_TIMEOUT 3초 → 개별 청크 응답 대기 (네트워크 지터 허용)
-// - CONSECUTIVE_TIMEOUTS 15회 → 45초간 무응답 시 fallback (일시적 끊김 대응)
-// - CONSECUTIVE_BACKPRESSURE 30회 → 6초간 서버 부하 시 fallback (세션 warming 포함)
-// - SATURATION 10초 → in-flight 꽉 찬 상태 10초 유지 시 fallback (Nabla 동일)
-const MAX_IN_FLIGHT_ACKS = 6;
-const ACK_TIMEOUT_MS = 3000;
-const MAX_CONSECUTIVE_TIMEOUTS = 15;
-const MAX_CONSECUTIVE_BACKPRESSURE = 30;
-const MAX_SATURATION_MS = 10_000;
 
 export function useAudioStreaming(): UseAudioStreamingReturn {
   const [state, setState] = useState<AudioStreamingState>('idle');
@@ -145,14 +129,14 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         return;
       }
 
-      if (inFlightAckCountRef.current >= MAX_IN_FLIGHT_ACKS) {
+      if (inFlightAckCountRef.current >= AUDIO_STREAMING_LIMITS.MAX_IN_FLIGHT_ACKS) {
         const now = Date.now();
         if (saturationStartAtRef.current === null) {
           saturationStartAtRef.current = now;
           return;
         }
 
-        if (now - saturationStartAtRef.current >= MAX_SATURATION_MS) {
+        if (shouldFallbackForSaturation(saturationStartAtRef.current, now)) {
           stopForRealtimeInstability(
             '네트워크 지연으로 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
             'client-network-saturation',
@@ -174,13 +158,16 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         ackTimeoutMapRef.current.delete(ackId);
         inFlightAckCountRef.current = Math.max(0, inFlightAckCountRef.current - 1);
         consecutiveTimeoutRef.current += 1;
-        if (consecutiveTimeoutRef.current >= MAX_CONSECUTIVE_TIMEOUTS) {
+        if (
+          consecutiveTimeoutRef.current >=
+          AUDIO_STREAMING_LIMITS.MAX_CONSECUTIVE_TIMEOUTS
+        ) {
           stopForRealtimeInstability(
             '응답 지연이 지속되어 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
             'client-ack-timeout',
           );
         }
-      }, ACK_TIMEOUT_MS);
+      }, AUDIO_STREAMING_LIMITS.ACK_TIMEOUT_MS);
 
       ackTimeoutMapRef.current.set(ackId, timeoutId);
 
@@ -201,11 +188,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
           return;
         }
 
-        if (
-          response.reason === 'realtime-capacity-exceeded' &&
-          response.fallbackToBatch &&
-          response.mode === 'batch'
-        ) {
+        if (isCapacityFallbackAck(response)) {
           requestRealtimeSessionStop();
           notifyFallbackToBatch(response.reason);
           cleanup();
@@ -216,31 +199,25 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
 
         if (response.reason === 'backpressure') {
           consecutiveBackpressureRef.current += 1;
-          if (consecutiveBackpressureRef.current >= MAX_CONSECUTIVE_BACKPRESSURE) {
-            stopForRealtimeInstability(
-              '전사 서버 부하가 지속되어 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
-              'client-backpressure',
-            );
-          } else {
-            setError('전사 서버 처리 지연이 감지되었습니다. 네트워크 상태를 확인해주세요.');
-          }
-          return;
         }
 
-        if (response.reason === 'session-warming') {
-          consecutiveBackpressureRef.current = 0;
-          setError('실시간 전사 세션 준비 중입니다. 잠시만 기다려주세요.');
-          return;
-        }
-
-        if (response.reason === 'chunk-too-large') {
-          setError('오디오 청크가 커서 일부 구간 전송에 실패했습니다.');
-          return;
-        }
-
-        setError(
-          '실시간 전사 연결이 불안정합니다. 잠시 후 자동으로 복구되지 않으면 회의를 다시 시작해주세요.',
+        const ackError = getAckErrorMessage(
+          response,
+          consecutiveBackpressureRef.current,
         );
+
+        if (ackError.kind === 'fallback') {
+          stopForRealtimeInstability(
+            ackError.message,
+            ackError.reason,
+          );
+          return;
+        }
+
+        if (response.reason !== 'backpressure') {
+          consecutiveBackpressureRef.current = 0;
+        }
+        setError(ackError.message);
       });
     },
     [cleanup, notifyFallbackToBatch, requestRealtimeSessionStop, stopForRealtimeInstability],

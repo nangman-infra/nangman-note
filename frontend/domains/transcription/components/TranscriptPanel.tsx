@@ -1,8 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, Mic, MicOff, Languages, Sparkles } from 'lucide-react';
+import { useMemo } from 'react';
+import { ArrowDown } from 'lucide-react';
 import type { FinalSegment, PartialSegment } from '../stores/transcriptionStore';
+import { TranscriptPanelEmptyState } from './TranscriptPanelEmptyState';
+import { TranscriptPanelFrame } from './TranscriptPanelFrame';
+import { TranscriptSegmentList } from './TranscriptSegmentList';
+import { useTranscriptAutoFollow } from './useTranscriptAutoFollow';
 
 interface TranscriptPanelProps {
   segments: FinalSegment[];
@@ -15,12 +19,6 @@ interface TranscriptPanelProps {
   error?: string | null;
 }
 
-function formatSegmentTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
 export function TranscriptPanel({
   segments,
   partial,
@@ -31,100 +29,48 @@ export function TranscriptPanel({
   meetingId,
   error,
 }: TranscriptPanelProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [followLive, setFollowLive] = useState(true);
-  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-
   const hasTranscriptData = useMemo(
     () => segments.length > 0 || Boolean(partial),
     [segments.length, partial],
   );
+  const {
+    scrollRef,
+    followLive,
+    showJumpToLatest,
+    scrollToBottom,
+    toggleFollowLive,
+  } = useTranscriptAutoFollow({
+    hasTranscriptData,
+    partialText: partial?.text,
+    segmentCount: segments.length,
+  });
 
-  const isNearBottom = useCallback((el: HTMLDivElement): boolean => {
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    return distance < 24;
-  }, []);
-
-  const scrollToBottom = useCallback((opts?: { forceFollow?: boolean }) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-    if (opts?.forceFollow) {
-      setFollowLive(true);
-      setShowJumpToLatest(false);
-    }
-  }, []);
-
-  // 스크롤 위치에 따라 live follow 상태 제어
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const handleScroll = () => {
-      const nearBottom = isNearBottom(el);
-      setShowJumpToLatest(!nearBottom);
-      setFollowLive((prev) => (nearBottom ? true : prev ? false : prev));
-    };
-
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-
-    return () => {
-      el.removeEventListener('scroll', handleScroll);
-    };
-  }, [isNearBottom]);
-
-  // 새 전사가 와도 사용자가 위를 보고 있으면 강제 스크롤하지 않음
-  useEffect(() => {
-    if (!followLive) return;
-    if (!hasTranscriptData) return;
-
-    requestAnimationFrame(() => {
-      scrollToBottom();
-    });
-  }, [followLive, hasTranscriptData, partial?.text, scrollToBottom, segments.length]);
-
-  // 마이크 비활성 상태
   if (micPermission === 'denied' || micPermission === 'unsupported') {
     return (
-      <PanelWrapper
+      <TranscriptPanelFrame
         title="노트 전용 모드"
         meetingId={meetingId}
         statusLabel="마이크 비활성"
         statusClassName="bg-slate-800 text-slate-300"
       >
-        <div className="flex h-full items-center justify-center px-5 text-center text-sm text-slate-400">
-          <div>
-            <MicOff className="mx-auto mb-2 h-8 w-8 text-slate-500" />
-            <p>마이크 접근이 차단되어 전사가 비활성화되었습니다.</p>
-            <p className="mt-1 text-xs">노트 작성에 집중해주세요.</p>
-          </div>
-        </div>
-      </PanelWrapper>
+        <TranscriptPanelEmptyState variant="mic-disabled" />
+      </TranscriptPanelFrame>
     );
   }
 
-  // 배치 모드
   if (!isRealtimeMode) {
     return (
-      <PanelWrapper
+      <TranscriptPanelFrame
         title="배치 전사 대기"
         meetingId={meetingId}
         statusLabel="배치 모드"
         statusClassName="bg-slate-800 text-slate-300"
       >
-        <div className="flex h-full items-center justify-center px-5 text-center text-sm text-slate-400">
-          <div>
-            <Mic className="mx-auto mb-2 h-8 w-8 text-slate-500" />
-            <p>현재 배치 전사 모드입니다.</p>
-            <p className="mt-1 text-xs">회의 종료 후 수집된 오디오가 AWS 배치 전사로 처리됩니다.</p>
-          </div>
-        </div>
-      </PanelWrapper>
+        <TranscriptPanelEmptyState variant="batch" />
+      </TranscriptPanelFrame>
     );
   }
 
-  // 실시간 모드
   const statusLabel = !isConnected
     ? '연결 중...'
     : hasActiveSession
@@ -138,120 +84,23 @@ export function TranscriptPanel({
       : 'bg-slate-800 text-slate-300';
 
   return (
-    <PanelWrapper
+    <TranscriptPanelFrame
       title="실시간 전사"
       meetingId={meetingId}
       statusLabel={statusLabel}
       statusClassName={statusClassName}
       error={error}
     >
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-2 space-y-2"
-      >
-        {segments.length === 0 && !partial && (
-          <div className="flex h-full items-center justify-center text-sm text-slate-400">
-            <div className="text-center">
-              <Languages className="mx-auto mb-2 h-8 w-8 text-slate-500" />
-              <p>음성을 기다리고 있습니다...</p>
-              <p className="mt-1 text-xs">말씀하시면 실시간으로 텍스트가 표시됩니다.</p>
-            </div>
-          </div>
-        )}
-
-        {/* 확정된 세그먼트들 */}
-        {segments.map((seg) => {
-          /**
-           * AI Key Point Insert Infrastructure (FR-5)
-           * -----------------------------------------
-           * When a future pipeline tags a segment as a key point (e.g. by adding
-           * an `isKeyPoint: true` flag on the server side), the segment is
-           * rendered with the `ai-card-accent` skin — a 4px `--tertiary` left
-           * bar on top of `--surface-container-highest`. The FinalSegment type
-           * does not currently carry that flag (no backend field exists), so we
-           * only check for it defensively via an `unknown` cast. This keeps the
-           * rendering pattern documented in-code without introducing a new
-           * required field on FinalSegment.
-           */
-          const isKeyPoint =
-            (seg as unknown as { isKeyPoint?: boolean }).isKeyPoint === true;
-
-          if (isKeyPoint) {
-            return (
-              <div
-                key={seg.resultId}
-                className="ai-card-accent group rounded-r-lg px-3 py-2"
-                data-key-point="true"
-              >
-                <div className="flex items-start gap-2">
-                  <span className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-cyan-300">
-                    <Sparkles className="h-3 w-3" aria-hidden="true" />
-                    {formatSegmentTime(seg.startTime)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm leading-relaxed text-slate-100">{seg.text}</p>
-                    {seg.translatedText && (
-                      <p className="mt-0.5 text-sm leading-relaxed text-cyan-300">
-                        <Languages className="mr-1 inline-block h-3 w-3" />
-                        {seg.translatedText}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <div key={seg.resultId} className="group">
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-300">
-                  {formatSegmentTime(seg.startTime)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-relaxed text-slate-100">{seg.text}</p>
-                  {seg.translatedText && (
-                    <p className="mt-0.5 text-sm leading-relaxed text-cyan-300">
-                      <Languages className="mr-1 inline-block h-3 w-3" />
-                      {seg.translatedText}
-                    </p>
-                  )}
-                  {!seg.translatedText && seg.translationStatus === 'pending' && (
-                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                      번역 중...
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* 진행중 partial */}
-        {partial && (
-          <div className="group opacity-80">
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5 shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-mono text-amber-300">
-                {formatSegmentTime(partial.startTime)}
-              </span>
-              <p className="min-w-0 flex-1 text-sm italic leading-relaxed text-slate-400">
-                {partial.text}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      <TranscriptSegmentList
+        segments={segments}
+        partial={partial}
+        scrollRef={scrollRef}
+      />
       <div className="bg-slate-950/60 px-3 py-2">
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <button
             type="button"
-            onClick={() => {
-              if (followLive) {
-                setFollowLive(false);
-                return;
-              }
-              scrollToBottom({ forceFollow: true });
-            }}
+            onClick={toggleFollowLive}
             className={`rounded-full px-2 py-1 transition ${
               followLive
                 ? 'bg-emerald-500/20 text-emerald-300'
@@ -275,55 +124,6 @@ export function TranscriptPanel({
           )}
         </div>
       </div>
-    </PanelWrapper>
-  );
-}
-
-/** 전사 패널 래퍼 (헤더 + 본문) — 다크 테마 */
-function PanelWrapper({
-  title,
-  meetingId,
-  statusLabel,
-  statusClassName,
-  error,
-  children,
-}: {
-  title: string;
-  meetingId: string;
-  statusLabel: string;
-  statusClassName: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <>
-      {/* No-Line 규칙: border 대신 배경 톤 전환(slate-950)으로 헤더 구획 */}
-      <div className="bg-slate-950/50 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold tracking-wide text-slate-400">
-              TRANSCRIPTION
-            </p>
-            <h2 className="mt-1 text-sm font-semibold text-slate-100">{title}</h2>
-          </div>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusClassName}`}
-          >
-            {statusLabel}
-          </span>
-        </div>
-        <div className="mt-2 text-[10px] text-slate-400">
-          Meeting ID: {meetingId.slice(0, 8)}...
-        </div>
-        {error && (
-          <div className="mt-1.5 rounded bg-rose-500/15 px-2 py-1 text-[10px] text-rose-300">
-            {error}
-          </div>
-        )}
-      </div>
-      <div className="flex h-[calc(100%-84px)] flex-col">
-        {children}
-      </div>
-    </>
+    </TranscriptPanelFrame>
   );
 }

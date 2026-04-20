@@ -1,0 +1,92 @@
+/* ─── App Shell ─── */
+.app-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+/* ─── Glass Surface: Editorial Frosted Panel ─── */
+.glass-surface {
+  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.80);
+  border: none;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 1px rgba(25, 28, 30, 0.02),
+    0 4px 20px rgba(25, 28, 30, 0.04),
+    0 12px 40px rgba(25, 28, 30, 0.06);
+}
+
+/* ─── Surface Card: Clean White with Tonal Lift ─── */
+.surface-card {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(25, 28, 30, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.surface-card:hover {
+  box-shadow: 0 4px 12px rgba(25, 28, 30, 0.08);
+}
+
+/* ─── Surface Tonal: Background sections without borders ─── */
+.surface-tonal {
+  background: var(--surface-container-low);
+  border-radius: 12px;
+}
+
+.surface-tonal-high {
+  background: var(--surface-container-high);
+  border-radius: 12px;
+}
+
+/* ─── AI Content Card accent ─── */
+.ai-card-accent {
+  border-left: 4px solid var(--tertiary);
+  background: var(--surface-container-highest);
+}
+
+/* ─── Editor Dot Grid: Live Meeting Room NoteEditor wrapper background ─── */
+/*
+ * Subtle radial-gradient dot pattern layered on top of the base surface.
+ * Used as the WRAPPER background for the note editor (not inside the editor content),
+ * so the dots evoke a "paper" feel while the editable area keeps a clean surface.
+ * Uses existing tokens (no hardcoded hex) and respects the No-Line rule via
+ * tonal separation instead of borders. Dot color uses --line-soft (rgba 0.2)
+ * so the pattern is felt, not read, on light surfaces.
+ */
+.editor-dot-grid {
+  background-color: var(--bg-card);
+  background-image: radial-gradient(
+    circle,
+    var(--line-soft) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+  background-position: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Static background — no animation to disable, but retained for explicit
+     NFR-1 compliance in case motion is layered on later. */
+  .editor-dot-grid {
+    background-attachment: local;
+  }
+}
+
+/* ─── Primary Gradient backgrounds ───
+ * Registered as a Tailwind v4 `@utility` so it participates in the utilities
+ * layer cascade (takes proper precedence over component-layer rules and
+ * matches sibling `bg-*` utility ordering). Using `background-image` +
+ * explicit `background-color` fallback ensures the gradient never falls
+ * back to an invisible transparent fill if an adjacent `bg-*` utility
+ * happens to reset `background-color`.
+ */
+@utility bg-brand-gradient {
+  background-color: var(--brand);
+  background-image: linear-gradient(
+    135deg,
+    var(--brand) 0%,
+    var(--brand-container) 100%
+  );
+}

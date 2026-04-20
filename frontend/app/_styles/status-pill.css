@@ -1,0 +1,79 @@
+/* ─── Status Pill Variants ───
+ * Semantic color variants for meeting status indicators.
+ * Maps to meeting-status.enum: pending (idle), recording (live), processing
+ * (idle + pulsing), completed (done), failed (warn).
+ *
+ * Apply on top of the base `.status-pill` class:
+ *   <span class="status-pill status-pill--live">녹음 중</span>
+ *
+ * Follows the No-Line rule: tonal backgrounds only, no borders.
+ * Reuses existing design tokens — no hardcoded hex.
+ */
+.status-pill--live,
+.status-pill--done,
+.status-pill--idle,
+.status-pill--warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  /* Relax the uppercase base: these variants express state, not metadata. */
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+}
+
+/* Live — red/error tone with an animated pulse dot (recording in progress) */
+.status-pill--live {
+  background: var(--error-container);
+  color: var(--danger);
+}
+
+.status-pill--live::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--danger);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent);
+  animation: ai-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Done — success/green tone (completed meetings) */
+.status-pill--done {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+}
+
+/* Idle — neutral surface tone (pending / processing) */
+.status-pill--idle {
+  background: var(--surface-container-low);
+  color: var(--ink-subtle);
+}
+
+/* Warn — amber/warning tone (failed meetings or attention states) */
+.status-pill--warn {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+@keyframes ai-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 0.4rem color-mix(in srgb, var(--danger) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);
+  }
+}
+
+/* NFR-1: prefers-reduced-motion — disable the live pulse explicitly. The
+ * global reduce-motion block above handles durations, but we also freeze
+ * the box-shadow halo so the dot stays static at its resting state. */
+@media (prefers-reduced-motion: reduce) {
+  .status-pill--live::before {
+    animation: none;
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,158 @@
+/* ─── Buttons ─── */
+@layer components {
+  .btn-neo {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--line-soft);
+    padding: 0.6rem 0.9rem;
+    font-size: 0.87rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .btn-neo:hover {
+    transform: translateY(-1px);
+    border-color: var(--line-strong);
+  }
+
+  /* Primary CTA: Gradient button */
+  .btn-primary {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 8px;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-container) 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 16px rgba(32, 53, 189, 0.25);
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    opacity: 0.92;
+    box-shadow: 0 4px 24px rgba(32, 53, 189, 0.35);
+    transform: translateY(-1px);
+  }
+
+  /* Secondary: Ghost border */
+  .btn-secondary {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid rgba(197, 197, 215, 0.2);
+    padding: 0.6rem 0.9rem;
+    font-size: 0.87rem;
+    font-weight: 600;
+    color: var(--brand);
+    background: transparent;
+    transition: all 0.2s ease;
+  }
+
+  .btn-secondary:hover {
+    background: rgba(32, 53, 189, 0.04);
+  }
+
+  /* AI Action button */
+  .btn-ai {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 8px;
+    border: none;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.87rem;
+    font-weight: 700;
+    background: var(--tertiary);
+    color: #ffffff;
+    transition: all 0.2s ease;
+  }
+
+  .btn-ai:hover {
+    background: var(--tertiary-container);
+  }
+}
+
+/* ─── Focus States ─── */
+.btn-neo:focus-visible,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.input-shell:focus-visible,
+button:focus-visible,
+a:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(32, 53, 189, 0.35);
+  outline-offset: 2px;
+}
+
+/* ─── Input Fields: No-border, tonal bg shift on focus ─── */
+.input-shell {
+  width: 100%;
+  border-radius: 12px;
+  border: none;
+  background: var(--surface-container-low);
+  padding: 0.64rem 0.82rem;
+  color: var(--ink-strong);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-shell::placeholder {
+  color: var(--ink-muted);
+}
+
+.input-shell:focus {
+  background: #ffffff;
+  box-shadow: 0 0 0 2px var(--brand);
+}
+
+/* ─── Status Pills ─── */
+.status-pill {
+  border-radius: 9999px;
+  padding: 0.24rem 0.64rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ─── Scrollbar ─── */
+.scroll-muted {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(197, 197, 215, 0.5) transparent;
+}
+
+.scroll-muted::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scroll-muted::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-muted::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: rgba(197, 197, 215, 0.5);
+}
+
+/* ─── Typography: Headline utility ─── */
+.font-headline {
+  font-family: 'Manrope', var(--font-display), sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Label utility: Technical metadata ─── */
+.label-sm {
+  font-family: 'Inter', var(--font-display), sans-serif;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

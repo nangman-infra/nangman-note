@@ -11,6 +11,32 @@
 
 import { describe, it, expect } from 'vitest';
 
+async function readSources(...relativePaths: string[]): Promise<string> {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+
+  const sources = await Promise.all(
+    relativePaths.map((relativePath) =>
+      fs.readFile(path.resolve(__dirname, relativePath), 'utf-8'),
+    ),
+  );
+
+  return sources.join('\n');
+}
+
+async function readGlobalStyleSources(): Promise<string> {
+  return readSources(
+    '../app/globals.css',
+    '../app/_styles/theme.css',
+    '../app/_styles/surfaces.css',
+    '../app/_styles/controls.css',
+    '../app/_styles/motion.css',
+    '../app/_styles/result-markdown.css',
+    '../app/_styles/markdown-editor.css',
+    '../app/_styles/status-pill.css',
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 3.1: SSO 로그인 성공 → callbackUrl 리다이렉트 정상
 // ---------------------------------------------------------------------------
@@ -70,20 +96,21 @@ describe('Preservation 3.2 — Desktop 3-column layout with fixed proportions', 
 // ---------------------------------------------------------------------------
 describe('Preservation 3.3 — Meeting list click shows ResultViewer', () => {
   it('should pass onSelectMeeting callback to MeetingList', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../app/page.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../app/page.tsx',
+      '../app/_components/home/HomePageContent.tsx',
+      '../app/_components/home/DashboardView.tsx',
+    );
 
-    // page.tsx should pass onSelectMeeting to MeetingList
+    // The home route should pass onSelectMeeting through to MeetingList.
     expect(source).toMatch(/onSelectMeeting\s*=\s*\{/);
   });
 
   it('should render ResultViewer when selectedMeetingId is set', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../app/page.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../app/page.tsx',
+      '../app/_components/home/HomePageContent.tsx',
+    );
 
     // When selectedMeetingId is truthy, ResultViewer should be rendered
     expect(source).toContain('selectedMeetingId');
@@ -91,10 +118,10 @@ describe('Preservation 3.3 — Meeting list click shows ResultViewer', () => {
   });
 
   it('should invoke onSelectMeeting with meeting.id on card click in MeetingList', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../domains/meeting/components/MeetingList.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../domains/meeting/components/MeetingList.tsx',
+      '../domains/meeting/components/MeetingListContent.tsx',
+    );
 
     // MeetingCard onClick should call onSelectMeeting with the meeting id
     expect(source).toMatch(new RegExp('onClick\\s*=\\s*\\{.*onSelectMeeting\\?\\.\\(meeting\\.id\\)', 's'));
@@ -106,15 +133,15 @@ describe('Preservation 3.3 — Meeting list click shows ResultViewer', () => {
 // ---------------------------------------------------------------------------
 describe('Preservation 3.4 — Server search API call and result display', () => {
   it('should call searchMeetings on form submit', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../domains/meeting/components/MeetingList.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../domains/meeting/components/MeetingList.tsx',
+      '../domains/meeting/components/MeetingListHeader.tsx',
+    );
 
     // The search form should call searchMeetings
     expect(source).toContain('searchMeetings');
     expect(source).toContain('handleSearchSubmit');
-    expect(source).toMatch(/onSubmit\s*=\s*\{handleSearchSubmit\}/);
+    expect(source).toMatch(/onSearchSubmit\s*=\s*\{handleSearchSubmit\}/);
   });
 
   it('should have a server-side search API endpoint in meetingApi', async () => {
@@ -134,10 +161,10 @@ describe('Preservation 3.4 — Server search API call and result display', () =>
 // ---------------------------------------------------------------------------
 describe('Preservation 3.5 — Cmd/Ctrl+K keyboard shortcut focuses search', () => {
   it('should listen for Cmd/Ctrl+K keydown and focus the search input', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../domains/meeting/components/MeetingList.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../domains/meeting/components/MeetingList.tsx',
+      '../domains/meeting/components/useMeetingListSearch.ts',
+    );
 
     // Should have a keydown listener that checks for metaKey/ctrlKey + 'k'
     expect(source).toMatch(/event\.metaKey\s*\|\|\s*event\.ctrlKey/);
@@ -221,10 +248,10 @@ describe('Preservation 3.7 — Note 3-second debounce auto-save', () => {
 // ---------------------------------------------------------------------------
 describe('Preservation 3.8 — Batch transcription completion triggers AI result generation', () => {
   it('should trigger batch transcription job after audio upload on meeting end', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../app/meeting/in-progress/page.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../app/meeting/in-progress/page.tsx',
+      '../app/meeting/in-progress/_hooks/useInProgressEndMeetingFlow.ts',
+    );
 
     // After meeting end, should upload audio and ask the server to confirm/queue the batch job
     expect(source).toContain('uploadAudio');
@@ -332,10 +359,10 @@ describe('Preservation 3.11 — Meeting trash move and permanent delete with con
   });
 
   it('should have move-to-trash and purge action types', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../domains/meeting/components/MeetingList.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../domains/meeting/components/MeetingList.tsx',
+      '../domains/meeting/components/useMeetingListActions.ts',
+    );
 
     expect(source).toContain("'move-to-trash'");
     expect(source).toContain("'purge'");
@@ -344,10 +371,10 @@ describe('Preservation 3.11 — Meeting trash move and permanent delete with con
   });
 
   it('should have restore functionality in trash view', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../domains/meeting/components/MeetingList.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../domains/meeting/components/MeetingList.tsx',
+      '../domains/meeting/components/useMeetingListActions.ts',
+    );
 
     expect(source).toContain('restoreMeeting');
     expect(source).toContain('회의를 복구했습니다');
@@ -386,10 +413,10 @@ describe('Preservation 3.12 — Multi-select bulk operations work correctly', ()
   });
 
   it('should show toast with result count after bulk operations', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../domains/meeting/components/MeetingList.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../domains/meeting/components/MeetingList.tsx',
+      '../domains/meeting/components/useMeetingListActions.ts',
+    );
 
     // Should show count of succeeded items in toast
     expect(source).toContain('result.succeeded.length');
@@ -402,20 +429,14 @@ describe('Preservation 3.12 — Multi-select bulk operations work correctly', ()
 // ---------------------------------------------------------------------------
 describe('Preservation 3.13 — prefers-reduced-motion disables animations', () => {
   it('should have a prefers-reduced-motion media query in globals.css', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const cssPath = path.resolve(__dirname, '../app/globals.css');
-    const cssContent = await fs.readFile(cssPath, 'utf-8');
+    const cssContent = await readGlobalStyleSources();
 
-    // globals.css should have a prefers-reduced-motion rule
+    // Global styles should have a prefers-reduced-motion rule
     expect(cssContent).toContain('prefers-reduced-motion: reduce');
   });
 
   it('should set animation-duration and transition-duration to near-zero', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const cssPath = path.resolve(__dirname, '../app/globals.css');
-    const cssContent = await fs.readFile(cssPath, 'utf-8');
+    const cssContent = await readGlobalStyleSources();
 
     // Inside the reduced-motion block, durations should be set to 0.01ms
     expect(cssContent).toContain('animation-duration: 0.01ms');
@@ -470,10 +491,10 @@ describe('Preservation 3.14 — Realtime transcription mode works correctly', ()
 // ---------------------------------------------------------------------------
 describe('Preservation 3.15 — Regeneration auto-updates result', () => {
   it('should have regenerate functionality in ResultViewer', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../domains/result/components/ResultViewer.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../domains/result/components/ResultViewer.tsx',
+      '../domains/result/components/ResultRegeneratePanel.tsx',
+    );
 
     expect(source).toContain('handleRegenerate');
     expect(source).toContain('regenerateResult');

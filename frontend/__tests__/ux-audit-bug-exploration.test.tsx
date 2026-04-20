@@ -12,16 +12,39 @@
 
 import { describe, it, expect } from 'vitest';
 
+async function readSources(...relativePaths: string[]): Promise<string> {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+
+  const sources = await Promise.all(
+    relativePaths.map((relativePath) =>
+      fs.readFile(path.resolve(__dirname, relativePath), 'utf-8'),
+    ),
+  );
+
+  return sources.join('\n');
+}
+
+async function readGlobalStyleSources(): Promise<string> {
+  return readSources(
+    '../app/globals.css',
+    '../app/_styles/theme.css',
+    '../app/_styles/surfaces.css',
+    '../app/_styles/controls.css',
+    '../app/_styles/motion.css',
+    '../app/_styles/result-markdown.css',
+    '../app/_styles/markdown-editor.css',
+    '../app/_styles/status-pill.css',
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 1. CSS Specificity (1.37)
 //    .btn-neo should be inside @layer components and NOT hardcode display
 // ---------------------------------------------------------------------------
 describe('Bug 1.37 — CSS Specificity: .btn-neo should not override Tailwind utilities', () => {
   it('should have .btn-neo defined inside @layer components so Tailwind utilities can override it', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const cssPath = path.resolve(__dirname, '../app/globals.css');
-    const cssContent = await fs.readFile(cssPath, 'utf-8');
+    const cssContent = await readGlobalStyleSources();
 
     // The .btn-neo block should be wrapped in @layer components { ... }
     const layerComponentsRegex = /@layer\s+components\s*\{[^}]*\.btn-neo\s*\{/s;
@@ -29,10 +52,7 @@ describe('Bug 1.37 — CSS Specificity: .btn-neo should not override Tailwind ut
   });
 
   it('should NOT hardcode display: inline-flex in .btn-neo', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const cssPath = path.resolve(__dirname, '../app/globals.css');
-    const cssContent = await fs.readFile(cssPath, 'utf-8');
+    const cssContent = await readGlobalStyleSources();
 
     // Extract the .btn-neo block
     const btnNeoMatch = cssContent.match(/\.btn-neo\s*\{([^}]*)\}/);
@@ -182,10 +202,11 @@ describe('Bug 1.21 — beforeunload should guard unsaved notes even without acti
 // ---------------------------------------------------------------------------
 describe('Bug A-1 — FTUE: empty workspace should show onboarding card', () => {
   it('should have an onboarding component or conditional for zero-meeting state in page.tsx', async () => {
-    const fs = await import('node:fs/promises');
-    const path = await import('node:path');
-    const filePath = path.resolve(__dirname, '../app/page.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const source = await readSources(
+      '../app/page.tsx',
+      '../app/_components/home/HomePageContent.tsx',
+      '../app/_components/home/DashboardView.tsx',
+    );
 
     // The page should differentiate between "no meeting selected" and "zero meetings in workspace".
     // Expected: When meetings.length === 0 && !isLoading, show an OnboardingViewer

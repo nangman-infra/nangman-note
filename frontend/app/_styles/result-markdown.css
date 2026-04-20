@@ -1,0 +1,78 @@
+/* ─── Result Markdown Styling ─── */
+.result-markdown {
+  color: var(--ink-strong);
+  line-height: 1.75;
+  font-size: 0.92rem;
+}
+
+.result-markdown h1,
+.result-markdown h2,
+.result-markdown h3,
+.result-markdown h4 {
+  font-family: 'Manrope', var(--font-display), sans-serif;
+  margin-top: 1.1em;
+  margin-bottom: 0.45em;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.result-markdown p,
+.result-markdown ul,
+.result-markdown ol,
+.result-markdown table {
+  margin: 0.6em 0;
+}
+
+/*
+ * Tables follow the No-Line Rule: no 1px borders. Instead we use tonal
+ * background alternation — header row with a stronger surface tint +
+ * weight, and body rows with subtle zebra striping — so structure is
+ * felt through surface hierarchy, not drawn with lines.
+ */
+.result-markdown table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.88rem;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.result-markdown th,
+.result-markdown td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+}
+
+.result-markdown thead th,
+.result-markdown th {
+  background: var(--surface-container);
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.result-markdown tbody tr:nth-child(even) td {
+  background: var(--surface-container-low);
+}
+
+.result-markdown tbody tr:nth-child(odd) td {
+  background: var(--bg-card);
+}
+
+.result-markdown code {
+  border-radius: 6px;
+  background: var(--surface-container-high);
+  padding: 0.1rem 0.35rem;
+  font-family: var(--font-code), 'IBM Plex Mono', monospace;
+  font-size: 0.83em;
+}
+
+.result-markdown pre {
+  overflow-x: auto;
+  border-radius: 10px;
+  background: #101d26;
+  color: #ecf3f7;
+  padding: 0.75rem;
+}

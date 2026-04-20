@@ -1,0 +1,92 @@
+/* ─── Stitch "Cognitive Workspace" Design Tokens ─── */
+:root {
+  /* Surface hierarchy (light → dark layering) */
+  --bg-root: #f7f9fb;
+  --bg-elevated: rgba(255, 255, 255, 0.84);
+  --bg-card: #ffffff;
+  --surface-container-low: #f2f4f6;
+  --surface-container: #eceef0;
+  --surface-container-high: #e6e8ea;
+  --surface-container-highest: #e0e3e5;
+
+  /* Ink */
+  --ink-strong: #191c1e;
+  --ink-muted: #757686;
+  --ink-subtle: #454654;
+
+  /* Lines — "Ghost Border" philosophy: felt, not seen */
+  --line-soft: rgba(197, 197, 215, 0.2);
+  --line-strong: rgba(197, 197, 215, 0.4);
+  --outline-variant: #c5c5d7;
+
+  /* Brand — Deep Indigo */
+  --brand: #2035bd;
+  --brand-strong: #1e33bb;
+  --brand-container: #3e51d5;
+  --brand-fixed: #dfe0ff;
+  --brand-fixed-dim: #bcc2ff;
+  --on-brand: #ffffff;
+  --on-brand-container: #d6d9ff;
+
+  /* Tertiary — AI Accent (Teal/Cyan) */
+  --tertiary: #00505a;
+  --tertiary-container: #006a77;
+  --tertiary-fixed: #9cf0ff;
+  --tertiary-fixed-dim: #00daf3;
+  --on-tertiary: #ffffff;
+
+  /* Secondary */
+  --secondary: #505f7c;
+  --secondary-container: #cbdafd;
+  --on-secondary-container: #505f7d;
+
+  /* Semantic */
+  --accent: #d97706;
+  --danger: #ba1a1a;
+  --error-container: #ffdad6;
+  --success: #16a34a;
+}
+
+@theme inline {
+  --color-background: var(--bg-root);
+  --color-elevated: var(--bg-elevated);
+  --color-card: var(--bg-card);
+  --color-foreground: var(--ink-strong);
+  --color-muted: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-container: var(--brand-container);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-dim: var(--tertiary-fixed-dim);
+  --font-sans: var(--font-display), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
+  --font-mono: var(--font-code), 'IBM Plex Mono', 'SFMono-Regular', monospace;
+  --font-headline: var(--font-display), 'Manrope', sans-serif;
+  --font-body: 'Inter', var(--font-display), 'Pretendard', sans-serif;
+}
+
+* {
+  border-color: var(--line-soft);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink-strong);
+  font-family: 'Inter', var(--font-display), 'Pretendard', 'Noto Sans KR', sans-serif;
+  letter-spacing: -0.01em;
+  background: var(--bg-root);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  color: #ffffff;
+  background-color: rgba(32, 53, 189, 0.82);
+}
