@@ -30,6 +30,9 @@ interface SocketAuthContext {
     origin: createWsCorsOriginHandler(),
     credentials: true,
   },
+  transports: ['websocket'],
+  pingTimeout: 10000,
+  pingInterval: 5000,
 })
 export class MeetingStatusGateway
   implements OnGatewayConnection, OnGatewayDisconnect

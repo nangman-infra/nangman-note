@@ -46,10 +46,10 @@ export class TranscriptionUploadEntity {
   @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage?: string | null;
 
-  @Column({ name: 'confirmed_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'confirmed_at', type: 'datetime', nullable: true })
   confirmedAt?: Date | null;
 
-  @Column({ name: 'job_queued_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'job_queued_at', type: 'datetime', nullable: true })
   jobQueuedAt?: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })

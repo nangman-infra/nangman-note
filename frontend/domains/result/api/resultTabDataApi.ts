@@ -6,6 +6,7 @@ export interface ResultTabTranscriptSegment {
   startTime: number;
   endTime: number;
   text: string;
+  speakerLabel?: string;
 }
 
 interface TranscriptListResponse {

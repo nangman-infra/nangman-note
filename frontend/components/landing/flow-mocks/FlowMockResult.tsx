@@ -1,65 +1,144 @@
 'use client';
 
-import { Copy, Download, Edit3, FileText } from 'lucide-react';
+import { ChevronDown, Copy, Download, Edit3, Sparkles } from 'lucide-react';
 
-/** 결과 뷰어 3탭 목업 */
+/**
+ * 결과 뷰어 화면 목업 — 실제 Meeting Result (Phase 4) 축소판.
+ *
+ * 참조: frontend/domains/result/components/ResultViewer.tsx
+ * - 상단 헤더: Finished 배지(tertiary-fixed bg) + 메타 라인(날짜 · 길이)
+ *   + Manrope 대형 헤드라인(축소 스케일) + 참가자 아바타 스택(-space-x)
+ * - 액션 줄: Export 드롭다운(btn-primary, ChevronDown) + 편집 + 복사
+ *   (보조 버튼은 btn-secondary 룩)
+ * - 탭 바: 활성 탭 `border-b-2 border-brand text-slate-900`,
+ *   비활성 탭 `text-[var(--ink-muted)]`
+ * - 본문 (AI Summary 탭): 8/4 grid
+ *   - 좌측: `ai-card-accent` 축소판 (4px tertiary 좌측 바 + surface-container-highest,
+ *     rounded-r) + "AI Summary" 라벨
+ *   - 우측: "생성 정보" 메타 카드 (흰 배경 + 작은 섀도우)
+ *
+ * No-Line 규칙: 구획 경계 border 제거, 배경 톤 전환으로만 나눈다.
+ */
 export function FlowMockResult() {
   return (
     <div className="surface-card overflow-hidden text-[11px]">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between border-b border-[var(--line-soft)] bg-white/40 px-4 py-2.5">
-        <span className="font-semibold">주간 정기회의</span>
+      {/* ── 헤더: 배지 · 메타 · 헤드라인 · 아바타 스택 · 액션 ── */}
+      <header className="space-y-2 px-3 pb-3 pt-3">
+        {/* Finished badge + 메타 라인 */}
         <div className="flex items-center gap-1.5">
-          <MockBtn icon={Edit3} label="편집" />
-          <MockBtn icon={Copy} label="복사" />
-          <MockBtn icon={Download} label="PDF" accent />
-          <MockBtn icon={Download} label="DOCX" accent />
+          <span className="rounded-full bg-[var(--tertiary-fixed)] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest text-[var(--tertiary)]">
+            Finished
+          </span>
+          <span className="text-[9px] font-medium text-[var(--ink-muted)]">
+            2026년 3월 12일 · 48분
+          </span>
         </div>
+
+        {/* Manrope 축소판 헤드라인 */}
+        <h2 className="font-headline text-[15px] font-extrabold leading-tight tracking-tight text-slate-900">
+          주간 정기회의
+        </h2>
+
+        {/* 참가자 아바타 스택 */}
+        <div className="flex items-center gap-1.5">
+          <div className="flex -space-x-1.5" aria-label="참가자 3명">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[7px] font-bold text-white ring-1 ring-white">
+              S1
+            </span>
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[7px] font-bold text-white ring-1 ring-white">
+              S2
+            </span>
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[7px] font-bold text-white ring-1 ring-white">
+              S3
+            </span>
+          </div>
+          <span className="text-[9px] font-medium text-[var(--ink-muted)]">
+            참가자 3명
+          </span>
+        </div>
+
+        {/* 액션 줄: Export 드롭다운 + 편집 + 복사 */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          {/* Export — btn-primary 축소판 */}
+          <span className="inline-flex items-center gap-1 rounded-md bg-brand px-2 py-1 text-[9px] font-bold text-white shadow-sm">
+            <Download className="h-2.5 w-2.5" aria-hidden="true" />
+            Export
+            <ChevronDown className="h-2.5 w-2.5" aria-hidden="true" />
+          </span>
+          {/* 편집 — btn-secondary 룩 */}
+          <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 text-[9px] font-semibold text-brand">
+            <Edit3 className="h-2.5 w-2.5" aria-hidden="true" />
+            편집
+          </span>
+          {/* 복사 — btn-secondary 룩 */}
+          <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 text-[9px] font-semibold text-brand">
+            <Copy className="h-2.5 w-2.5" aria-hidden="true" />
+            복사
+          </span>
+        </div>
+      </header>
+
+      {/* ── 탭 바 (No-Line: 배경 톤으로 구획, 활성 탭만 2px brand bar) ── */}
+      <div className="flex gap-4 bg-[var(--surface-container-low)] px-3">
+        <span className="border-b-2 border-brand py-1.5 text-[9px] font-bold tracking-wide text-slate-900">
+          AI Summary
+        </span>
+        <span className="border-b-2 border-transparent py-1.5 text-[9px] font-bold tracking-wide text-[var(--ink-muted)]">
+          Full Transcript
+        </span>
+        <span className="border-b-2 border-transparent py-1.5 text-[9px] font-bold tracking-wide text-[var(--ink-muted)]">
+          Original Notes
+        </span>
       </div>
 
-      {/* 탭 */}
-      <div className="flex border-b border-[var(--line-soft)]">
-        <div className="border-b-2 border-brand px-4 py-2 text-[10px] font-semibold text-brand">
-          <FileText className="mr-1 inline h-3 w-3" />
-          회의록
+      {/* ── 본문: 8/4 grid (AI Summary 탭) ── */}
+      <div className="grid grid-cols-12 gap-2 p-3">
+        {/* 좌측(8): ai-card-accent 축소판 */}
+        <div className="col-span-8">
+          <div className="mb-1 flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider text-[var(--tertiary)]">
+            <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
+            AI Summary
+          </div>
+          <article className="ai-card-accent rounded-r-lg p-2.5">
+            <p className="text-[10px] font-bold text-slate-900">
+              1. 배포 일정 확정
+            </p>
+            <p className="mt-0.5 text-[9px] leading-snug text-[var(--ink-subtle)]">
+              3/15 스테이징, 3/18 프로덕션 배포로 합의. QA 시나리오는 3/13까지
+              김OO이 작성.
+            </p>
+            <p className="mt-1.5 text-[10px] font-bold text-slate-900">
+              2. API 응답 속도 개선
+            </p>
+            <p className="mt-0.5 text-[9px] leading-snug text-[var(--ink-subtle)]">
+              Redis 캐시 레이어 도입에 합의.
+            </p>
+          </article>
         </div>
-        <div className="px-4 py-2 text-[10px] text-muted">전사 원본</div>
-        <div className="px-4 py-2 text-[10px] text-muted">메모</div>
-      </div>
 
-      {/* 구조화된 문서 */}
-      <div className="space-y-2.5 p-4">
-        <div className="text-xs font-bold">📋 안건 1: 배포 일정 확인</div>
-        <div className="space-y-1 pl-3 text-[10px]">
-          <p className="text-muted">스테이징 배포를 3/15로 확정하고, 프로덕션은 3/18로 진행하기로 했습니다.</p>
-          <div className="mt-1.5 rounded-lg border border-teal-200 bg-teal-50/50 px-3 py-1.5">
-            <span className="text-[9px] font-semibold text-teal-700">✅ 결정사항</span>
-            <p className="mt-0.5 text-teal-900">3/15 스테이징, 3/18 프로덕션 배포 확정</p>
+        {/* 우측(4): 생성 정보 메타 카드 */}
+        <aside className="col-span-4">
+          <div className="rounded-lg bg-white p-2 shadow-sm">
+            <h3 className="mb-1 text-[8px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+              생성 정보
+            </h3>
+            <dl className="space-y-1">
+              <div className="flex items-baseline justify-between gap-1.5">
+                <dt className="text-[8px] text-[var(--ink-muted)]">단어</dt>
+                <dd className="font-mono text-[8px] font-semibold text-slate-900">
+                  4,238
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-1.5">
+                <dt className="text-[8px] text-[var(--ink-muted)]">노트</dt>
+                <dd className="font-mono text-[8px] font-semibold text-slate-900">
+                  312자
+                </dd>
+              </div>
+            </dl>
           </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-1.5">
-            <span className="text-[9px] font-semibold text-amber-700">📌 할 일</span>
-            <p className="mt-0.5 text-amber-900">QA 시나리오 작성 — 김OO, 3/13까지</p>
-          </div>
-        </div>
-
-        <div className="text-xs font-bold">📋 안건 2: API 응답 속도 개선</div>
-        <div className="space-y-1 pl-3 text-[10px]">
-          <p className="text-muted">Redis 캐시 레이어 도입에 합의했습니다.</p>
-          <div className="rounded-lg border border-teal-200 bg-teal-50/50 px-3 py-1.5">
-            <span className="text-[9px] font-semibold text-teal-700">✅ 결정사항</span>
-            <p className="mt-0.5 text-teal-900">캐시 레이어 도입 합의</p>
-          </div>
-        </div>
+        </aside>
       </div>
     </div>
-  );
-}
-
-function MockBtn({ icon: Icon, label, accent = false }: { icon: typeof Edit3; label: string; accent?: boolean }) {
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[9px] font-medium ${accent ? 'bg-brand/10 text-brand' : 'bg-white/60 text-muted'}`}>
-      <Icon className="h-2.5 w-2.5" />
-      {label}
-    </span>
   );
 }

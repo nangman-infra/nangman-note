@@ -52,6 +52,11 @@ interface SocketAuthContext {
     origin: createWsCorsOriginHandler(),
     credentials: true,
   },
+  // ARTS 참조: WebSocket 안정성 설정
+  transports: ['websocket'],
+  pingTimeout: 10000,
+  pingInterval: 5000,
+  maxHttpBufferSize: 1e6, // 1MB — 오디오 청크 최대 크기
 })
 export class TranscriptionGateway
   implements OnGatewayConnection, OnGatewayDisconnect

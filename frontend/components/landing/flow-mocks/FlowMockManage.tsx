@@ -1,84 +1,146 @@
 'use client';
 
-import { CalendarDays, Search, Settings, Trash2 } from 'lucide-react';
+import { BookOpenText, Edit3, GraduationCap, Users } from 'lucide-react';
 
-/** 회의 관리 화면 목업 */
+/**
+ * 프롬프트 관리 화면 목업 — 실제 Prompt Management (Phase 5) 축소판.
+ *
+ * 참조: frontend/app/settings/page.tsx
+ * - 상단 헤더: eyebrow "Prompt Management" + Manrope 헤드라인 "프롬프트 관리"
+ * - System Library 섹션: 3열 템플릿 카드 그리드
+ *   (아이콘 타일 + 이름 + 1줄 설명 + 문서 타입 라벨 + Edit 링크)
+ * - Template Editor 섹션: 기본값 폼 2행 (tonal select, 라벨 + 미니 select)
+ *
+ * No-Line 규칙: 모든 구획을 배경 톤 전환으로만 나눈다 (border-* 미사용).
+ */
 export function FlowMockManage() {
   return (
     <div className="surface-card overflow-hidden text-[11px]">
-      {/* 사이드바 + 리스트 2-column */}
-      <div className="grid grid-cols-[120px_1fr] divide-x divide-[var(--line-soft)]" style={{ height: 240 }}>
-        {/* 미니 사이드바 */}
-        <div className="space-y-2 bg-white/40 p-2.5">
-          <div className="text-[9px] font-semibold text-brand">TransNote</div>
-          <SidebarItem icon={CalendarDays} label="오늘" active />
-          <SidebarItem icon={CalendarDays} label="최근" />
-          <SidebarItem icon={CalendarDays} label="전체" />
-          <div className="mt-2 text-[8px] font-semibold tracking-wide text-muted">TAGS</div>
-          <div className="flex flex-wrap gap-1">
-            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[8px] font-semibold text-teal-800">회의록</span>
-            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[8px] font-semibold text-amber-800">강의</span>
-          </div>
-          <div className="mt-auto space-y-1 pt-3">
-            <SidebarItem icon={Settings} label="설정" />
-            <SidebarItem icon={Trash2} label="휴지통" />
-          </div>
-        </div>
+      {/* ── 헤더: eyebrow + Manrope 헤드라인 ── */}
+      <header className="px-3 pb-2 pt-3">
+        <p className="text-[8px] font-bold uppercase tracking-widest text-[var(--ink-muted)]">
+          Prompt Management
+        </p>
+        <h2 className="mt-0.5 font-headline text-[14px] font-extrabold leading-tight tracking-tight text-slate-900">
+          프롬프트 관리
+        </h2>
+      </header>
 
-        {/* 회의 리스트 */}
-        <div className="flex flex-col">
-          {/* 검색 + 필터 */}
-          <div className="border-b border-[var(--line-soft)] bg-white/30 px-3 py-2">
-            <div className="flex items-center gap-1.5 rounded-lg border border-[var(--line-soft)] bg-white/80 px-2 py-1.5">
-              <Search className="h-3 w-3 text-muted" />
-              <span className="text-[10px] text-muted">회의 검색... ⌘K</span>
-            </div>
-            <div className="mt-1.5 flex gap-1">
-              <FilterPill label="전체" active />
-              <FilterPill label="진행 중" />
-              <FilterPill label="정리 중" />
-              <FilterPill label="완료" />
-            </div>
-          </div>
-
-          {/* 카드 리스트 */}
-          <div className="flex-1 space-y-1.5 overflow-hidden p-2">
-            <MeetingMiniCard title="주간 정기회의" status="완료" statusColor="bg-teal-100 text-teal-700" time="오늘 · 48분" />
-            <MeetingMiniCard title="UX 리서치 강의" status="완료" statusColor="bg-teal-100 text-teal-700" time="어제 · 1시간 22분" />
-            <MeetingMiniCard title="시니어 멘토링" status="정리 중" statusColor="bg-amber-100 text-amber-700" time="3/5 · 35분" />
-            <MeetingMiniCard title="스프린트 회고" status="완료" statusColor="bg-teal-100 text-teal-700" time="3/3 · 52분" />
-          </div>
+      {/* ── System Library: 3열 템플릿 카드 그리드 ── */}
+      <section className="px-3 pb-3">
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <p className="text-[8px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+            System Library
+          </p>
+          <span className="text-[8px] font-semibold text-[var(--ink-muted)]">
+            3개 템플릿
+          </span>
         </div>
-      </div>
+        <ul className="grid grid-cols-3 gap-1.5" role="list">
+          <TemplateMiniCard
+            icon={Users}
+            tone="bg-indigo-50 text-indigo-600"
+            name="일일 스탠드업"
+            description="팀 단위 진행 현황·블로커·다음 단계를 간결하게 정리."
+            typeLabel="회의"
+          />
+          <TemplateMiniCard
+            icon={BookOpenText}
+            tone="bg-amber-50 text-amber-700"
+            name="UX 강의"
+            description="강의 핵심 주제와 질의응답을 장별로 구조화."
+            typeLabel="강의"
+          />
+          <TemplateMiniCard
+            icon={GraduationCap}
+            tone="bg-cyan-50 text-cyan-700"
+            name="시니어 멘토링"
+            description="피드백·액션 아이템·후속 과제 중심으로 요약."
+            typeLabel="멘토링"
+          />
+        </ul>
+      </section>
+
+      {/* ── Template Editor: 기본값 설정 (tonal surface-container-low) ── */}
+      <section className="bg-[var(--surface-container-low)] px-3 py-2.5">
+        <p className="mb-1.5 text-[8px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+          Template Editor
+        </p>
+        <div className="space-y-1.5">
+          <DefaultFormRow
+            label="기본 프롬프트"
+            value="일일 스탠드업"
+          />
+          <DefaultFormRow
+            label="기본 전사 모드"
+            value="Realtime (실시간 전사)"
+          />
+        </div>
+      </section>
     </div>
   );
 }
 
-function SidebarItem({ icon: Icon, label, active = false }: { icon: typeof CalendarDays; label: string; active?: boolean }) {
+/**
+ * 축소판 템플릿 카드 — surface-card 위에 올라가는 한 단계 리프트 카드.
+ * tonal 타일 아이콘 + 이름 + 1줄 설명 + 하단 메타 라인(타입 · Edit).
+ */
+function TemplateMiniCard({
+  icon: Icon,
+  tone,
+  name,
+  description,
+  typeLabel,
+}: {
+  icon: typeof Users;
+  tone: string;
+  name: string;
+  description: string;
+  typeLabel: string;
+}) {
   return (
-    <div className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] ${active ? 'bg-brand/10 font-semibold text-brand' : 'text-muted'}`}>
-      <Icon className="h-3 w-3" />
-      {label}
-    </div>
-  );
-}
-
-function FilterPill({ label, active = false }: { label: string; active?: boolean }) {
-  return (
-    <span className={`rounded-md px-2 py-0.5 text-[9px] font-medium ${active ? 'bg-brand/10 text-brand' : 'text-muted'}`}>
-      {label}
-    </span>
-  );
-}
-
-function MeetingMiniCard({ title, status, statusColor, time }: { title: string; status: string; statusColor: string; time: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--line-soft)] bg-white/50 px-3 py-2">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold">{title}</span>
-        <span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold ${statusColor}`}>{status}</span>
+    <li className="flex flex-col rounded-lg bg-white/80 p-2 shadow-sm">
+      <span
+        className={`inline-flex h-5 w-5 items-center justify-center rounded-md ${tone}`}
+        aria-hidden="true"
+      >
+        <Icon className="h-3 w-3" />
+      </span>
+      <p className="mt-1.5 font-headline text-[10px] font-bold leading-tight tracking-tight text-slate-900">
+        {name}
+      </p>
+      <p className="mt-0.5 line-clamp-1 text-[8px] leading-snug text-[var(--ink-subtle)]">
+        {description}
+      </p>
+      <div className="mt-auto flex items-center justify-between pt-1.5">
+        <span className="text-[7px] font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
+          {typeLabel}
+        </span>
+        <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-brand">
+          <Edit3 className="h-2 w-2" aria-hidden="true" />
+          Edit
+        </span>
       </div>
-      <div className="mt-0.5 text-[9px] text-muted">{time}</div>
+    </li>
+  );
+}
+
+/**
+ * Template Editor 기본값 행 — 라벨 + 톤 배경의 미니 select 목업.
+ * No-Line 규칙: border 없이 흰 배경 + 작은 섀도우로 select 느낌을 낸다.
+ */
+function DefaultFormRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[9px] font-semibold text-[var(--ink-subtle)]">
+        {label}
+      </span>
+      <span className="inline-flex min-w-[110px] items-center justify-between gap-1 rounded-md bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-900 shadow-sm">
+        <span className="truncate">{value}</span>
+        <span aria-hidden="true" className="text-[var(--ink-muted)]">
+          ▾
+        </span>
+      </span>
     </div>
   );
 }

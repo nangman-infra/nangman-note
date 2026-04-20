@@ -7,12 +7,12 @@ export function LandingFooter() {
       <div className="mx-auto max-w-6xl px-5 py-10">
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white/80 px-2.5 py-1 text-xs font-semibold text-brand">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white/80 px-2.5 py-1 font-headline text-xs font-semibold text-brand">
               <Sparkles className="h-3.5 w-3.5" />
               TransNote
             </span>
             <div>
-              <p className="text-sm font-semibold">TransNote</p>
+              <p className="font-headline text-sm font-semibold">TransNote</p>
               <p className="text-xs text-muted">노트 중심 AI 회의록 워크스페이스</p>
             </div>
           </div>

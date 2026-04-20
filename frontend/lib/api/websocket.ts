@@ -37,8 +37,16 @@ export function createSocket(
     auth: (cb) => {
       cb(resolveAuth() ?? {});
     },
-    transports: ['polling', 'websocket'],
+    // WebSocket 전용 transport — polling→upgrade 불안정 제거 (ARTS 동일)
+    transports: ['websocket'],
     withCredentials: true,
+    // 안정적인 재연결 설정
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 10,
+    timeout: 10000,
+    forceNew: true,
   });
 
   return socket;

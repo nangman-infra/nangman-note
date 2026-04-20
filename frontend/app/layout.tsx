@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { IBM_Plex_Mono, Manrope } from 'next/font/google';
+import { IBM_Plex_Mono, Inter, Manrope } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/auth/AuthSessionProvider';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
 import { NetworkStatusBanner } from '@/components/feedback/NetworkStatusBanner';
@@ -30,6 +30,12 @@ function buildRuntimeEnvScript(): string {
 
 const manrope = Manrope({
   variable: '--font-display',
+  subsets: ['latin'],
+  display: 'swap',
+});
+
+const inter = Inter({
+  variable: '--font-body',
   subsets: ['latin'],
   display: 'swap',
 });
@@ -125,7 +131,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: buildRuntimeEnvScript() }}
         />
       </head>
-      <body className={`${manrope.variable} ${plexMono.variable} antialiased`}>
+      <body className={`${manrope.variable} ${inter.variable} ${plexMono.variable} antialiased`}>
         <NetworkStatusBanner />
         <AuthSessionProvider>
           <FeedbackProvider>{children}</FeedbackProvider>

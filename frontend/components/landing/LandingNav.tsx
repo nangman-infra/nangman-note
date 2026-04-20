@@ -30,7 +30,9 @@ export function LandingNav() {
       style={
         scrolled
           ? {
-              background: 'rgba(244, 240, 230, 0.8)',
+              // Use the globals `--bg-elevated` token (frosted surface) rather
+              // than a hardcoded cream value, per NFR-4.
+              background: 'var(--bg-elevated)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
             }
@@ -40,7 +42,7 @@ export function LandingNav() {
       {/* 데스크톱 */}
       <div className="mx-auto hidden max-w-6xl items-center gap-6 px-5 py-3.5 sm:flex">
         <Link href="/landing" className="inline-flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white/80 px-2.5 py-1 text-xs font-semibold text-brand">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white/80 px-2.5 py-1 font-headline text-xs font-semibold text-brand">
             <Sparkles className="h-3.5 w-3.5" />
             TransNote
           </span>
@@ -69,7 +71,7 @@ export function LandingNav() {
       {/* 모바일 */}
       <div className="flex items-center justify-between px-5 py-3.5 sm:hidden">
         <Link href="/landing" className="inline-flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white/80 px-2.5 py-1 text-xs font-semibold text-brand">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white/80 px-2.5 py-1 font-headline text-xs font-semibold text-brand">
             <Sparkles className="h-3.5 w-3.5" />
             TransNote
           </span>

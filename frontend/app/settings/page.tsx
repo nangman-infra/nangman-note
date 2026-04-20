@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
+  BookOpenText,
   Edit3,
+  GraduationCap,
   Languages,
   Mic,
   Plus,
-  Settings2,
   Sparkles,
   Trash2,
+  Users,
 } from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
@@ -25,6 +27,29 @@ import {
   type PromptDocumentType,
 } from '@/domains/prompt/types/prompt.types';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
+
+// ─── Document-type → icon/tile-tone mapping for the System Library grid. ───
+// Keeps visual identity consistent with Stitch tile tokens (tonal, no hex).
+const DOCUMENT_TYPE_TILE: Record<
+  PromptDocumentType,
+  { icon: typeof Sparkles; tone: string }
+> = {
+  meeting: { icon: Users, tone: 'bg-indigo-50 text-indigo-600' },
+  lecture: { icon: BookOpenText, tone: 'bg-amber-50 text-amber-700' },
+  mentoring: { icon: GraduationCap, tone: 'bg-cyan-50 text-cyan-700' },
+};
+
+function formatUpdatedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -164,45 +189,205 @@ export default function SettingsPage() {
     pushToast({ title: '프롬프트가 삭제되었습니다', variant: 'info' });
   };
 
-  const resolvedDefaultPromptId = prompts.some((prompt) => prompt.id === defaultPromptId)
+  const resolvedDefaultPromptId = prompts.some(
+    (prompt) => prompt.id === defaultPromptId,
+  )
     ? defaultPromptId
     : DEFAULT_PROMPT_ID;
 
   return (
     <div className="app-shell min-h-dvh p-4 sm:p-6">
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-6xl">
+        {/* ── Breadcrumb / Back ── */}
         <button
           type="button"
           onClick={() => router.push('/')}
-          className="btn-neo inline-flex mb-5 text-xs text-muted"
+          className="btn-neo mb-5 inline-flex text-xs text-muted"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           워크스페이스로 돌아가기
         </button>
 
-        <div className="mb-6">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[var(--line-soft)] bg-white px-2.5 py-1 text-xs font-semibold text-brand">
-            <Settings2 className="h-3.5 w-3.5" />
-            Settings
-          </div>
-          <h1 className="text-3xl font-semibold">설정</h1>
-          <p className="mt-1 text-sm text-muted">
-            기본 전사 설정과 기본 프롬프트를 관리합니다. 여기서 설정한 값은 새 회의 시작 시 자동 적용됩니다.
+        {/* ── Page Headline ──
+             Large editorial headline (Manrope, -0.02em) per Stitch spec. */}
+        <div className="mb-8">
+          <p className="label-sm mb-2 text-[var(--ink-muted)]">
+            Prompt Management
+          </p>
+          <h1 className="font-headline text-3xl font-extrabold tracking-tight sm:text-4xl">
+            프롬프트 관리
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            팀에 맞는 회의록 템플릿을 선택·편집하고, 새 회의에 자동 적용할
+            기본값을 관리합니다.
           </p>
         </div>
 
-        <div className="mb-6 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-          💡 이 설정은 사용자 계정 기준으로 저장되며, 같은 계정으로 로그인한 다른 기기에도 적용됩니다.
-        </div>
-
+        {/* ─────────────────────────────────────────────────────────────
+             Section 1 — System Library
+             Stitch spec: template grid with icon tile, name, 2-line
+             description, updated timestamp, Edit link. The page-level
+             "Template Editor" is the PromptEditorDialog launched from
+             the Edit / 새 프롬프트 actions in this grid.
+            ───────────────────────────────────────────────────────────── */}
         <ErrorBoundary>
-          <section className="glass-surface mb-6 p-6">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-              <Mic className="h-5 w-5 text-brand" />
-              전사 기본 설정
-            </h2>
+          <section
+            aria-labelledby="system-library-heading"
+            className="glass-surface mb-6 p-6 sm:p-8"
+          >
+            <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="label-sm mb-1 text-[var(--ink-muted)]">
+                  System Library
+                </p>
+                <h2
+                  id="system-library-heading"
+                  className="font-headline text-xl font-bold tracking-tight sm:text-2xl"
+                >
+                  프롬프트 템플릿 라이브러리
+                </h2>
+                <p className="mt-1 text-xs text-muted">
+                  기본 타입이 문서 구조를 정하고, 사용자 프롬프트는 추가 강조와
+                  표현 방식만 덧붙입니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openCreate}
+                disabled={isLoading}
+                className="btn-primary inline-flex self-start sm:self-auto"
+              >
+                <Plus className="h-4 w-4" />새 프롬프트
+              </button>
+            </header>
 
-            <div className="space-y-4">
+            {/* 3-col template card grid — Stitch spec. */}
+            {prompts.length === 0 ? (
+              <div className="rounded-xl bg-[var(--surface-container-low)] p-8 text-center">
+                <p className="text-sm text-muted">
+                  등록된 프롬프트가 없습니다. 새 프롬프트를 만들어보세요.
+                </p>
+              </div>
+            ) : (
+              <ul
+                role="list"
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+              >
+                {prompts.map((prompt) => {
+                  const tile =
+                    DOCUMENT_TYPE_TILE[prompt.documentType] ??
+                    DOCUMENT_TYPE_TILE.meeting;
+                  const TileIcon = tile.icon;
+                  const description =
+                    prompt.content ||
+                    PROMPT_DOCUMENT_TYPE_HELP_TEXT[prompt.documentType];
+
+                  return (
+                    <li
+                      key={prompt.id}
+                      className="surface-card group relative flex flex-col overflow-hidden p-6"
+                    >
+                      <div className="mb-4 flex items-start justify-between">
+                        <div
+                          className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${tile.tone}`}
+                        >
+                          <TileIcon className="h-5 w-5" />
+                        </div>
+                        {!prompt.isDefault ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteConfirmId === prompt.id
+                                ? void handleDelete(prompt.id)
+                                : setDeleteConfirmId(prompt.id)
+                            }
+                            className="rounded-full p-1.5 text-[var(--ink-muted)] opacity-0 transition group-hover:opacity-100 hover:bg-rose-50 hover:text-rose-600"
+                            aria-label={
+                              deleteConfirmId === prompt.id
+                                ? '삭제 확인'
+                                : '프롬프트 삭제'
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <h3 className="font-headline text-lg font-bold leading-snug tracking-tight">
+                        {prompt.name}
+                      </h3>
+                      <p className="mt-1.5 line-clamp-2 text-sm text-[var(--ink-subtle)]">
+                        {description}
+                      </p>
+
+                      <div className="mt-auto flex items-end justify-between pt-6">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="label-sm text-[var(--ink-muted)]">
+                            {prompt.isDefault
+                              ? '기본 템플릿'
+                              : PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}
+                          </span>
+                          {!prompt.isDefault && prompt.updatedAt ? (
+                            <span className="text-[11px] text-[var(--ink-muted)]">
+                              수정 {formatUpdatedAt(prompt.updatedAt)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {!prompt.isDefault ? (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(prompt)}
+                            className="inline-flex items-center gap-1 text-sm font-bold text-[var(--brand)] hover:underline"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                            Edit
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </ErrorBoundary>
+
+        {/* ─────────────────────────────────────────────────────────────
+             Section 2 — Template Editor Defaults
+             These are the workspace-level defaults that the Template
+             Editor applies when launching a new meeting. The in-depth
+             editor for a single template lives in PromptEditorDialog,
+             opened from the System Library grid above.
+            ───────────────────────────────────────────────────────────── */}
+        <ErrorBoundary>
+          <section
+            aria-labelledby="template-editor-heading"
+            className="glass-surface p-6 sm:p-8"
+          >
+            <header className="mb-6">
+              <p className="label-sm mb-1 text-[var(--ink-muted)]">
+                Template Editor
+              </p>
+              <h2
+                id="template-editor-heading"
+                className="flex items-center gap-2 font-headline text-xl font-bold tracking-tight sm:text-2xl"
+              >
+                <Mic className="h-5 w-5 text-[var(--brand)]" />
+                기본 설정
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                여기서 설정한 값은 새 회의 시작 시 자동 적용되고, 회의별로
+                개별 override 할 수 있습니다.
+              </p>
+            </header>
+
+            {/* Tonal info pill — No-Line rule (tonal bg, no border). */}
+            <p className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-xs text-[var(--ink-subtle)]">
+              💡 이 설정은 사용자 계정 기준으로 저장되며, 같은 계정으로
+              로그인한 다른 기기에도 적용됩니다.
+            </p>
+
+            <div className="space-y-5">
               <div>
                 <label
                   htmlFor="default-prompt"
@@ -220,7 +405,8 @@ export default function SettingsPage() {
                     if (!success) {
                       pushToast({
                         title: '기본 프롬프트 변경에 실패했습니다',
-                        description: settingsError || '잠시 후 다시 시도해주세요.',
+                        description:
+                          settingsError || '잠시 후 다시 시도해주세요.',
                         variant: 'error',
                       });
                       return;
@@ -240,7 +426,8 @@ export default function SettingsPage() {
                   ))}
                 </select>
                 <p className="mt-1 text-[11px] text-muted">
-                  새 회의 화면은 이 프롬프트를 기본값으로 시작하고, 회의별로 다른 프롬프트를 고를 수 있습니다.
+                  새 회의 화면은 이 프롬프트를 기본값으로 시작하고, 회의별로
+                  다른 프롬프트를 고를 수 있습니다.
                 </p>
               </div>
 
@@ -256,13 +443,14 @@ export default function SettingsPage() {
                   value={defaultTranscriptionMode}
                   onChange={async (e) => {
                     const success = await updateSettings({
-                      defaultTranscriptionMode:
-                        e.target.value as MeetingTranscriptionMode,
+                      defaultTranscriptionMode: e.target
+                        .value as MeetingTranscriptionMode,
                     });
                     if (!success) {
                       pushToast({
                         title: '기본 전사 모드 변경에 실패했습니다',
-                        description: settingsError || '잠시 후 다시 시도해주세요.',
+                        description:
+                          settingsError || '잠시 후 다시 시도해주세요.',
                         variant: 'error',
                       });
                       return;
@@ -283,7 +471,8 @@ export default function SettingsPage() {
                   </option>
                 </select>
                 <p className="mt-1 text-[11px] text-muted">
-                  새 회의 시작 시 기본으로 적용됩니다. 회의별로 override 가능합니다.
+                  새 회의 시작 시 기본으로 적용됩니다. 회의별로 override
+                  가능합니다.
                 </p>
               </div>
 
@@ -304,7 +493,8 @@ export default function SettingsPage() {
                     if (!success) {
                       pushToast({
                         title: '기본 전사 언어 변경에 실패했습니다',
-                        description: settingsError || '잠시 후 다시 시도해주세요.',
+                        description:
+                          settingsError || '잠시 후 다시 시도해주세요.',
                         variant: 'error',
                       });
                       return;
@@ -346,7 +536,8 @@ export default function SettingsPage() {
                     if (!success) {
                       pushToast({
                         title: '기본 번역 설정 변경에 실패했습니다',
-                        description: settingsError || '잠시 후 다시 시도해주세요.',
+                        description:
+                          settingsError || '잠시 후 다시 시도해주세요.',
                         variant: 'error',
                       });
                       return;
@@ -375,99 +566,9 @@ export default function SettingsPage() {
             </div>
           </section>
         </ErrorBoundary>
-
-        <ErrorBoundary>
-          <section className="glass-surface p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="flex items-center gap-2 text-lg font-semibold">
-                  <Sparkles className="h-5 w-5 text-brand" />
-                  프롬프트 관리
-                </h2>
-                <p className="mt-1 text-[11px] text-muted">
-                  기본 타입이 문서 구조를 정하고, 사용자 프롬프트는 추가 강조와 표현 방식만 덧붙입니다.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openCreate}
-                disabled={isLoading}
-                className="btn-neo inline-flex text-xs text-brand"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                새 프롬프트
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {prompts.map((prompt) => (
-                <div
-                  key={prompt.id}
-                  className="surface-card flex items-start justify-between gap-3 p-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{prompt.name}</p>
-                      <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
-                        {PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}
-                      </span>
-                      {prompt.isDefault ? (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-muted">
-                          기본
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-muted">
-                      {prompt.content}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted">
-                      {PROMPT_DOCUMENT_TYPE_HELP_TEXT[prompt.documentType]}
-                    </p>
-                  </div>
-
-                  {!prompt.isDefault ? (
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(prompt)}
-                        className="rounded-full p-1.5 text-muted transition hover:bg-black/5"
-                        aria-label="편집"
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </button>
-                      {deleteConfirmId === prompt.id ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(prompt.id)}
-                          className="rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-200"
-                        >
-                          삭제 확인
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setDeleteConfirmId(prompt.id)}
-                          className="rounded-full p-1.5 text-muted transition hover:bg-rose-50 hover:text-rose-600"
-                          aria-label="삭제"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-
-              {prompts.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted">
-                  등록된 프롬프트가 없습니다. 새 프롬프트를 만들어보세요.
-                </p>
-              ) : null}
-            </div>
-          </section>
-        </ErrorBoundary>
       </div>
 
+      {/* Template Editor modal — launched from the System Library grid. */}
       <PromptEditorDialog
         key={editingPromptId ?? 'create'}
         open={editorOpen}

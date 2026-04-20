@@ -18,7 +18,7 @@ import type {
 } from '../application/ports/streaming-transcription-provider.port';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
-const DEFAULT_SAMPLE_RATE = 48_000;
+const DEFAULT_SAMPLE_RATE = 16_000;
 const DEFAULT_MAX_BUFFERED_AUDIO_BYTES = 8 * 1024 * 1024; // 8MB
 const DEFAULT_LANGUAGE_OPTIONS = [
   'ko-KR',

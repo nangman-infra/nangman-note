@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Download, Edit3, FileText, Loader2, MoreVertical, RefreshCw, Save, X } from 'lucide-react';
+import { ChevronDown, Copy, Download, Edit3, FileText, Loader2, RefreshCw, Save, Sparkles, X } from 'lucide-react';
 import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
@@ -76,12 +76,12 @@ export function ResultViewer({
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [tabDataMeetingId, setTabDataMeetingId] = useState('');
-  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [isExporting, setIsExporting] = useState<'pdf' | 'docx' | null>(null);
-  const overflowMenuRef = useRef<HTMLDivElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const regenerateDialogRef = useRef<HTMLDialogElement>(null);
 
   // 탭 데이터 로드
@@ -140,17 +140,17 @@ export function ResultViewer({
     onMeetingUnavailable?.(meetingId);
   }, [isMissingMeeting, meetingId, onMeetingUnavailable, pushToast]);
 
-  // Close overflow menu on outside click
+  // Close export menu on outside click
   useEffect(() => {
-    if (!showOverflowMenu) return;
+    if (!showExportMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node)) {
-        setShowOverflowMenu(false);
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showOverflowMenu]);
+  }, [showExportMenu]);
 
   // Regenerate confirmation dialog open/close
   useEffect(() => {
@@ -173,6 +173,32 @@ export function ResultViewer({
   const visibleNoteContent = isCurrentTabData ? noteContent : '';
   const visibleTranscriptError = isCurrentTabData ? transcriptError : null;
   const visibleNoteError = isCurrentTabData ? noteError : null;
+
+  // 참가자 아바타 스택 — transcript의 speakerLabel에서 유추 (메타데이터에 participants 필드 없음)
+  const uniqueSpeakers = Array.from(
+    new Set(
+      visibleTranscripts
+        .map((s) => s.speakerLabel?.trim())
+        .filter((label): label is string => Boolean(label && label.length > 0)),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  const visibleSpeakers = uniqueSpeakers.slice(0, 3);
+  const overflowSpeakerCount = Math.max(uniqueSpeakers.length - 3, 0);
+  const speakerPalette = [
+    'bg-indigo-500',
+    'bg-teal-500',
+    'bg-amber-500',
+    'bg-rose-500',
+  ];
+  const getSpeakerInitial = (label: string): string => {
+    // "spk_0" → "S1", "spk_1" → "S2", else first char upper
+    const match = label.match(/^spk[_-]?(\d+)$/i);
+    if (match) {
+      const idx = Number.parseInt(match[1] ?? '0', 10);
+      return `S${idx + 1}`;
+    }
+    return label.slice(0, 2).toUpperCase();
+  };
 
   if (isLoading) {
     return (
@@ -324,104 +350,163 @@ export function ResultViewer({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-[var(--line-soft)] px-6 py-5">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold tracking-wide text-muted">RESULT</p>
-            {isEditingTitle ? (
-              <input
-                autoFocus
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                onBlur={() => void handleTitleSave()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleTitleSave();
-                  if (e.key === 'Escape') setIsEditingTitle(false);
-                }}
-                className="input-shell text-xl font-semibold"
-              />
-            ) : (
-              <h2
-                onClick={handleTitleClick}
-                className="text-xl font-semibold leading-tight cursor-pointer hover:text-brand transition"
-                title="클릭하여 제목 편집"
-              >
-                {result.metadata?.title || '회의록'}
-              </h2>
-            )}
-            <p className="mt-1 text-xs text-muted">생성 시각: {new Date(result.createdAt).toLocaleString()}</p>
-          </div>
+      <header className="px-6 py-6 sm:px-8 lg:px-12">
+        {/* Status badge + date */}
+        <div className="mb-4 flex items-center gap-2">
+          <span className="rounded-full bg-[var(--tertiary-fixed)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--tertiary)]">
+            {result.metadata?.totalDuration > 0 ? 'Finished' : 'Draft'}
+          </span>
+          <span className="text-sm font-medium text-[var(--ink-muted)]">
+            {new Date(result.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+            {' · '}
+            {Math.round(result.metadata.totalDuration / 60)}분
+          </span>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+        {/* Title — large editorial headline (Manrope, -0.02em) */}
+        {isEditingTitle ? (
+          <input
+            autoFocus
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onBlur={() => void handleTitleSave()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) void handleTitleSave();
+              if (e.key === 'Escape') setIsEditingTitle(false);
+            }}
+            className="input-shell font-headline text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
+          />
+        ) : (
+          <h1
+            onClick={handleTitleClick}
+            className="font-headline text-3xl font-extrabold leading-tight tracking-tight cursor-pointer hover:text-indigo-700 transition sm:text-4xl lg:text-5xl"
+            title="클릭하여 제목 편집"
+          >
+            {result.metadata?.title || '회의록'}
+          </h1>
+        )}
+
+        {/* Metadata chips */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full bg-[var(--secondary-container)] px-2.5 py-1 font-semibold text-[var(--on-secondary-container)]">단어 수: {result.metadata.transcriptWordCount}</span>
+          <span className="rounded-full bg-[var(--secondary-container)] px-2.5 py-1 font-semibold text-[var(--on-secondary-container)]">노트 길이: {result.metadata.noteLength}</span>
+        </div>
+
+        {/* 참가자 아바타 스택 — transcript의 speakerLabel 기반. 데이터 없으면 숨김 */}
+        {uniqueSpeakers.length > 0 ? (
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex -space-x-2" aria-label={`참가자 ${uniqueSpeakers.length}명`}>
+              {visibleSpeakers.map((label, idx) => (
+                <span
+                  key={label}
+                  title={label}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white ring-2 ring-white ${
+                    speakerPalette[idx % speakerPalette.length]
+                  }`}
+                >
+                  {getSpeakerInitial(label)}
+                </span>
+              ))}
+              {overflowSpeakerCount > 0 ? (
+                <button
+                  type="button"
+                  title={uniqueSpeakers.slice(3).join(', ')}
+                  aria-label={`추가 참가자 ${overflowSpeakerCount}명`}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 ring-2 ring-white hover:bg-slate-300 transition"
+                >
+                  +{overflowSpeakerCount}
+                </button>
+              ) : null}
+            </div>
+            <span className="text-xs font-medium text-[var(--ink-muted)]">
+              참가자 {uniqueSpeakers.length}명
+            </span>
+          </div>
+        ) : null}
+
+        {/* Action buttons row */}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
             {!isEditing ? (
               <>
-                <button type="button" onClick={handleStartEdit} className="btn-neo inline-flex">
-                  <Edit3 className="h-4 w-4" />
-                  편집
-                </button>
-                <button type="button" onClick={handleCopy} className="btn-neo inline-flex">
-                  <Copy className="h-4 w-4" />
-                  복사
-                </button>
-                <button type="button" onClick={handleExportPDF} disabled={isExporting !== null} className="btn-neo hidden sm:inline-flex">
-                  {isExporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  PDF
-                </button>
-                <button type="button" onClick={handleExportDOCX} disabled={isExporting !== null} className="btn-neo hidden sm:inline-flex">
-                  {isExporting === 'docx' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                  DOCX
-                </button>
-                {/* Mobile overflow menu for PDF/DOCX */}
-                <div ref={overflowMenuRef} className="relative sm:hidden">
+                {/* Export dropdown — single btn-primary with PDF/DOCX menu */}
+                <div ref={exportMenuRef} className="relative">
                   <button
                     type="button"
-                    onClick={() => setShowOverflowMenu((v) => !v)}
-                    className="btn-neo inline-flex"
-                    aria-label="더보기"
-                    aria-expanded={showOverflowMenu}
-                    aria-haspopup="true"
+                    onClick={() => setShowExportMenu((v) => !v)}
+                    disabled={isExporting !== null}
+                    className="btn-primary inline-flex"
+                    aria-haspopup="menu"
+                    aria-expanded={showExportMenu}
                   >
-                    <MoreVertical className="h-4 w-4" />
+                    {isExporting !== null ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Export
+                    <ChevronDown className="h-4 w-4" />
                   </button>
-                  {showOverflowMenu && (
-                    <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-lg border border-[var(--line-soft)] bg-white py-1 shadow-lg">
+                  {showExportMenu && (
+                    <div
+                      role="menu"
+                      className="absolute left-0 top-full z-20 mt-1 min-w-[180px] rounded-lg bg-white py-1 shadow-lg"
+                    >
                       <button
                         type="button"
-                        onClick={() => { void handleExportPDF(); setShowOverflowMenu(false); }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                        role="menuitem"
+                        onClick={() => { setShowExportMenu(false); void handleExportPDF(); }}
+                        disabled={isExporting !== null}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Download className="h-4 w-4" />
+                        {isExporting === 'pdf' ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
                         PDF 내보내기
                       </button>
                       <button
                         type="button"
-                        onClick={() => { void handleExportDOCX(); setShowOverflowMenu(false); }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+                        role="menuitem"
+                        onClick={() => { setShowExportMenu(false); void handleExportDOCX(); }}
+                        disabled={isExporting !== null}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <FileText className="h-4 w-4" />
+                        {isExporting === 'docx' ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4" />
+                        )}
                         DOCX 내보내기
                       </button>
                     </div>
                   )}
                 </div>
+                <button type="button" onClick={handleStartEdit} className="btn-secondary inline-flex">
+                  <Edit3 className="h-4 w-4" />
+                  편집
+                </button>
+                <button type="button" onClick={handleCopy} className="btn-secondary inline-flex">
+                  <Copy className="h-4 w-4" />
+                  복사
+                </button>
               </>
             ) : (
               <>
-                <button type="button" onClick={() => setIsEditing(false)} className="btn-neo inline-flex">
+                <button type="button" onClick={() => setIsEditing(false)} className="btn-secondary inline-flex">
                   <X className="h-4 w-4" />
                   취소
                 </button>
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="btn-neo inline-flex border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white"
+                  className="btn-primary inline-flex"
                 >
                   <Save className="h-4 w-4" />
                   저장
                 </button>
               </>
             )}
-          </div>
         </div>
 
         {isRegenerating ? (
@@ -439,32 +524,24 @@ export function ResultViewer({
             className="mb-3"
           />
         ) : null}
-
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full bg-white px-2.5 py-1 text-muted">단어 수: {result.metadata.transcriptWordCount}</span>
-          <span className="rounded-full bg-white px-2.5 py-1 text-muted">노트 길이: {result.metadata.noteLength}</span>
-          <span className="rounded-full bg-white px-2.5 py-1 text-muted">
-            소요 시간: {Math.round(result.metadata.totalDuration / 60)}분
-          </span>
-        </div>
       </header>
 
-      {/* 탭 네비게이션 */}
-      <div className="border-b border-[var(--line-soft)] px-6">
-        <div className="flex gap-1">
+      {/* 탭 네비게이션 — Stitch editorial style */}
+      <div className="px-6 sm:px-8 lg:px-12">
+        <div className="flex gap-8 border-b border-[var(--outline-variant)]/10">
           {([
-            { key: 'result' as ResultTab, label: '회의록' },
-            { key: 'transcript' as ResultTab, label: `전사 원본 (${visibleTranscripts.length})` },
-            { key: 'note' as ResultTab, label: '메모' },
+            { key: 'result' as ResultTab, label: 'AI Summary' },
+            { key: 'transcript' as ResultTab, label: `Full Transcript` },
+            { key: 'note' as ResultTab, label: 'Original Notes' },
           ]).map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`px-3 py-2 text-sm font-semibold transition ${
+              className={`pb-4 text-sm font-bold tracking-wide transition ${
                 activeTab === tab.key
-                  ? 'border-b-2 border-brand text-brand'
-                  : 'text-muted hover:text-foreground'
+                  ? 'border-b-2 border-brand text-slate-900'
+                  : 'border-b-2 border-transparent text-[var(--ink-muted)] hover:text-slate-900'
               }`}
             >
               {tab.label}
@@ -485,9 +562,101 @@ export function ResultViewer({
             />
           </div>
         ) : activeTab === 'result' ? (
-          <article className="result-markdown surface-card p-5">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
-          </article>
+          /**
+           * AI Summary (Phase 4 — Tasks 4.4 & 4.5)
+           *
+           * Design spec calls for:
+           *  - 좌측(8/12): Executive Summary 카드 (ai-card-accent) + Structured Outline
+           *  - 우측(4/12): Action Items 카드 + Core Topics 칩 + AI Confidence / 생성 메타
+           *
+           * Backend constraint: `MeetingResult` exposes only a single Markdown
+           * `content` string plus `metadata` with `title`, `generatedAt`,
+           * `totalDuration`, `transcriptWordCount`, `noteLength`. There are NO
+           * `action_items`, `core_topics`, or `confidence` fields — and the
+           * spec's Preservation rule ("백엔드 변경 금지") forbids adding them.
+           * Per the data-mapping rule ("해당 필드가 없으면 UI에서 표시하지 않는다"),
+           * we DO NOT render Action Items / Core Topics / Confidence cards.
+           *
+           * Pragmatic approach:
+           *  - Left (lg:col-span-8): AI-labeled markdown article with the
+           *    `ai-card-accent` skin (4px `--tertiary` bar on surface-container-
+           *    highest). The existing `.result-markdown` typography handles
+           *    numbered headings / ordered lists, giving the sectioned outline
+           *    feel the design calls for.
+           *  - Right (lg:col-span-4): metadata-only side panel — always-shown
+           *    "생성 정보" card + optional "사용 프롬프트" card when
+           *    `result.promptId` resolves. Below `lg`, these stack under the
+           *    article so mobile/tablet users see the same info order.
+           */
+          <div className="grid gap-6 lg:grid-cols-12">
+            <div className="lg:col-span-8">
+              <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--tertiary)]">
+                <Sparkles className="h-3.5 w-3.5" />
+                AI Summary
+              </div>
+              <article className="result-markdown ai-card-accent rounded-r-2xl p-6">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
+              </article>
+            </div>
+
+            <aside className="flex flex-col gap-4 lg:col-span-4">
+              {/* 생성 정보 메타 카드 — 항상 표시 */}
+              <div className="rounded-2xl bg-white p-5 shadow-md">
+                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                  생성 정보
+                </h3>
+                <dl className="space-y-2.5 text-sm">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-xs text-[var(--ink-muted)]">생성 시각</dt>
+                    <dd className="text-right text-xs font-medium text-slate-900">
+                      {new Date(
+                        result.metadata?.generatedAt || result.createdAt,
+                      ).toLocaleString('ko-KR', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-xs text-[var(--ink-muted)]">전사 단어 수</dt>
+                    <dd className="font-mono text-xs font-semibold text-slate-900">
+                      {result.metadata.transcriptWordCount.toLocaleString()}
+                    </dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-xs text-[var(--ink-muted)]">노트 길이</dt>
+                    <dd className="font-mono text-xs font-semibold text-slate-900">
+                      {result.metadata.noteLength.toLocaleString()}자
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              {/* 사용 프롬프트 카드 — promptId 있을 때만 */}
+              {result.promptId ? (
+                <div className="rounded-2xl bg-[var(--surface-container-low)] p-5">
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+                    사용 프롬프트
+                  </h3>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {promptOptions.find((p) => p.id === result.promptId)?.name ??
+                      result.promptId}
+                  </p>
+                  {(() => {
+                    const p = promptOptions.find((opt) => opt.id === result.promptId);
+                    return p ? (
+                      <p className="mt-1 text-[11px] text-[var(--ink-muted)]">
+                        {PROMPT_DOCUMENT_TYPE_LABELS[p.documentType]}
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
+              ) : null}
+            </aside>
+          </div>
         ) : null}
 
         {/* 전사 원본 탭 */}
@@ -539,7 +708,7 @@ export function ResultViewer({
       {!isEditing && activeTab === 'result' && (
         <footer className="border-t border-[var(--line-soft)] px-6 py-4">
           {!showRegenerate ? (
-            <button type="button" onClick={openRegeneratePanel} className="btn-neo inline-flex">
+            <button type="button" onClick={openRegeneratePanel} className="btn-secondary inline-flex">
               <RefreshCw className={`h-4 w-4 ${isRegenerating ? 'animate-spin' : ''}`} />
               프롬프트 변경 후 재생성
             </button>

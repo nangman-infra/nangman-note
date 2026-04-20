@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronUp, Mic, MicOff, Radio, Square, Timer } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Mic, MicOff, Radio, Save, Sparkles, Square } from 'lucide-react';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
@@ -17,6 +17,7 @@ import { NoteEditor } from '@/domains/note/components/NoteEditor';
 import { useTranscription } from '@/domains/transcription/hooks/useTranscription';
 import { useAudioStreaming } from '@/domains/transcription/hooks/useAudioStreaming';
 import { TranscriptPanel } from '@/domains/transcription/components/TranscriptPanel';
+import { TranscriptAudioVisualizer } from '@/domains/transcription/components/TranscriptAudioVisualizer';
 import { useNoteStore } from '@/domains/note/stores/noteStore';
 import { useAudioCapture, type AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
 import { useMediaRecorder } from '@/domains/transcription/hooks/useMediaRecorder';
@@ -536,6 +537,8 @@ export default function InProgressMeetingPage() {
     navigateHome();
   }, [currentMeeting?.status, pushToast, navigateHome, showProcessing]);
 
+  // ── 빈 상태 / 복구 화면 ──
+
   // 회의 없음 상태
   if (!currentMeeting) {
     if (isLeavingPage) {
@@ -544,10 +547,10 @@ export default function InProgressMeetingPage() {
 
     if (isRecoveringMeeting) {
       return (
-        <div className="app-shell flex min-h-dvh items-center justify-center p-6">
-          <div className="glass-surface w-full max-w-xl p-7 text-center">
-            <h1 className="text-2xl font-semibold">회의 상태를 복구하는 중입니다</h1>
-            <p className="mt-2 text-sm text-muted">
+        <div className="flex h-screen items-center justify-center bg-[var(--bg-root)] p-6">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-8 text-center shadow-xl">
+            <h1 className="font-headline text-2xl font-extrabold tracking-tight">회의 상태를 복구하는 중입니다</h1>
+            <p className="mt-2 text-sm text-[var(--ink-muted)]">
               잠시만 기다려주세요. 마지막으로 열었던 회의를 확인하고 있습니다.
             </p>
           </div>
@@ -556,15 +559,15 @@ export default function InProgressMeetingPage() {
     }
 
     return (
-      <div className="app-shell flex min-h-dvh items-center justify-center p-6">
-        <div className="glass-surface w-full max-w-xl p-7 text-center">
+      <div className="flex h-screen items-center justify-center p-6">
+        <div className="w-full max-w-xl rounded-2xl bg-white p-7 text-center shadow-xl">
           <h1 className="text-2xl font-semibold">진행 중인 회의가 없습니다</h1>
           <p className="mt-2 text-sm text-muted">새 회의를 시작하면 이 화면에서 노트와 전사를 함께 관리할 수 있습니다.</p>
           <div className="mt-5 flex justify-center gap-2">
-            <Link href="/" className="btn-neo inline-flex">
+            <Link href="/" className="btn-secondary inline-flex">
               홈으로 이동
             </Link>
-            <Link href="/meeting/new" className="btn-neo inline-flex border-transparent bg-brand text-white hover:bg-brand-strong hover:text-white">
+            <Link href="/meeting/new" className="btn-primary inline-flex">
               새 회의 시작
             </Link>
           </div>
@@ -577,203 +580,197 @@ export default function InProgressMeetingPage() {
     return null; // 홈으로 리다이렉트 중
   }
 
+  // ── 상태 배너 렌더링 헬퍼 ──
+  const renderBanners = () => {
+    const banners: { variant: 'error' | 'warning' | 'info'; title: string; message: string; onDismiss?: () => void }[] = [];
+
+    if (error) {
+      banners.push({ variant: 'error', title: '회의 상태 오류', message: error });
+    }
+    if (permission === 'unsupported') {
+      banners.push({
+        variant: 'error',
+        title: '마이크 미지원 브라우저',
+        message: '현재 브라우저는 마이크 캡처를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.',
+      });
+    }
+    if (recorderError) {
+      banners.push({ variant: 'warning', title: '녹음 오류', message: recorderError });
+    }
+    if (permission === 'denied' && !micBannerDismissed) {
+      banners.push({
+        variant: 'warning',
+        title: '마이크 접근이 차단되었습니다',
+        message: '노트 전용 모드로 진행 중입니다. 전사 데이터 없이 노트 기반으로만 결과를 생성합니다. 브라우저 설정에서 마이크 권한을 허용하면 녹음이 가능합니다.',
+        onDismiss: () => setMicBannerDismissed(true),
+      });
+    }
+    if (audioCaptureError && permission !== 'denied' && permission !== 'unsupported') {
+      banners.push({ variant: 'warning', title: '마이크 연결 오류', message: audioCaptureError });
+    }
+    if (isRealtimeMode && transcriptionError) {
+      banners.push({
+        variant: 'warning',
+        title: '전사 연결 불안정',
+        message: '전사 서버와의 연결이 지연되고 있습니다. 노트는 계속 저장됩니다.',
+      });
+    }
+    if (isRealtimeMode && audioStreamingError) {
+      banners.push({ variant: 'warning', title: '오디오 스트리밍 중단', message: audioStreamingError });
+    }
+
+    // 우선순위 정렬: error > warning > info
+    const priorityOrder = { error: 0, warning: 1, info: 2 } as const;
+    banners.sort((a, b) => priorityOrder[a.variant] - priorityOrder[b.variant]);
+
+    if (banners.length === 0) return null;
+
+    const [primary, ...rest] = banners;
+
+    return (
+      <div className="px-6 py-2 space-y-2">
+        <StatusBanner
+          variant={primary.variant}
+          title={primary.title}
+          message={primary.message}
+          onDismiss={primary.onDismiss}
+        />
+        {rest.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowExtraBanners((v) => !v)}
+              className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            >
+              {showExtraBanners ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+              {rest.length}개 추가 알림
+            </button>
+            {showExtraBanners &&
+              rest.map((b, i) => (
+                <StatusBanner
+                  key={i}
+                  variant={b.variant}
+                  title={b.title}
+                  message={b.message}
+                  onDismiss={b.onDismiss}
+                />
+              ))}
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="app-shell min-h-dvh p-4 sm:p-5">
-      <div className="mx-auto flex h-[calc(100dvh-2rem)] w-full max-w-[1400px] flex-col gap-3">
-        {/* 헤더 */}
-        <header className="glass-surface px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold tracking-wide text-muted">LIVE SESSION</p>
-              <h1 className="text-xl font-semibold">{currentMeeting.title || '제목 없는 회의'}</h1>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* 녹음 상태 배지 — 모바일에서 숨김 */}
-              <span className={`hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${recBadge.className}`}>
-                {permission === 'denied' || permission === 'unsupported' ? (
-                  <MicOff className="mr-1 inline-block h-3.5 w-3.5" />
-                ) : (
-                  <Mic className="mr-1 inline-block h-3.5 w-3.5" />
-                )}
-                {recBadge.label}
-              </span>
-
-              {/* 연결 상태 배지 — 모바일에서 숨김 */}
-              <span className={`hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${connectionBadge.className}`}>
-                <Radio className="mr-1 inline-block h-3.5 w-3.5" />
-                {connectionBadge.label}
-              </span>
-
-              {/* 마이크 거부 배너 닫은 후 "노트 전용" 배지 표시 */}
-              {micBannerDismissed && permission === 'denied' && (
-                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                  <MicOff className="mr-1 inline-block h-3.5 w-3.5" />
-                  노트 전용
-                </span>
-              )}
-
-              {/* 타이머 */}
-              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-muted">
-                <Timer className="mr-1 inline-block h-3.5 w-3.5" />
-                {formatTime(elapsedSeconds)}
-              </span>
-
-              {/* 마이크 선택 (디바이스 2개 이상일 때만) */}
-              {devices.length > 1 && (
-                <select
-                  value={selectedDeviceId || ''}
-                  onChange={(e) => handleDeviceChange(e.target.value)}
-                  className="rounded-lg border border-[var(--line-soft)] bg-white px-2 py-1 text-xs"
-                  aria-label="마이크 선택"
-                >
-                  {devices.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <button type="button" onClick={handleGoHome} className="btn-neo inline-flex text-xs text-muted">
-                <ArrowLeft className="h-3.5 w-3.5" />
-                목록으로
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowEndDialog(true)}
-                disabled={isLoading || isEnding}
-                className="btn-neo inline-flex border-transparent bg-rose-600 px-3 py-2 text-xs text-white hover:bg-rose-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Square className="h-3.5 w-3.5" />
-                회의 종료
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* 상태 배너들 — 우선순위 기반 최대 1개 표시 + 접기/펼치기 */}
-        {(() => {
-          const banners: { variant: 'error' | 'warning' | 'info'; title: string; message: string; onDismiss?: () => void }[] = [];
-
-          if (error) {
-            banners.push({ variant: 'error', title: '회의 상태 오류', message: error });
-          }
-          if (permission === 'unsupported') {
-            banners.push({
-              variant: 'error',
-              title: '마이크 미지원 브라우저',
-              message: '현재 브라우저는 마이크 캡처를 지원하지 않습니다. Chrome 또는 Edge를 사용해주세요.',
-            });
-          }
-          if (recorderError) {
-            banners.push({ variant: 'warning', title: '녹음 오류', message: recorderError });
-          }
-          if (permission === 'denied' && !micBannerDismissed) {
-            banners.push({
-              variant: 'warning',
-              title: '마이크 접근이 차단되었습니다',
-              message: '노트 전용 모드로 진행 중입니다. 전사 데이터 없이 노트 기반으로만 결과를 생성합니다. 브라우저 설정에서 마이크 권한을 허용하면 녹음이 가능합니다.',
-              onDismiss: () => setMicBannerDismissed(true),
-            });
-          }
-          if (audioCaptureError && permission !== 'denied' && permission !== 'unsupported') {
-            banners.push({ variant: 'warning', title: '마이크 연결 오류', message: audioCaptureError });
-          }
-          if (isRealtimeMode && transcriptionError) {
-            banners.push({
-              variant: 'warning',
-              title: '전사 연결 불안정',
-              message: '전사 서버와의 연결이 지연되고 있습니다. 노트는 계속 저장됩니다.',
-            });
-          }
-          if (isRealtimeMode && audioStreamingError) {
-            banners.push({ variant: 'warning', title: '오디오 스트리밍 중단', message: audioStreamingError });
-          }
-
-          // 우선순위 정렬: error > warning > info
-          const priorityOrder = { error: 0, warning: 1, info: 2 } as const;
-          banners.sort((a, b) => priorityOrder[a.variant] - priorityOrder[b.variant]);
-
-          if (banners.length === 0) return null;
-
-          const [primary, ...rest] = banners;
-
-          return (
-            <>
-              <StatusBanner
-                variant={primary.variant}
-                title={primary.title}
-                message={primary.message}
-                onDismiss={primary.onDismiss}
-              />
-              {rest.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowExtraBanners((v) => !v)}
-                    className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    {showExtraBanners ? (
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    )}
-                    {rest.length}개 추가 알림
-                  </button>
-                  {showExtraBanners &&
-                    rest.map((b, i) => (
-                      <StatusBanner
-                        key={i}
-                        variant={b.variant}
-                        title={b.title}
-                        message={b.message}
-                        onDismiss={b.onDismiss}
-                      />
-                    ))}
-                </>
-              )}
-            </>
-          );
-        })()}
-
-        {/* 모바일 탭 전환 버튼 */}
-        <div className="flex gap-1 rounded-lg bg-slate-100 p-1 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setMobilePanel('note')}
-            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-              mobilePanel === 'note'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* ── Stitch TopBar ── */}
+      <header className="z-40 sticky top-0 flex items-center justify-between w-full px-6 py-3 bg-slate-50/80 backdrop-blur-xl shadow-sm shadow-[inset_0_-1px_0_0_rgba(197,197,215,0.2)]">
+        <div className="flex min-w-0 items-center gap-6">
+          <span className="font-headline text-xl font-extrabold tracking-tighter text-indigo-700">Nangman Note</span>
+          <div className="hidden sm:block h-6 w-px bg-[var(--outline-variant)]/30" aria-hidden="true" />
+          <nav
+            aria-label="Breadcrumb"
+            className="hidden min-w-0 items-center gap-3 text-sm font-medium sm:flex"
           >
-            노트
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobilePanel('transcript')}
-            className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-              mobilePanel === 'transcript'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            전사
-          </button>
+            <button
+              type="button"
+              onClick={handleGoHome}
+              className="text-indigo-700 font-semibold font-headline tracking-tight hover:underline"
+            >
+              대시보드
+            </button>
+            <span className="text-slate-400 text-sm" aria-hidden="true">›</span>
+            <span
+              className="truncate max-w-[40vw] text-slate-900 font-bold font-headline tracking-tight"
+              title={currentMeeting.title || '제목 없는 회의'}
+            >
+              {currentMeeting.title || '제목 없는 회의'}
+            </span>
+          </nav>
         </div>
 
-        {/* 메인 콘텐츠: 노트 + 전사 패널 */}
-        {/* 데스크톱: 그리드로 양쪽 표시 / 모바일: 탭에 따라 한 패널씩 표시 */}
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">
-          <section className={`glass-surface min-h-0 overflow-hidden ${mobilePanel !== 'note' ? 'hidden lg:block' : ''}`}>
-            <ErrorBoundary>
-              <NoteEditor meetingId={currentMeeting.id} />
-            </ErrorBoundary>
-          </section>
+        <div className="flex items-center gap-4">
+          {/* Status badges — inline in header for desktop */}
+          <div className="hidden sm:flex items-center gap-2">
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${recBadge.className}`}>
+              {permission === 'denied' || permission === 'unsupported' ? (
+                <MicOff className="mr-1 inline-block h-3.5 w-3.5" />
+              ) : (
+                <Mic className="mr-1 inline-block h-3.5 w-3.5" />
+              )}
+              {recBadge.label}
+            </span>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${connectionBadge.className}`}>
+              <Radio className="mr-1 inline-block h-3.5 w-3.5" />
+              {connectionBadge.label}
+            </span>
+            {micBannerDismissed && permission === 'denied' && (
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                <MicOff className="mr-1 inline-block h-3.5 w-3.5" />
+                노트 전용
+              </span>
+            )}
+            {devices.length > 1 && (
+              <select
+                value={selectedDeviceId || ''}
+                onChange={(e) => handleDeviceChange(e.target.value)}
+                className="rounded-lg border border-[var(--line-soft)] bg-white px-2 py-1 text-xs"
+                aria-label="마이크 선택"
+              >
+                {devices.map((device) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
-          <aside className={`glass-surface min-h-0 overflow-hidden ${mobilePanel !== 'transcript' ? 'hidden lg:block' : ''}`}>
-            <ErrorBoundary>
+          {/* Timer capsule — Stitch rounded-full style */}
+          <div
+            className="flex items-center rounded-full bg-[var(--surface-container-low)] px-4 py-1.5"
+            aria-live="polite"
+            aria-label={`경과 시간 ${formatTime(elapsedSeconds)}`}
+          >
+            <div className="relative mr-3 flex items-center justify-center" aria-hidden="true">
+              <div className="h-2.5 w-2.5 rounded-full bg-[var(--tertiary-fixed-dim)]" />
+              <div className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-[var(--tertiary-fixed-dim)] opacity-40" />
+            </div>
+            <span className="label-sm text-[var(--ink-subtle)] tracking-widest">{formatTime(elapsedSeconds)}</span>
+          </div>
+
+          {/* Stop Meeting button — Stitch error style */}
+          <button
+            type="button"
+            onClick={() => setShowEndDialog(true)}
+            disabled={isLoading || isEnding}
+            aria-label="회의 종료"
+            className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-rose-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Square className="h-4 w-4" aria-hidden="true" />
+            회의 종료
+          </button>
+        </div>
+      </header>
+
+      {/* 상태 배너들 — 헤더 바로 아래, 메인 위 */}
+      {renderBanners()}
+
+      {/* ── Stitch Main: flex-1 flex overflow-hidden ── */}
+      <main className="flex-1 flex overflow-hidden">
+        {/* 모바일 탭 전환 — main 내부 상단, lg:hidden */}
+        <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 rounded-none bg-slate-100 p-1 lg:hidden" style={{ position: 'relative' }}>
+          {/* We use a wrapper to keep mobile tabs inside the flow without absolute positioning issues */}
+        </div>
+
+        {/* ── Left Pane: Transcript (dark, w-2/5) ── */}
+        <section className={`w-2/5 flex-col bg-slate-900 text-slate-100 border-r border-[var(--outline-variant)]/10 hidden lg:flex ${mobilePanel === 'transcript' ? '!flex w-full' : ''}`}>
+          <ErrorBoundary>
+            <div className="flex min-h-0 flex-1 flex-col">
               <TranscriptPanel
                 segments={segments}
                 partial={partial}
@@ -784,9 +781,50 @@ export default function InProgressMeetingPage() {
                 meetingId={currentMeeting.id}
                 error={transcriptionError || audioStreamingError}
               />
-            </ErrorBoundary>
-          </aside>
-        </div>
+            </div>
+          </ErrorBoundary>
+          {/* Audio Visualizer — bottom of left pane */}
+          <TranscriptAudioVisualizer
+            stream={stream}
+            isActive={
+              recorderState === 'recording' ||
+              audioStreamingState === 'streaming'
+            }
+          />
+        </section>
+
+        {/* ── Right Pane: Note Editor (flex-1, editor-dot-grid) ── */}
+        <section className={`flex-1 flex-col editor-dot-grid hidden lg:flex ${mobilePanel === 'note' ? '!flex' : ''}`}>
+          <ErrorBoundary>
+            <NoteEditor meetingId={currentMeeting.id} />
+          </ErrorBoundary>
+        </section>
+      </main>
+
+      {/* 모바일 탭 전환 버튼 — 메인 영역 아래 고정 */}
+      <div className="flex gap-1 bg-slate-100 p-1 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setMobilePanel('note')}
+          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+            mobilePanel === 'note'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          노트
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobilePanel('transcript')}
+          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+            mobilePanel === 'transcript'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          전사
+        </button>
       </div>
 
       {/* 처리 진행 상태 (회의 종료 후) — 비차단: 홈 이동 허용 */}
@@ -808,7 +846,7 @@ export default function InProgressMeetingPage() {
                 setCurrentMeeting(null);
                 navigateHome();
               }}
-              className="btn-neo inline-flex text-xs text-muted"
+              className="btn-secondary inline-flex text-xs"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               홈으로 이동 (백그라운드에서 계속 처리)
@@ -816,6 +854,51 @@ export default function InProgressMeetingPage() {
           </div>
         </div>
       )}
+
+      {/* 우하단 Floating Quick Actions (FAB) — 회의 진행 중 유용한 액션 */}
+      <div
+        className="pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 lg:bottom-8 lg:right-8"
+        aria-label="빠른 작업"
+      >
+        {/* FAB 2 — AI 요약 안내 (요약은 회의 종료 후 생성됨) */}
+        <button
+          type="button"
+          onClick={() => {
+            pushToast({
+              title: 'AI 요약은 회의 종료 후에 생성됩니다',
+              description:
+                '회의를 종료하면 전사·노트 기반으로 요약이 자동 생성됩니다.',
+              variant: 'info',
+            });
+          }}
+          aria-label="AI 요약 안내"
+          title="AI 요약 안내"
+          className="pointer-events-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 text-white shadow-lg transition hover:brightness-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+        >
+          <Sparkles className="h-6 w-6" aria-hidden="true" />
+        </button>
+
+        {/* FAB 1 — 노트 수동 저장 */}
+        <button
+          type="button"
+          onClick={async () => {
+            if (!meetingId) return;
+            const ok = await useNoteStore.getState().saveNote(meetingId);
+            pushToast({
+              title: ok ? '노트를 저장했습니다' : '노트 저장에 실패했습니다',
+              description: ok
+                ? '최신 내용이 안전하게 저장되었습니다.'
+                : '오프라인 백업에 저장했으며, 연결이 복구되면 다시 시도합니다.',
+              variant: ok ? 'success' : 'error',
+            });
+          }}
+          aria-label="노트 저장"
+          title="노트 저장"
+          className="pointer-events-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-lg transition hover:bg-slate-50 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tertiary)]"
+        >
+          <Save className="h-6 w-6 text-[var(--tertiary)]" aria-hidden="true" />
+        </button>
+      </div>
 
       {/* 종료 확인 모달 */}
       <EndMeetingDialog

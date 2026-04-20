@@ -33,12 +33,20 @@ interface UseAudioStreamingReturn {
   stopStreaming: () => void;
 }
 
-// 100ms 청크 기준 6개면 약 600ms RTT까지 실시간성을 유지하며 버퍼링할 수 있음.
+// ── Backpressure & fallback 임계값 ──
+// 업계 BP 참조 (Nabla: 10초 in-flight, Deepgram: 10초 재연결 허용)
+//
+// 200ms 청크 기준:
+// - MAX_IN_FLIGHT_ACKS 6개 → 최대 1.2초 RTT까지 실시간성 유지
+// - ACK_TIMEOUT 3초 → 개별 청크 응답 대기 (네트워크 지터 허용)
+// - CONSECUTIVE_TIMEOUTS 15회 → 45초간 무응답 시 fallback (일시적 끊김 대응)
+// - CONSECUTIVE_BACKPRESSURE 30회 → 6초간 서버 부하 시 fallback (세션 warming 포함)
+// - SATURATION 10초 → in-flight 꽉 찬 상태 10초 유지 시 fallback (Nabla 동일)
 const MAX_IN_FLIGHT_ACKS = 6;
-const ACK_TIMEOUT_MS = 1200;
-const MAX_CONSECUTIVE_TIMEOUTS = 5;
-const MAX_CONSECUTIVE_BACKPRESSURE = 8;
-const MAX_SATURATION_MS = 2500;
+const ACK_TIMEOUT_MS = 3000;
+const MAX_CONSECUTIVE_TIMEOUTS = 15;
+const MAX_CONSECUTIVE_BACKPRESSURE = 30;
+const MAX_SATURATION_MS = 10_000;
 
 export function useAudioStreaming(): UseAudioStreamingReturn {
   const [state, setState] = useState<AudioStreamingState>('idle');
@@ -176,7 +184,7 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
 
       ackTimeoutMapRef.current.set(ackId, timeoutId);
 
-      socket.emit('audio', chunk, (ack?: AudioAckResponse) => {
+      socket.emit('audio', new Uint8Array(chunk), (ack?: AudioAckResponse) => {
         const timer = ackTimeoutMapRef.current.get(ackId);
         if (timer === undefined) {
           return;
@@ -247,7 +255,11 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
       setError(null);
 
       try {
-        const audioContext = new AudioContext();
+        // ARTS 참조: 브라우저 기본 sampleRate 사용 (보통 48kHz)
+        // 다운샘플링은 AudioWorklet(pcm-processor) 내부에서 수행
+        const audioContext = new AudioContext({
+          latencyHint: 'interactive',
+        });
         audioContextRef.current = audioContext;
         socketRef.current = socket;
         optionsRef.current = options;
