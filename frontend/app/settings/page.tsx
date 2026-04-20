@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
-import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
-import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
-import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
-import { PromptEditorDialog } from '@/domains/prompt/components/PromptEditorDialog';
-import type { Prompt, PromptDocumentType } from '@/domains/prompt/types/prompt.types';
+import { MeetingTranscriptionMode } from '@/domains/meeting';
+import {
+  PromptEditorDialog,
+  type Prompt,
+  type PromptDocumentType,
+  usePrompt,
+} from '@/domains/prompt';
+import { useUserSettingsStore } from '@/domains/settings';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { DefaultSettingsSection } from './_components/DefaultSettingsSection';
 import { PromptTemplateLibrarySection } from './_components/PromptTemplateLibrarySection';

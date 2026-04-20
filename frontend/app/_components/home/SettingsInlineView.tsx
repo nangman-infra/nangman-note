@@ -5,10 +5,12 @@ import { Download, LogOut, Mail, Moon, Sun } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
-import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
-import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
-import type { PromptDocumentType } from '@/domains/prompt/types/prompt.types';
-import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
+import {
+  formatPromptLabel,
+  type PromptDocumentType,
+  usePrompt,
+} from '@/domains/prompt';
+import { useUserSettingsStore } from '@/domains/settings';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { MeetingTranscriptionMode } from '@/lib/transcription/transcriptionMode';
 

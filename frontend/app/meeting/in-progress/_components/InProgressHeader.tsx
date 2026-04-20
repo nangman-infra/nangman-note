@@ -1,7 +1,7 @@
 'use client';
 
 import { Mic, MicOff, Radio, Square } from 'lucide-react';
-import type { AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
+import type { AudioCapturePermission } from '@/domains/transcription';
 import { formatTime } from '@/lib/utils/date';
 import type { MeetingStatusBadge } from './meetingStatusView';
 

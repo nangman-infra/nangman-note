@@ -1,11 +1,13 @@
 'use client';
 
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
-import { NoteEditor } from '@/domains/note/components/NoteEditor';
-import { TranscriptAudioVisualizer } from '@/domains/transcription/components/TranscriptAudioVisualizer';
-import { TranscriptPanel } from '@/domains/transcription/components/TranscriptPanel';
-import type { AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
-import type { AudioStreamingState } from '@/domains/transcription/hooks/useAudioStreaming';
+import { NoteEditor } from '@/domains/note';
+import {
+  TranscriptAudioVisualizer,
+  TranscriptPanel,
+  type AudioCapturePermission,
+  type AudioStreamingState,
+} from '@/domains/transcription';
 
 type TranscriptPanelProps = React.ComponentProps<typeof TranscriptPanel>;
 

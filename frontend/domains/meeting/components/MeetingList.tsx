@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { useMeetings } from '../hooks/useMeeting';
 import { useMeetingStatus } from '@/hooks/useMeetingStatus';
+import { MeetingCompletionState } from '../types/meeting-completion-state.enum';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import { MeetingActionDialog } from './MeetingActionDialog';
 import type { SidebarTimeFilter } from '@/components/layout/Sidebar';
@@ -118,7 +119,10 @@ export function MeetingList({
             ? null
             : (message.phase as MeetingProcessingPhase | undefined),
         needsAttention: message.needsAttention,
-        completionState: message.completionState,
+        completionState: message.completionState as
+          | MeetingCompletionState
+          | null
+          | undefined,
       });
     },
     onResultRegenerate: (message) => {

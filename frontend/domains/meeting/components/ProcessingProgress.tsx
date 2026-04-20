@@ -5,6 +5,7 @@ import type { ComponentType } from 'react';
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
 import { meetingApi } from '../api/meetingApi';
 import { useMeetingStatus } from '@/hooks/useMeetingStatus';
+import type { MeetingStatusMessage } from '@/hooks/useMeetingStatus';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import { MeetingStatus } from '../types/meeting.types';
 
@@ -85,11 +86,7 @@ export function ProcessingProgress({
 
   // WebSocket 으로 회의 상태 변경 수신 (폴링 대체)
   const handleStatusChange = useCallback(
-    (message: {
-      meetingId: string;
-      status: string;
-      phase?: MeetingProcessingPhase | 'completed';
-    }) => {
+    (message: MeetingStatusMessage) => {
       if (
         message.status === MeetingStatus.COMPLETED ||
         message.phase === 'completed'

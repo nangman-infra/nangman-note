@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { Bell, BookOpen, Clock, Mic, Settings, Upload, Users } from 'lucide-react';
-import { MeetingList } from '@/domains/meeting/components/MeetingList';
-import { useMeetings } from '@/domains/meeting/hooks/useMeeting';
+import { MeetingList, useMeetings } from '@/domains/meeting';
 import type { SidebarTimeFilter, SidebarView } from '@/components/layout/Sidebar';
 
 /* ================================================================== */

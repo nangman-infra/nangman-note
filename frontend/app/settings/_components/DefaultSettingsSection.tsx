@@ -2,9 +2,8 @@
 
 import { Languages, Mic } from 'lucide-react';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
-import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
-import type { Prompt } from '@/domains/prompt/types/prompt.types';
-import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
+import { MeetingTranscriptionMode } from '@/domains/meeting';
+import { formatPromptLabel, type Prompt } from '@/domains/prompt';
 
 interface DefaultSettingsSectionProps {
   prompts: Prompt[];

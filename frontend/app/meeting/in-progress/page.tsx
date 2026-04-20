@@ -3,18 +3,22 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
-import { meetingApi } from '@/domains/meeting/api/meetingApi';
-import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
-import { useBeforeUnloadGuard } from '@/domains/meeting/hooks/useBeforeUnloadGuard';
-import { EndMeetingDialog } from '@/domains/meeting/components/EndMeetingDialog';
-import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
-import { MeetingStatus } from '@/domains/meeting/types/meeting.types';
-import { useTranscription } from '@/domains/transcription/hooks/useTranscription';
-import { useAudioStreaming } from '@/domains/transcription/hooks/useAudioStreaming';
-import { useNoteStore } from '@/domains/note/stores/noteStore';
-import { useAudioCapture } from '@/domains/transcription/hooks/useAudioCapture';
-import { useMediaRecorder } from '@/domains/transcription/hooks/useMediaRecorder';
-import { useAudioUpload } from '@/domains/transcription/hooks/useAudioUpload';
+import {
+  EndMeetingDialog,
+  MeetingStatus,
+  MeetingTranscriptionMode,
+  meetingApi,
+  useBeforeUnloadGuard,
+  useMeeting,
+} from '@/domains/meeting';
+import { useNoteStore } from '@/domains/note';
+import {
+  useAudioCapture,
+  useAudioStreaming,
+  useAudioUpload,
+  useMediaRecorder,
+  useTranscription,
+} from '@/domains/transcription';
 import { formatTime } from '@/lib/utils/date';
 import { InProgressBanners } from './_components/InProgressBanners';
 import { InProgressEmptyState } from './_components/InProgressEmptyState';

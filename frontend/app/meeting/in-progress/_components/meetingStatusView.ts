@@ -1,4 +1,4 @@
-import type { AudioCapturePermission } from '@/domains/transcription/hooks/useAudioCapture';
+import type { AudioCapturePermission } from '@/domains/transcription';
 
 export interface MeetingStatusBadge {
   label: string;

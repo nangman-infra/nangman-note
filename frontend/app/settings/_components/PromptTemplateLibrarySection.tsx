@@ -6,7 +6,7 @@ import {
   PROMPT_DOCUMENT_TYPE_HELP_TEXT,
   PROMPT_DOCUMENT_TYPE_LABELS,
   type Prompt,
-} from '@/domains/prompt/types/prompt.types';
+} from '@/domains/prompt';
 import {
   DOCUMENT_TYPE_TILE,
   SETTINGS_FALLBACK_TILE,

@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowLeft } from 'lucide-react';
-import { ProcessingProgress } from '@/domains/meeting/components/ProcessingProgress';
+import { ProcessingProgress } from '@/domains/meeting';
 
 type UploadState = React.ComponentProps<typeof ProcessingProgress>['uploadState'];
 

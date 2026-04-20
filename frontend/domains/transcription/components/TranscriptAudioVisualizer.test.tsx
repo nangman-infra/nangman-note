@@ -103,9 +103,8 @@ describe('TranscriptAudioVisualizer integration with in-progress page', () => {
       await fs.readFile(workspacePath, 'utf-8'),
     ].join('\n');
 
-    expect(source).toContain(
-      "import { TranscriptAudioVisualizer } from '@/domains/transcription/components/TranscriptAudioVisualizer'",
-    );
+    expect(source).toContain("from '@/domains/transcription'");
+    expect(source).toContain('TranscriptAudioVisualizer,');
     expect(source).toContain('<TranscriptAudioVisualizer');
     // Passed the live stream and a derived isActive flag based on recorder /
     // audio streaming state.

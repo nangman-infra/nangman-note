@@ -6,18 +6,27 @@ import { Socket } from 'socket.io-client';
 import { createSocket } from '@/lib/api/websocket';
 import { isSocketAuthError } from '@/lib/api/socketAuth';
 
-import { MeetingCompletionState } from '@/domains/meeting/types/meeting-completion-state.enum';
-import { MeetingProcessingPhase } from '@/domains/meeting/types/meeting-processing-phase.enum';
+export type MeetingStatusPhase =
+  | 'uploading'
+  | 'transcribing'
+  | 'generating'
+  | 'regenerating';
 
-interface MeetingStatusMessage {
+export type MeetingStatusCompletionState =
+  | 'succeeded'
+  | 'partial'
+  | 'attention_required'
+  | 'failed';
+
+export interface MeetingStatusMessage {
   meetingId: string;
   status: string;
-  phase?: MeetingProcessingPhase | 'completed';
+  phase?: MeetingStatusPhase | 'completed';
   needsAttention?: boolean;
-  completionState?: MeetingCompletionState | null;
+  completionState?: MeetingStatusCompletionState | null;
 }
 
-interface ResultRegenerateMessage {
+export interface ResultRegenerateMessage {
   meetingId: string;
   phase: 'started' | 'completed' | 'failed';
   errorMessage?: string;

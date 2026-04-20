@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
-import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import {
   PROMPT_DOCUMENT_TYPE_HELP_TEXT,
   PROMPT_DOCUMENT_TYPE_LABELS,
   type PromptDocumentType,
-} from '@/domains/prompt/types/prompt.types';
+  usePrompt,
+} from '@/domains/prompt';
 
 /* ================================================================== */
 /* Prompts Inline View — Stitch-based prompt management               */

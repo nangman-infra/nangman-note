@@ -5,7 +5,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import type { PromptDocumentType } from '@/domains/prompt/types/prompt.types';
+import type { PromptDocumentType } from '@/domains/prompt';
 
 export const DOCUMENT_TYPE_TILE: Record<
   PromptDocumentType,

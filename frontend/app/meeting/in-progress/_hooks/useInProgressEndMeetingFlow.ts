@@ -1,11 +1,9 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import type { Meeting } from '@/domains/meeting/types/meeting.types';
-import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
-import { transcriptionApi } from '@/domains/transcription/api/transcriptionApi';
-import type { UploadResult } from '@/domains/transcription/hooks/useAudioUpload';
-import { useNoteStore } from '@/domains/note/stores/noteStore';
+import { type Meeting, MeetingTranscriptionMode } from '@/domains/meeting';
+import { useNoteStore } from '@/domains/note';
+import { transcriptionApi, type UploadResult } from '@/domains/transcription';
 
 type EndMeeting = (options?: {
   skipTranscription?: boolean;

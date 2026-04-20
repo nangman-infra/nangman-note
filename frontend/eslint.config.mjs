@@ -8,12 +8,47 @@ const eslintConfig = defineConfig([
   {
     files: ["**/*.{ts,tsx}"],
     rules: {
+      "no-nested-ternary": "warn",
       "no-restricted-properties": [
         "error",
         {
           object: "process",
           property: "env",
           message: "Use '@/lib/config/env' instead of direct process.env access.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["app/**/*.{ts,tsx}", "__tests__/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/domains/*/*"],
+              message:
+                "Import domains through their public API, for example '@/domains/meeting'.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["components/**/*.{ts,tsx}", "hooks/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/domains/*"],
+              message:
+                "Shared frontend layers must not import domain modules. Move domain-specific logic into domains or compose it from app.",
+            },
+          ],
         },
       ],
     },
@@ -29,6 +64,10 @@ const eslintConfig = defineConfig([
               group: ["@/domains/*"],
               message:
                 "Domain module must not directly import other domains. Compose domains from app layer.",
+            },
+            {
+              group: ["@/app/*"],
+              message: "Domain modules must not import the app layer.",
             },
           ],
         },

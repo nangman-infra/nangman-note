@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
-import { useMeeting } from '@/domains/meeting/hooks/useMeeting';
-import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
-import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
-import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
-import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
+import { MeetingTranscriptionMode, useMeeting } from '@/domains/meeting';
+import { formatPromptLabel, usePrompt } from '@/domains/prompt';
+import { useUserSettingsStore } from '@/domains/settings';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { NewMeetingForm } from './_components/NewMeetingForm';
 import { NewMeetingHero } from './_components/NewMeetingHero';
