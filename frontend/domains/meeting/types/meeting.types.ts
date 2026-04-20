@@ -1,15 +1,13 @@
 import { MeetingCompletionState } from './meeting-completion-state.enum';
 import { MeetingProcessingPhase } from './meeting-processing-phase.enum';
+import { MeetingTranscriptionMode } from '@/lib/transcription/transcriptionMode';
+
+export { MeetingTranscriptionMode } from '@/lib/transcription/transcriptionMode';
 
 export enum MeetingStatus {
   RECORDING = 'recording',
   PROCESSING = 'processing',
   COMPLETED = 'completed',
-}
-
-export enum MeetingTranscriptionMode {
-  BATCH = 'batch',
-  REALTIME = 'realtime',
 }
 
 export interface Meeting {

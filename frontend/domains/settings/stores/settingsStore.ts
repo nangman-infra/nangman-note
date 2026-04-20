@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
+import { MeetingTranscriptionMode } from '@/lib/transcription/transcriptionMode';
 import { settingsApi } from '../api/settingsApi';
-import { MeetingTranscriptionMode } from '../../meeting/types/meeting.types';
 import type { UpdateUserSettingsDto, UserSettings } from '../types/settings.types';
 
 const LEGACY_MEETING_SETTINGS_KEY = 'transnote-meeting-settings';

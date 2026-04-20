@@ -11,7 +11,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
-import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
 import { usePrompt } from '../hooks/usePrompt';
 import { PromptEditorDialog } from './PromptEditorDialog';
 import {
@@ -20,6 +19,8 @@ import {
 } from '../types/prompt.types';
 
 interface PromptSelectorProps {
+  selectedPromptId?: string;
+  onDefaultPromptChange?: (promptId: string) => boolean | Promise<boolean>;
   onChange?: (promptId: string) => void;
 }
 
@@ -36,14 +37,17 @@ interface PromptSelectorProps {
    - All functional contracts (onChange, selection state, open/close,
      CRUD handlers, a11y roles) are preserved from the prior design.
    ───────────────────────────────────────────────────────────── */
-export function PromptSelector({ onChange }: PromptSelectorProps) {
+export function PromptSelector({
+  selectedPromptId: selectedPromptIdProp,
+  onDefaultPromptChange,
+  onChange,
+}: PromptSelectorProps) {
   const [expanded, setExpanded] = useState(false);
   const { prompts, isLoading, createPrompt, updatePrompt, deletePrompt } =
     usePrompt();
-  const { defaultPromptId, updateSettings } = useUserSettingsStore();
 
-  const selectedPromptId = prompts.some((prompt) => prompt.id === defaultPromptId)
-    ? defaultPromptId
+  const selectedPromptId = prompts.some((prompt) => prompt.id === selectedPromptIdProp)
+    ? selectedPromptIdProp
     : DEFAULT_PROMPT_ID;
   const selectedPrompt = prompts.find((prompt) => prompt.id === selectedPromptId);
 
@@ -58,8 +62,8 @@ export function PromptSelector({ onChange }: PromptSelectorProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleChange = async (promptId: string) => {
-    const success = await updateSettings({ defaultPromptId: promptId });
-    if (!success) return;
+    const success = await onDefaultPromptChange?.(promptId);
+    if (success === false) return;
     onChange?.(promptId);
   };
 

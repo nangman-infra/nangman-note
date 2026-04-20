@@ -31,19 +31,6 @@ import {
   pruneSelectionToVisible,
 } from './meetingSelection';
 
-/** Maps known promptId values to human-readable tag labels. */
-const TAG_LABEL_MAP: Record<string, string> = {
-  prompt_default_meeting: '회의록',
-  prompt_default_lecture: '강의',
-  prompt_default_seminar: '멘토링',
-};
-
-const TIME_FILTER_LABEL: Record<SidebarTimeFilter, string> = {
-  today: '오늘',
-  recent: '최근 7일',
-  all: '전체',
-};
-
 interface MeetingListProps {
   initialShowTrash?: boolean;
   showTrash?: boolean;
@@ -91,8 +78,6 @@ export function MeetingList({
   selectedMeetingId,
   timeFilter = 'all',
   tagFilter = null,
-  onTimeFilterChange,
-  onTagFilterChange,
   onMeetingsLoaded,
 }: MeetingListProps) {
   const {

@@ -1,22 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Bell, BookOpen, Clock, Download, LogOut, Mail, Mic, Moon, NotebookText, Pencil, Search, Settings, Sun, Trash2, Upload, Users } from 'lucide-react';
+import { ArrowLeft, Bell, BookOpen, Clock, Download, LogOut, Mail, Mic, Moon, Pencil, Settings, Sun, Trash2, Upload, Users } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
-import { TwoColumnLayout, useLayout } from '@/components/layout/TwoColumnLayout';
+import { TwoColumnLayout } from '@/components/layout/TwoColumnLayout';
 import { Sidebar, type SidebarTimeFilter, type SidebarView } from '@/components/layout/Sidebar';
 import { MeetingList } from '@/domains/meeting/components/MeetingList';
+import { meetingApi } from '@/domains/meeting/api/meetingApi';
 import { useMeetings } from '@/domains/meeting/hooks/useMeeting';
+import { useMeetingStore } from '@/domains/meeting/stores/meetingStore';
 import { usePrompt } from '@/domains/prompt/hooks/usePrompt';
 import { ResultViewer } from '@/domains/result/components/ResultViewer';
+import { useResultStore } from '@/domains/result/stores/resultStore';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { useUserSettingsStore } from '@/domains/settings/stores/settingsStore';
-import { MeetingTranscriptionMode } from '@/domains/meeting/types/meeting.types';
+import { MeetingTranscriptionMode } from '@/lib/transcription/transcriptionMode';
 import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
-import { PromptEditorDialog } from '@/domains/prompt/components/PromptEditorDialog';
 import { PROMPT_DOCUMENT_TYPE_HELP_TEXT, PROMPT_DOCUMENT_TYPE_LABELS, type PromptDocumentType } from '@/domains/prompt/types/prompt.types';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 
@@ -41,7 +43,7 @@ interface HomePageContentProps {
 
 function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
-  const [meetingListRefreshToken, setMeetingListRefreshToken] = useState(0);
+  const meetingListRefreshToken = 0;
   const [timeFilter, setTimeFilter] = useState<SidebarTimeFilter>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [showTrash, setShowTrash] = useState(initialShowTrash);
@@ -54,9 +56,31 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   });
   const { prompts } = usePrompt();
 
-  const requestMeetingListRefresh = () => {
-    setMeetingListRefreshToken((prev) => prev + 1);
-  };
+  const handleResultTitleUpdate = useCallback(
+    async (meetingId: string, title: string) => {
+      try {
+        await meetingApi.update(meetingId, { title });
+        useResultStore.setState((state) => {
+          if (!state.result) return state;
+          return {
+            result: {
+              ...state.result,
+              metadata: { ...state.result.metadata, title },
+            },
+          };
+        });
+        useMeetingStore.setState((state) => ({
+          meetings: state.meetings.map((meeting) =>
+            meeting.id === meetingId ? { ...meeting, title } : meeting,
+          ),
+        }));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [],
+  );
 
   const handleTrashToggle = () => {
     setShowTrash((prev) => !prev);
@@ -116,7 +140,6 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
           onMeetingsLoaded={handleMeetingsLoaded}
           meetingsInfo={meetingsInfo}
           showOnboarding={showOnboarding}
-          onRefreshList={requestMeetingListRefresh}
         />
       }
       viewer={
@@ -174,9 +197,11 @@ function HomePageContent({ initialShowTrash }: HomePageContentProps) {
                 promptOptions={prompts.map((prompt) => ({
                   id: prompt.id,
                   name: prompt.name,
+                  label: formatPromptLabel(prompt),
                   documentType: prompt.documentType,
                   isDefault: prompt.isDefault,
                 }))}
+                onTitleUpdate={handleResultTitleUpdate}
               />
             </div>
           </div>
@@ -204,7 +229,6 @@ interface DashboardViewProps {
   onMeetingsLoaded: (info: { total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean }) => void;
   meetingsInfo: { total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean };
   showOnboarding: boolean;
-  onRefreshList: () => void;
 }
 
 function DashboardView({
@@ -221,7 +245,6 @@ function DashboardView({
   onMeetingsLoaded,
   meetingsInfo,
   showOnboarding,
-  onRefreshList,
 }: DashboardViewProps) {
   const isHistory = activeView === 'history';
 
@@ -610,20 +633,10 @@ interface PromptsInlineViewProps {
 function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
   const { pushToast } = useFeedback();
   const {
-    isLoading: isPromptLoading,
-    error: promptError,
     createPrompt,
     updatePrompt,
     deletePrompt,
   } = usePrompt();
-
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-  const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
-  const [editorInitialName, setEditorInitialName] = useState('');
-  const [editorInitialContent, setEditorInitialContent] = useState('');
-  const [editorInitialDocumentType, setEditorInitialDocumentType] = useState<PromptDocumentType>('meeting');
-  const [isEditorSaving, setIsEditorSaving] = useState(false);
 
   // Inline editor state (for the Template Editor section)
   const [inlineName, setInlineName] = useState('');
@@ -961,7 +974,6 @@ function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
     isHydrated,
     isLoading: isSettingsLoading,
     isSaving: isSettingsSaving,
-    error: settingsError,
     fetchSettings,
     updateSettings,
   } = useUserSettingsStore();

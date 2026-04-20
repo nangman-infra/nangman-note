@@ -10,7 +10,7 @@
  * **Validates: Requirements 1.37, 1.7, 1.14, 1.36, 1.21, A-1, B-2, D-3**
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // 1. CSS Specificity (1.37)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
 /**
  * TranscriptAudioVisualizer
@@ -35,32 +35,36 @@ export interface TranscriptAudioVisualizerProps {
 const DEFAULT_BAR_COUNT = 24;
 const MIN_HEIGHT_PERCENT = 8; // resting floor height for bars when inactive
 const MAX_HEIGHT_PERCENT = 92;
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
  * Read `prefers-reduced-motion: reduce` safely on the client.
  * Returns false during SSR / tests where matchMedia is unavailable.
  */
 function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
+  const getSnapshot = () => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
+      return false;
     }
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setReduced(query.matches);
+    return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+  };
 
-    const onChange = (event: MediaQueryListEvent) => setReduced(event.matches);
+  const subscribe = (onStoreChange: () => void) => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return () => undefined;
+    }
+    const query = window.matchMedia(REDUCED_MOTION_QUERY);
+
     if (typeof query.addEventListener === 'function') {
-      query.addEventListener('change', onChange);
-      return () => query.removeEventListener('change', onChange);
+      query.addEventListener('change', onStoreChange);
+      return () => query.removeEventListener('change', onStoreChange);
     }
     // Older Safari fallback
-    query.addListener(onChange);
-    return () => query.removeListener(onChange);
-  }, []);
+    query.addListener(onStoreChange);
+    return () => query.removeListener(onStoreChange);
+  };
 
-  return reduced;
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
 
 export function TranscriptAudioVisualizer({
@@ -70,23 +74,22 @@ export function TranscriptAudioVisualizer({
   className,
 }: TranscriptAudioVisualizerProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
-  const containerRef = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const barIndexes = useMemo(
+    () => Array.from({ length: barCount }, (_, index) => index),
+    [barCount],
+  );
+  const visualizerMode =
+    !stream || !isActive || prefersReducedMotion ? 'resting' : 'active';
 
-  // Keep the refs array sized to the current barCount so we don't leak
-  // references across barCount prop changes.
-  if (barRefs.current.length !== barCount) {
-    barRefs.current = new Array<HTMLDivElement | null>(barCount).fill(null);
-  }
+  useEffect(() => {
+    barRefs.current = barRefs.current.slice(0, barCount);
+  }, [barCount]);
 
   useEffect(() => {
     // Bail out when we have no stream, the visualizer is inactive, or the user
     // prefers reduced motion. In all these cases the flat resting bars remain.
     if (!stream || !isActive || prefersReducedMotion) {
-      // Reset bars to resting height in case we were previously active.
-      for (const bar of barRefs.current) {
-        if (bar) bar.style.height = `${MIN_HEIGHT_PERCENT}%`;
-      }
       return;
     }
 
@@ -169,7 +172,6 @@ export function TranscriptAudioVisualizer({
 
   return (
     <div
-      ref={containerRef}
       role="presentation"
       aria-hidden="true"
       className={`relative flex h-16 items-end justify-center gap-1 bg-slate-950 px-4 py-3 ${
@@ -178,9 +180,9 @@ export function TranscriptAudioVisualizer({
       data-testid="transcript-audio-visualizer"
       data-active={isActive ? 'true' : 'false'}
     >
-      {Array.from({ length: barCount }).map((_, index) => (
+      {barIndexes.map((index) => (
         <div
-          key={index}
+          key={`${visualizerMode}:${index}`}
           ref={(el) => {
             barRefs.current[index] = el;
           }}

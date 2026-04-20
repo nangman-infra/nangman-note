@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ComponentType } from 'react';
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
 import { meetingApi } from '../api/meetingApi';
 import { useMeetingStatus } from '@/hooks/useMeetingStatus';
@@ -16,6 +17,10 @@ type UploadState =
 
 type ProcessingStep = 'uploading' | 'transcribing' | 'generating' | 'completed' | 'failed';
 
+const PROCESSING_STATUS_POLL_INTERVAL_MS = 5000;
+const ELAPSED_TIMER_INTERVAL_MS = 1000;
+const LONG_PROCESSING_WARNING_SECONDS = 300;
+
 interface ProcessingProgressProps {
   meetingId: string;
   uploadState: UploadState;
@@ -24,6 +29,34 @@ interface ProcessingProgressProps {
   onComplete?: () => void;
   onRetryUpload?: () => void;
   onContinueWithoutAudio?: () => void;
+}
+
+function formatElapsed(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}분 ${s.toString().padStart(2, '0')}초`;
+}
+
+function ElapsedProcessingTimer() {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, ELAPSED_TIMER_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="mt-2 text-xs text-muted">
+      <span>경과 시간: {formatElapsed(elapsedSeconds)}</span>
+      {elapsedSeconds > LONG_PROCESSING_WARNING_SECONDS && (
+        <p className="mt-1 text-amber-600 font-medium">
+          예상보다 오래 걸리고 있습니다. 완료 시 알려드립니다.
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function ProcessingProgress({
@@ -106,7 +139,7 @@ export function ProcessingProgress({
       } catch {
         // 폴백 확인 실패는 무시하고 다음 틱에서 재시도
       }
-    }, 5000);
+    }, PROCESSING_STATUS_POLL_INTERVAL_MS);
 
     return () => {
       disposed = true;
@@ -125,28 +158,11 @@ export function ProcessingProgress({
       ? uploadError || '오디오 업로드에 실패했습니다.'
       : null;
 
-  // 경과 시간 카운터 (1.28)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  useEffect(() => {
-    setElapsedSeconds(0);
-    if (currentStep === 'completed' || currentStep === 'failed') return;
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [meetingId, currentStep]);
-
-  const formatElapsed = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}분 ${s.toString().padStart(2, '0')}초`;
-  };
-
   const steps: Array<{
     key: ProcessingStep;
     label: string;
     description: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: ComponentType<{ className?: string }>;
   }> = [
     {
       key: 'uploading',
@@ -194,14 +210,7 @@ export function ProcessingProgress({
       )}
 
       {currentStep !== 'failed' && currentStep !== 'completed' && (
-        <div className="mt-2 text-xs text-muted">
-          <span>경과 시간: {formatElapsed(elapsedSeconds)}</span>
-          {elapsedSeconds > 300 && (
-            <p className="mt-1 text-amber-600 font-medium">
-              예상보다 오래 걸리고 있습니다. 완료 시 알려드립니다.
-            </p>
-          )}
-        </div>
+        <ElapsedProcessingTimer key={`${meetingId}:${currentStep}`} />
       )}
 
       {error && currentStep === 'failed' ? (

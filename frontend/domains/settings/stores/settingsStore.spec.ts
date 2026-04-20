@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { settingsApi } from '../api/settingsApi';
 import { useUserSettingsStore } from './settingsStore';
-import { MeetingTranscriptionMode } from '../../meeting/types/meeting.types';
+import { MeetingTranscriptionMode } from '@/lib/transcription/transcriptionMode';
 
 // localStorage + window polyfill for node test environment
 const storageMap = new Map<string, string>();

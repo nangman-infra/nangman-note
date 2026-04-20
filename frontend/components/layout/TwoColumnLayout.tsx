@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState } from 'react';
-import { Columns3, FileText, PanelLeft } from 'lucide-react';
+import { Columns3, FileText } from 'lucide-react';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 
 /* ------------------------------------------------------------------ */
@@ -38,7 +38,7 @@ interface TwoColumnLayoutProps {
 }
 
 export function TwoColumnLayout({ sidebar, dashboard, viewer, showViewer, breadcrumb }: TwoColumnLayoutProps) {
-  const [activeView, setActiveView] = useState<ActiveView>(showViewer ? 'viewer' : 'dashboard');
+  const [, setActiveView] = useState<ActiveView>(showViewer ? 'viewer' : 'dashboard');
 
   // Sync showViewer prop → internal state
   const resolvedView = showViewer ? 'viewer' : 'dashboard';

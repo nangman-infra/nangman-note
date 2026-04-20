@@ -9,11 +9,7 @@ import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import { copyToClipboard, sanitizeNoteMarkdown } from '@/lib/utils/markdown';
 import { PROMPT_DOCUMENT_TYPE_LABELS } from '@/lib/constants';
-import { meetingApi } from '@/domains/meeting/api/meetingApi';
-import { useMeetingStore } from '@/domains/meeting/stores/meetingStore';
-import { formatPromptLabel } from '@/domains/prompt/lib/formatPromptLabel';
 import { useResult } from '../hooks/useResult';
-import { useResultStore } from '../stores/resultStore';
 import {
   resultTabDataApi,
   type ResultTabTranscriptSegment,
@@ -25,9 +21,11 @@ interface ResultViewerProps {
   promptOptions?: Array<{
     id: string;
     name: string;
+    label: string;
     documentType: 'meeting' | 'lecture' | 'mentoring';
     isDefault?: boolean;
   }>;
+  onTitleUpdate: (meetingId: string, title: string) => Promise<boolean>;
 }
 
 function formatSegmentTime(seconds: number): string {
@@ -49,6 +47,7 @@ export function ResultViewer({
   meetingId,
   onMeetingUnavailable,
   promptOptions = [],
+  onTitleUpdate,
 }: ResultViewerProps) {
   const {
     result,
@@ -246,23 +245,8 @@ export function ResultViewer({
       return;
     }
     try {
-      await meetingApi.update(meetingId, { title: trimmed });
-      // Optimistic local update — patch the result store so the title renders immediately
-      useResultStore.setState((state) => {
-        if (!state.result) return state;
-        return {
-          result: {
-            ...state.result,
-            metadata: { ...state.result.metadata, title: trimmed },
-          },
-        };
-      });
-      // Also patch the meeting list store so the sidebar title updates immediately
-      useMeetingStore.setState((state) => ({
-        meetings: state.meetings.map((m) =>
-          m.id === meetingId ? { ...m, title: trimmed } : m,
-        ),
-      }));
+      const success = await onTitleUpdate(meetingId, trimmed);
+      if (!success) throw new Error('Failed to update meeting title');
       setIsEditingTitle(false);
       pushToast({ title: '제목이 변경되었습니다', variant: 'success' });
     } catch {
@@ -730,7 +714,7 @@ export function ResultViewer({
                     })
                     .map((prompt) => (
                       <option key={prompt.id} value={prompt.id}>
-                        {formatPromptLabel(prompt)}
+                        {prompt.label}
                       </option>
                     ))}
                 </select>
