@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { getSession, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { Socket } from 'socket.io-client';
 import { useTranscriptionStore } from '../stores/transcriptionStore';
 import { createSocket } from '@/lib/api/websocket';
-import { extractSocketErrorMessage, isSocketAuthError } from '@/lib/api/socketAuth';
-import type { RealtimeTranscriptPayload } from '../types/transcription.types';
+import {
+  bindTranscriptionSocketHandlers,
+  recoverTranscriptionSocketAuth,
+  stopTranscriptionSession,
+} from '../lib/transcriptionSocketSession';
 
 interface UseTranscriptionOptions {
   onFallbackToBatch?: (payload?: { reason?: string }) => void;
@@ -45,58 +48,20 @@ export function useTranscription(
   }, [fallbackHandler]);
 
   const stopSession = useCallback(async (): Promise<boolean> => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) {
-      setHasActiveSession(false);
-      return false;
-    }
-
-    const success = await new Promise<boolean>((resolve) => {
-      let settled = false;
-      const done = (ok: boolean) => {
-        if (settled) return;
-        settled = true;
-        resolve(ok);
-      };
-
-      const timerId = window.setTimeout(() => done(false), 1500);
-      socket.emit(
-        'transcript:stop',
-        (response?: { ok?: boolean }) => {
-          window.clearTimeout(timerId);
-          done(Boolean(response?.ok));
-        },
-      );
+    return stopTranscriptionSession({
+      socket: socketRef.current,
+      setHasActiveSession,
     });
-
-    if (success) {
-      setHasActiveSession(false);
-    }
-    return success;
   }, [setHasActiveSession]);
 
   const recoverSocketAuth = useCallback(async (socket: Socket) => {
-    if (isRecoveringAuthRef.current) {
-      return;
-    }
-    isRecoveringAuthRef.current = true;
-
-    try {
-      const refreshedSession = await getSession();
-      const refreshedToken = refreshedSession?.accessToken;
-      if (!refreshedToken) {
-        setError('인증 세션이 만료되었습니다. 다시 로그인해주세요.');
-        return;
-      }
-
-      accessTokenRef.current = refreshedToken;
-
-      if (!socket.connected && socketRef.current === socket) {
-        socket.connect();
-      }
-    } finally {
-      isRecoveringAuthRef.current = false;
-    }
+    await recoverTranscriptionSocketAuth({
+      socket,
+      socketRef,
+      accessTokenRef,
+      isRecoveringAuthRef,
+      setError,
+    });
   }, [setError]);
 
   useEffect(() => {
@@ -127,76 +92,17 @@ export function useTranscription(
     const socket = createSocket('/ws/transcribe', { meetingId }, () => accessTokenRef.current);
     socketRef.current = socket;
 
-    socket.on('connect', () => {
-      authRecoveryPendingRef.current = false;
-      setConnected(true);
-      setError(null);
-    });
-
-    socket.on('disconnect', (reason) => {
-      setConnected(false);
-      setHasActiveSession(false);
-
-      if (reason === 'io server disconnect' && authRecoveryPendingRef.current) {
-        authRecoveryPendingRef.current = false;
-        void recoverSocketAuth(socket);
-      }
-    });
-
-    socket.on('connected', (data: { meetingId: string; hasActiveSession: boolean }) => {
-      setHasActiveSession(data.hasActiveSession);
-    });
-
-    socket.on('error', (payload: unknown) => {
-      if (isSocketAuthError(payload)) {
-        authRecoveryPendingRef.current = true;
-        void recoverSocketAuth(socket);
-      }
-
-      setError(extractSocketErrorMessage(payload) || 'Transcription error');
-    });
-
-    socket.on('connect_error', (payload: unknown) => {
-      if (isSocketAuthError(payload)) {
-        authRecoveryPendingRef.current = true;
-        void recoverSocketAuth(socket);
-      }
-
-      setConnected(false);
-      setHasActiveSession(false);
-      setError(
-        extractSocketErrorMessage(payload) || 'Transcription connection failed',
-      );
-    });
-
-    // 실시간 전사 이벤트 수신
-    socket.on('transcript:partial', (payload: RealtimeTranscriptPayload) => {
-      handlePayload(payload);
-    });
-
-    socket.on('transcript:final', (payload: RealtimeTranscriptPayload) => {
-      handlePayload(payload);
-    });
-
-    socket.on('transcript:translation', (payload: RealtimeTranscriptPayload) => {
-      handlePayload(payload);
-    });
-
-    socket.on('transcript:error', (err: { message?: string }) => {
-      setError(err.message || 'Transcription stream error');
-    });
-
-    socket.on(
-      'transcript:fallback',
-      (payload: { mode?: 'batch'; reason?: string }) => {
-        if (payload.mode === 'batch') {
-          fallbackCallbackRef.current?.({ reason: payload.reason });
-        }
+    bindTranscriptionSocketHandlers({
+      socket,
+      authRecoveryPendingRef,
+      fallbackCallbackRef,
+      recoverSocketAuth: (nextSocket) => {
+        void recoverSocketAuth(nextSocket);
       },
-    );
-
-    socket.on('transcript:session-ended', () => {
-      setHasActiveSession(false);
+      setConnected,
+      setHasActiveSession,
+      setError,
+      handlePayload,
     });
 
     // Cleanup

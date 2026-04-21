@@ -53,12 +53,7 @@ interface MeetingState {
 
 function mapSearchResultToMeeting(result: SearchResult): Meeting {
   const fallbackCompletionState =
-    result.completionState ??
-    (result.needsAttention
-      ? MeetingCompletionState.ATTENTION_REQUIRED
-      : result.status === 'completed'
-        ? MeetingCompletionState.SUCCEEDED
-        : null);
+    result.completionState ?? getFallbackCompletionState(result);
 
   return {
     id: result.meetingId,
@@ -73,6 +68,14 @@ function mapSearchResultToMeeting(result: SearchResult): Meeting {
     createdAt: result.startedAt,
     updatedAt: result.startedAt,
   };
+}
+
+function getFallbackCompletionState(
+  result: SearchResult,
+): MeetingCompletionState | null {
+  if (result.needsAttention) return MeetingCompletionState.ATTENTION_REQUIRED;
+  if (result.status === 'completed') return MeetingCompletionState.SUCCEEDED;
+  return null;
 }
 
 export const useMeetingStore = create<MeetingState>((set, get) => ({

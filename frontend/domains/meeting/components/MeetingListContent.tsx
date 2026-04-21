@@ -47,15 +47,19 @@ export function MeetingListContent({
   onPurgeMeeting,
   onToggleSelect,
 }: MeetingListContentProps) {
-  return (
-    <div className="scroll-muted flex-1 space-y-1.5 overflow-y-auto px-4 py-3">
-      {isLoading ? (
+  const renderContent = () => {
+    if (isLoading) {
+      return (
         <div className="space-y-2">
           {Array.from({ length: 4 }, (_, index) => (
             <MeetingCardSkeleton key={index} />
           ))}
         </div>
-      ) : sortedMeetings.length === 0 ? (
+      );
+    }
+
+    if (sortedMeetings.length === 0) {
+      return (
         <MeetingListEmptyState
           showTrash={showTrash}
           isSearchApplied={isSearchApplied}
@@ -66,28 +70,36 @@ export function MeetingListContent({
           onClearSearch={onClearSearch}
           onResetStatusFilter={onResetStatusFilter}
         />
-      ) : (
-        <>
-          {visibleMeetings.map((meeting, index) => (
-            <div key={meeting.id} className={index < 3 ? 'motion-rise' : ''}>
-              <MeetingCard
-                meeting={meeting}
-                mode={showTrash ? 'trash' : 'active'}
-                onClick={showTrash ? undefined : () => onSelectMeeting?.(meeting.id)}
-                onDelete={undefined}
-                onRestore={
-                  showTrash ? () => onRestoreMeeting(meeting.id) : undefined
-                }
-                onPurge={showTrash ? () => onPurgeMeeting(meeting.id) : undefined}
-                isActive={meeting.id === selectedMeetingId}
-                selectionMode={selectionMode}
-                isSelected={selectedIds.has(meeting.id)}
-                onToggleSelect={() => onToggleSelect(meeting.id)}
-              />
-            </div>
-          ))}
-        </>
-      )}
+      );
+    }
+
+    return (
+      <>
+        {visibleMeetings.map((meeting, index) => (
+          <div key={meeting.id} className={index < 3 ? 'motion-rise' : ''}>
+            <MeetingCard
+              meeting={meeting}
+              mode={showTrash ? 'trash' : 'active'}
+              onClick={showTrash ? undefined : () => onSelectMeeting?.(meeting.id)}
+              onDelete={undefined}
+              onRestore={
+                showTrash ? () => onRestoreMeeting(meeting.id) : undefined
+              }
+              onPurge={showTrash ? () => onPurgeMeeting(meeting.id) : undefined}
+              isActive={meeting.id === selectedMeetingId}
+              selectionMode={selectionMode}
+              isSelected={selectedIds.has(meeting.id)}
+              onToggleSelect={() => onToggleSelect(meeting.id)}
+            />
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  return (
+    <div className="scroll-muted flex-1 space-y-1.5 overflow-y-auto px-4 py-3">
+      {renderContent()}
     </div>
   );
 }

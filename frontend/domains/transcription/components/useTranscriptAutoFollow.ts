@@ -43,7 +43,7 @@ export function useTranscriptAutoFollow({
     const handleScroll = () => {
       const nearBottom = isNearBottom(element);
       setShowJumpToLatest(!nearBottom);
-      setFollowLive((prev) => (nearBottom ? true : prev ? false : prev));
+      setFollowLive((prev) => getNextFollowLiveState(prev, nearBottom));
     };
 
     element.addEventListener('scroll', handleScroll, { passive: true });
@@ -78,4 +78,13 @@ export function useTranscriptAutoFollow({
     scrollToBottom,
     toggleFollowLive,
   };
+}
+
+function getNextFollowLiveState(
+  previousFollowLive: boolean,
+  nearBottom: boolean,
+): boolean {
+  if (nearBottom) return true;
+  if (previousFollowLive) return false;
+  return previousFollowLive;
 }

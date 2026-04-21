@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import type { RealtimeTranscriptPayload } from '../types/transcription.types';
+import type {
+  RealtimeTranscriptContentPayload,
+  RealtimeTranscriptPayload,
+} from '../types/transcription.types';
 
 function normalizeTextForCompare(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -187,11 +190,7 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
               resultId: payload.resultId,
               text: cleanedFinal,
               translatedText: payload.translatedText,
-              translationStatus: payload.translationPending
-                ? 'pending'
-                : payload.translatedText
-                  ? 'done'
-                  : undefined,
+              translationStatus: getTranslationStatus(payload),
               startTime: payload.startTime,
               endTime: payload.endTime,
               detectedLanguage: payload.detectedLanguage,
@@ -224,3 +223,11 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
     set({ error });
   },
 }));
+
+function getTranslationStatus(
+  payload: RealtimeTranscriptContentPayload,
+): FinalSegment['translationStatus'] {
+  if (payload.translationPending) return 'pending';
+  if (payload.translatedText) return 'done';
+  return undefined;
+}

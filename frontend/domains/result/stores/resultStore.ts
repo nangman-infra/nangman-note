@@ -62,12 +62,11 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
         isPending: false,
         isMissingMeeting: false,
         error: null,
-        isRegenerating:
-          typeof serverReportedRegenerating === 'boolean'
-            ? serverReportedRegenerating
-            : generatedAtChanged
-              ? false
-              : prev.isRegenerating,
+        isRegenerating: resolveRegeneratingState({
+          serverReportedRegenerating,
+          generatedAtChanged,
+          previousIsRegenerating: prev.isRegenerating,
+        }),
       });
     } catch (error) {
       const message =
@@ -210,3 +209,23 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
     set(store.getInitialState());
   },
 }));
+
+function resolveRegeneratingState({
+  serverReportedRegenerating,
+  generatedAtChanged,
+  previousIsRegenerating,
+}: {
+  serverReportedRegenerating: unknown;
+  generatedAtChanged: boolean;
+  previousIsRegenerating: boolean;
+}): boolean {
+  if (typeof serverReportedRegenerating === 'boolean') {
+    return serverReportedRegenerating;
+  }
+
+  if (generatedAtChanged) {
+    return false;
+  }
+
+  return previousIsRegenerating;
+}

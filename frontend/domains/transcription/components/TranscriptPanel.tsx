@@ -71,17 +71,11 @@ export function TranscriptPanel({
     );
   }
 
-  const statusLabel = !isConnected
-    ? '연결 중...'
-    : hasActiveSession
-      ? '전사 중'
-      : '대기 중';
-
-  const statusClassName = !isConnected
-    ? 'bg-amber-500/20 text-amber-300'
-    : hasActiveSession
-      ? 'bg-emerald-500/20 text-emerald-300 animate-pulse'
-      : 'bg-slate-800 text-slate-300';
+  const statusLabel = getRealtimeStatusLabel({ isConnected, hasActiveSession });
+  const statusClassName = getRealtimeStatusClassName({
+    isConnected,
+    hasActiveSession,
+  });
 
   return (
     <TranscriptPanelFrame
@@ -126,4 +120,28 @@ export function TranscriptPanel({
       </div>
     </TranscriptPanelFrame>
   );
+}
+
+function getRealtimeStatusLabel({
+  isConnected,
+  hasActiveSession,
+}: {
+  isConnected: boolean;
+  hasActiveSession: boolean;
+}): string {
+  if (!isConnected) return '연결 중...';
+  if (hasActiveSession) return '전사 중';
+  return '대기 중';
+}
+
+function getRealtimeStatusClassName({
+  isConnected,
+  hasActiveSession,
+}: {
+  isConnected: boolean;
+  hasActiveSession: boolean;
+}): string {
+  if (!isConnected) return 'bg-amber-500/20 text-amber-300';
+  if (hasActiveSession) return 'bg-emerald-500/20 text-emerald-300 animate-pulse';
+  return 'bg-slate-800 text-slate-300';
 }

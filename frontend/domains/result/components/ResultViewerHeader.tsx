@@ -165,21 +165,39 @@ export function ResultViewerHeader({
         )}
       </div>
 
-      {isRegenerating ? (
-        <StatusBanner
-          variant="info"
-          title="AI가 회의록을 재생성하고 있습니다"
-          message="프롬프트를 변경하여 새로운 회의록을 생성 중입니다. 완료되면 자동으로 업데이트됩니다."
-          className="mb-3"
-        />
-      ) : error ? (
-        <StatusBanner
-          variant="error"
-          title="결과 처리 오류"
-          message="잠시 후 다시 시도해주세요. 입력하신 내용은 유지됩니다."
-          className="mb-3"
-        />
-      ) : null}
+      {renderResultStatusBanner({ isRegenerating, error })}
     </header>
   );
+}
+
+function renderResultStatusBanner({
+  isRegenerating,
+  error,
+}: {
+  isRegenerating: boolean;
+  error?: string | null;
+}) {
+  if (isRegenerating) {
+    return (
+      <StatusBanner
+        variant="info"
+        title="AI가 회의록을 재생성하고 있습니다"
+        message="프롬프트를 변경하여 새로운 회의록을 생성 중입니다. 완료되면 자동으로 업데이트됩니다."
+        className="mb-3"
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <StatusBanner
+        variant="error"
+        title="결과 처리 오류"
+        message="잠시 후 다시 시도해주세요. 입력하신 내용은 유지됩니다."
+        className="mb-3"
+      />
+    );
+  }
+
+  return null;
 }

@@ -3,32 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_AUDIO_INPUT_SOURCE,
-  type AudioInputSource,
 } from '../types/audio-input.types';
+import {
+  createAudioConstraints,
+  enumerateAudioDevices,
+  isMediaDevicesSupported,
+  isSupportedAudioInputSource,
+  type AudioCapturePermission,
+  type AudioCaptureRequest,
+  type AudioCaptureRequestResult,
+  type AudioDevice,
+} from '../lib/audioCaptureUtils';
 
-export interface AudioDevice {
-  deviceId: string;
-  label: string;
-}
-
-export type AudioCapturePermission = 'prompt' | 'granted' | 'denied' | 'unsupported';
-export type AudioCaptureFailureReason =
-  | 'denied'
-  | 'unsupported'
-  | 'device-not-found'
-  | 'device-unavailable'
-  | 'invalid-device'
-  | 'unknown';
-
-export interface AudioCaptureRequestResult {
-  granted: boolean;
-  reason?: AudioCaptureFailureReason;
-}
-
-export interface AudioCaptureRequest {
-  deviceId?: string;
-  inputSource?: AudioInputSource;
-}
+export type {
+  AudioCaptureFailureReason,
+  AudioCapturePermission,
+  AudioCaptureRequest,
+  AudioCaptureRequestResult,
+  AudioDevice,
+} from '../lib/audioCaptureUtils';
 
 interface UseAudioCaptureReturn {
   permission: AudioCapturePermission;
@@ -41,24 +34,6 @@ interface UseAudioCaptureReturn {
   ) => Promise<AudioCaptureRequestResult>;
   selectDevice: (deviceId: string) => void;
   stopCapture: () => void;
-}
-
-function isMediaDevicesSupported(): boolean {
-  return (
-    typeof navigator !== 'undefined' &&
-    typeof navigator.mediaDevices !== 'undefined' &&
-    typeof navigator.mediaDevices.getUserMedia === 'function'
-  );
-}
-
-async function enumerateAudioDevices(): Promise<AudioDevice[]> {
-  const allDevices = await navigator.mediaDevices.enumerateDevices();
-  return allDevices
-    .filter((device) => device.kind === 'audioinput')
-    .map((device, index) => ({
-      deviceId: device.deviceId,
-      label: device.label || `마이크 ${index + 1}`,
-    }));
 }
 
 export function useAudioCapture(): UseAudioCaptureReturn {
@@ -101,20 +76,9 @@ export function useAudioCapture(): UseAudioCaptureReturn {
         normalizedRequest?.inputSource ?? DEFAULT_AUDIO_INPUT_SOURCE;
       setError(null);
 
-      const audioConstraints: MediaTrackConstraints = {
-        // 현재는 마이크 수집만 지원하지만, 요청 모델은 이후 meeting audio mix / desktop app 확장을 대비한다.
-        ...(effectiveDeviceId ? { deviceId: { exact: effectiveDeviceId } } : {}),
-        // 회의 양측 음성을 함께 수집하기 위해 브라우저 DSP(특히 echo cancellation)를 비활성화한다.
-        // 노트북 스피커로 재생되는 상대방 음성은 echo cancellation이 켜져 있으면 제거될 수 있다.
-        channelCount: { ideal: 1 },
-        sampleRate: { ideal: 48_000 },
-        sampleSize: { ideal: 16 },
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      };
+      const audioConstraints = createAudioConstraints(effectiveDeviceId ?? undefined);
 
-      if (inputSource !== DEFAULT_AUDIO_INPUT_SOURCE) {
+      if (!isSupportedAudioInputSource(inputSource)) {
         setError(
           '선택한 입력 소스는 아직 준비 중입니다. 현재는 마이크 입력만 지원합니다.',
         );

@@ -1,25 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Socket } from 'socket.io-client';
+import { useCallback, useEffect, useState } from 'react';
+import type { Socket } from 'socket.io-client';
 import {
-  AUDIO_STREAMING_LIMITS,
-  getAckErrorMessage,
-  isCapacityFallbackAck,
-  shouldFallbackForSaturation,
-  type AudioAckResponse,
-} from './audioStreamingPolicy';
+  cleanupAudioStreamingRuntime,
+  handleAudioAckResponse,
+  handleAudioChunk,
+  markStoppedByGuard,
+  notifyAudioStreamingFallback,
+  preloadAudioWorkletModule,
+  requestRealtimeSessionStop,
+  startAudioStreamingRuntime,
+  useAudioStreamingRuntimeRefs,
+  type AudioStreamingState,
+  type StartStreamingOptions,
+} from '../lib/audioStreamingRuntime';
+import type { AudioAckResponse } from './audioStreamingPolicy';
 
-export type AudioStreamingState =
-  | 'idle'
-  | 'streaming'
-  | 'stopping'
-  | 'stopped'
-  | 'error';
-
-interface StartStreamingOptions {
-  onFallbackToBatch?: (payload?: { reason?: string }) => void;
-}
+export type { AudioStreamingState } from '../lib/audioStreamingRuntime';
 
 interface UseAudioStreamingReturn {
   state: AudioStreamingState;
@@ -35,192 +33,65 @@ interface UseAudioStreamingReturn {
 export function useAudioStreaming(): UseAudioStreamingReturn {
   const [state, setState] = useState<AudioStreamingState>('idle');
   const [error, setError] = useState<string | null>(null);
-
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const socketRef = useRef<Socket | null>(null);
-  const optionsRef = useRef<StartStreamingOptions | undefined>(undefined);
-  const fallbackNotifiedRef = useRef(false);
-  const inFlightAckCountRef = useRef(0);
-  const nextAckIdRef = useRef(1);
-  const ackTimeoutMapRef = useRef<Map<number, number>>(new Map());
-  const consecutiveTimeoutRef = useRef(0);
-  const consecutiveBackpressureRef = useRef(0);
-  const saturationStartAtRef = useRef<number | null>(null);
-  const stoppedByGuardRef = useRef(false);
-  const lastTransportNoticeAtRef = useRef<number | null>(null);
+  const refs = useAudioStreamingRuntimeRefs();
 
   const notifyFallbackToBatch = useCallback((reason?: string) => {
-    if (fallbackNotifiedRef.current) return;
-    fallbackNotifiedRef.current = true;
-    optionsRef.current?.onFallbackToBatch?.({ reason });
-  }, []);
+    notifyAudioStreamingFallback(refs, reason);
+  }, [refs]);
 
-  const requestRealtimeSessionStop = useCallback(() => {
-    const socket = socketRef.current;
-    if (!socket?.connected) return;
-    socket.emit('transcript:stop', () => undefined);
-  }, []);
-
-  const clearAckTrackers = useCallback(() => {
-    ackTimeoutMapRef.current.forEach((timerId) => {
-      window.clearTimeout(timerId);
-    });
-    ackTimeoutMapRef.current.clear();
-    inFlightAckCountRef.current = 0;
-    consecutiveTimeoutRef.current = 0;
-    consecutiveBackpressureRef.current = 0;
-    saturationStartAtRef.current = null;
-  }, []);
+  const requestSessionStop = useCallback(() => {
+    requestRealtimeSessionStop(refs.socketRef.current);
+  }, [refs]);
 
   const cleanup = useCallback(() => {
-    clearAckTrackers();
-
-    if (workletNodeRef.current) {
-      try {
-        workletNodeRef.current.port.postMessage('stop');
-        workletNodeRef.current.disconnect();
-      } catch {
-        // no-op
-      }
-      workletNodeRef.current = null;
-    }
-
-    if (sourceNodeRef.current) {
-      try {
-        sourceNodeRef.current.disconnect();
-      } catch {
-        // no-op
-      }
-      sourceNodeRef.current = null;
-    }
-
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      void audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-
-    socketRef.current = null;
-    optionsRef.current = undefined;
-    fallbackNotifiedRef.current = false;
-    lastTransportNoticeAtRef.current = null;
-  }, [clearAckTrackers]);
+    cleanupAudioStreamingRuntime(refs);
+  }, [refs]);
 
   const stopForRealtimeInstability = useCallback(
     (message: string, reason: string) => {
-      if (stoppedByGuardRef.current) return;
-      stoppedByGuardRef.current = true;
-      requestRealtimeSessionStop();
+      if (!markStoppedByGuard(refs)) return;
+      requestSessionStop();
       notifyFallbackToBatch(reason);
       cleanup();
       setState('stopped');
       setError(message);
     },
-    [cleanup, notifyFallbackToBatch, requestRealtimeSessionStop],
+    [cleanup, notifyFallbackToBatch, refs, requestSessionStop],
+  );
+
+  const handleAck = useCallback(
+    (ackId: number, ack?: AudioAckResponse) => {
+      handleAudioAckResponse({
+        ackId,
+        ack,
+        refs,
+        requestSessionStop,
+        notifyFallbackToBatch,
+        cleanup,
+        setState,
+        setError,
+        stopForRealtimeInstability,
+      });
+    },
+    [
+      cleanup,
+      notifyFallbackToBatch,
+      refs,
+      requestSessionStop,
+      stopForRealtimeInstability,
+    ],
   );
 
   const handleChunk = useCallback(
     (chunk: ArrayBuffer) => {
-      if (!chunk || chunk.byteLength === 0) return;
-
-      const socket = socketRef.current;
-      if (!socket?.connected) {
-        return;
-      }
-
-      if (inFlightAckCountRef.current >= AUDIO_STREAMING_LIMITS.MAX_IN_FLIGHT_ACKS) {
-        const now = Date.now();
-        if (saturationStartAtRef.current === null) {
-          saturationStartAtRef.current = now;
-          return;
-        }
-
-        if (shouldFallbackForSaturation(saturationStartAtRef.current, now)) {
-          stopForRealtimeInstability(
-            '네트워크 지연으로 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
-            'client-network-saturation',
-          );
-        }
-        return;
-      }
-
-      saturationStartAtRef.current = null;
-
-      const ackId = nextAckIdRef.current++;
-      inFlightAckCountRef.current += 1;
-
-      const timeoutId = window.setTimeout(() => {
-        const trackedTimer = ackTimeoutMapRef.current.get(ackId);
-        if (trackedTimer === undefined) {
-          return;
-        }
-        ackTimeoutMapRef.current.delete(ackId);
-        inFlightAckCountRef.current = Math.max(0, inFlightAckCountRef.current - 1);
-        consecutiveTimeoutRef.current += 1;
-        if (
-          consecutiveTimeoutRef.current >=
-          AUDIO_STREAMING_LIMITS.MAX_CONSECUTIVE_TIMEOUTS
-        ) {
-          stopForRealtimeInstability(
-            '응답 지연이 지속되어 실시간 전사를 중지했습니다. 회의를 종료하면 배치 전사로 처리됩니다.',
-            'client-ack-timeout',
-          );
-        }
-      }, AUDIO_STREAMING_LIMITS.ACK_TIMEOUT_MS);
-
-      ackTimeoutMapRef.current.set(ackId, timeoutId);
-
-      socket.emit('audio', new Uint8Array(chunk), (ack?: AudioAckResponse) => {
-        const timer = ackTimeoutMapRef.current.get(ackId);
-        if (timer === undefined) {
-          return;
-        }
-        window.clearTimeout(timer);
-        ackTimeoutMapRef.current.delete(ackId);
-        inFlightAckCountRef.current = Math.max(0, inFlightAckCountRef.current - 1);
-        consecutiveTimeoutRef.current = 0;
-
-        const response = ack ?? { ok: false, reason: 'ack-timeout' };
-        if (response.ok) {
-          consecutiveBackpressureRef.current = 0;
-          setError(null);
-          return;
-        }
-
-        if (isCapacityFallbackAck(response)) {
-          requestRealtimeSessionStop();
-          notifyFallbackToBatch(response.reason);
-          cleanup();
-          setState('stopped');
-          setError('실시간 전사 용량 초과로 배치 모드로 전환되었습니다.');
-          return;
-        }
-
-        if (response.reason === 'backpressure') {
-          consecutiveBackpressureRef.current += 1;
-        }
-
-        const ackError = getAckErrorMessage(
-          response,
-          consecutiveBackpressureRef.current,
-        );
-
-        if (ackError.kind === 'fallback') {
-          stopForRealtimeInstability(
-            ackError.message,
-            ackError.reason,
-          );
-          return;
-        }
-
-        if (response.reason !== 'backpressure') {
-          consecutiveBackpressureRef.current = 0;
-        }
-        setError(ackError.message);
+      handleAudioChunk({
+        chunk,
+        refs,
+        stopForRealtimeInstability,
+        onAck: handleAck,
       });
     },
-    [cleanup, notifyFallbackToBatch, requestRealtimeSessionStop, stopForRealtimeInstability],
+    [handleAck, refs, stopForRealtimeInstability],
   );
 
   const startStreaming = useCallback(
@@ -232,49 +103,13 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
       setError(null);
 
       try {
-        // ARTS 참조: 브라우저 기본 sampleRate 사용 (보통 48kHz)
-        // 다운샘플링은 AudioWorklet(pcm-processor) 내부에서 수행
-        const audioContext = new AudioContext({
-          latencyHint: 'interactive',
+        await startAudioStreamingRuntime({
+          stream,
+          socket,
+          options,
+          refs,
+          handleChunk,
         });
-        audioContextRef.current = audioContext;
-        socketRef.current = socket;
-        optionsRef.current = options;
-        fallbackNotifiedRef.current = false;
-        stoppedByGuardRef.current = false;
-        lastTransportNoticeAtRef.current = null;
-        clearAckTrackers();
-
-        if (audioContext.state === 'suspended') {
-          await audioContext.resume();
-        }
-
-        await audioContext.audioWorklet.addModule(
-          '/audio-worklet/pcm-processor.js',
-        );
-
-        const source = audioContext.createMediaStreamSource(stream);
-        sourceNodeRef.current = source;
-
-        const workletNode = new AudioWorkletNode(
-          audioContext,
-          'pcm-processor',
-        );
-        workletNodeRef.current = workletNode;
-
-        workletNode.port.onmessage = (event: MessageEvent) => {
-          const pcmBuffer: ArrayBuffer = event.data;
-          if (!pcmBuffer || pcmBuffer.byteLength === 0) return;
-          handleChunk(pcmBuffer);
-        };
-
-        source.connect(workletNode);
-
-        const silentGain = audioContext.createGain();
-        silentGain.gain.value = 0;
-        workletNode.connect(silentGain);
-        silentGain.connect(audioContext.destination);
-
         setState('streaming');
       } catch (err) {
         const message =
@@ -286,28 +121,18 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         cleanup();
       }
     },
-    [cleanup, clearAckTrackers, handleChunk],
+    [cleanup, handleChunk, refs],
   );
 
   const stopStreaming = useCallback(() => {
     setState('stopping');
-    requestRealtimeSessionStop();
+    requestSessionStop();
     cleanup();
     setState('stopped');
-  }, [cleanup, requestRealtimeSessionStop]);
+  }, [cleanup, requestSessionStop]);
 
   useEffect(() => {
-    const head = document.head;
-    const existing = head.querySelector<HTMLLinkElement>(
-      'link[data-audio-worklet-preload="true"]',
-    );
-    if (existing) return;
-
-    const preload = document.createElement('link');
-    preload.rel = 'modulepreload';
-    preload.href = '/audio-worklet/pcm-processor.js';
-    preload.setAttribute('data-audio-worklet-preload', 'true');
-    head.appendChild(preload);
+    preloadAudioWorkletModule();
   }, []);
 
   useEffect(() => {

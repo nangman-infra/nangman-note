@@ -39,7 +39,7 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold">노트 편집기</p>
             <p className="text-xs text-muted">
-              {isSaving ? '자동 저장 중...' : lastSaved ? `마지막 저장: ${lastSaved.toLocaleTimeString()}` : '아직 저장 전'}
+              {getSaveStatusLabel(isSaving, lastSaved)}
             </p>
           </div>
         </header>
@@ -84,4 +84,10 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
       </div>
     </div>
   );
+}
+
+function getSaveStatusLabel(isSaving: boolean, lastSaved: Date | null): string {
+  if (isSaving) return '자동 저장 중...';
+  if (lastSaved) return `마지막 저장: ${lastSaved.toLocaleTimeString()}`;
+  return '아직 저장 전';
 }

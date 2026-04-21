@@ -2,6 +2,8 @@
 
 import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
 
+type FlowMockStepStatus = 'done' | 'active' | 'pending';
+
 /** AI 처리 프로그레스 목업 */
 export function FlowMockProcessing() {
   const steps = [
@@ -18,34 +20,20 @@ export function FlowMockProcessing() {
       <div className="space-y-3">
         {steps.map((step) => (
           <div key={step.label} className="flex items-center gap-3">
-            <div
-              className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
-                step.status === 'done'
-                  ? 'bg-brand/10 text-brand'
-                  : step.status === 'active'
-                    ? 'bg-amber-50 text-amber-600'
-                    : 'bg-gray-100 text-gray-400'
-              }`}
-            >
-              {step.status === 'done' ? (
-                <CheckCircle2 className="h-3.5 w-3.5" />
-              ) : step.status === 'active' ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <step.icon className="h-3.5 w-3.5" />
-              )}
-            </div>
+	            <div
+	              className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
+	                getStepIconFrameClassName(step.status)
+	              }`}
+	            >
+	              {renderStepIcon(step)}
+	            </div>
 
             {/* 연결선 */}
             <div className="flex flex-1 items-center gap-2">
-              <span
-                className={`text-[11px] font-medium ${
-                  step.status === 'done'
-                    ? 'text-brand'
-                    : step.status === 'active'
-                      ? 'text-amber-700'
-                      : 'text-gray-400'
-                }`}
+	              <span
+	                className={`text-[11px] font-medium ${
+	                  getStepLabelClassName(step.status)
+	                }`}
               >
                 {step.label}
               </span>
@@ -58,4 +46,33 @@ export function FlowMockProcessing() {
       </div>
     </div>
   );
+}
+
+function getStepIconFrameClassName(status: FlowMockStepStatus): string {
+  if (status === 'done') return 'bg-brand/10 text-brand';
+  if (status === 'active') return 'bg-amber-50 text-amber-600';
+  return 'bg-gray-100 text-gray-400';
+}
+
+function getStepLabelClassName(status: FlowMockStepStatus): string {
+  if (status === 'done') return 'text-brand';
+  if (status === 'active') return 'text-amber-700';
+  return 'text-gray-400';
+}
+
+function renderStepIcon(step: {
+  icon: React.ComponentType<{ className?: string }>;
+  status: FlowMockStepStatus;
+}) {
+  const StepIcon = step.icon;
+
+  if (step.status === 'done') {
+    return <CheckCircle2 className="h-3.5 w-3.5" />;
+  }
+
+  if (step.status === 'active') {
+    return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
+  }
+
+  return <StepIcon className="h-3.5 w-3.5" />;
 }

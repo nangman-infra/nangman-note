@@ -87,6 +87,83 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
 
   // For history/prompts/settings views, we don't show the viewer panel
   const showViewer = Boolean(selectedMeetingId) && activeView !== 'history' && activeView !== 'prompts' && activeView !== 'settings';
+  const renderViewer = () => {
+    if (activeView === 'settings') {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="flex items-center gap-3 bg-slate-50/80 px-6 py-3 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={handleBackToDashboard}
+              className="btn-secondary inline-flex text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Dashboard
+            </button>
+            <span className="text-sm font-semibold text-slate-900">Settings</span>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <SettingsInlineView prompts={prompts} />
+          </div>
+        </div>
+      );
+    }
+
+    if (activeView === 'prompts') {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="flex items-center gap-3 bg-slate-50/80 px-6 py-3 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={handleBackToDashboard}
+              className="btn-secondary inline-flex text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Dashboard
+            </button>
+            <span className="text-sm font-semibold text-slate-900">Prompts</span>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <PromptsInlineView prompts={prompts} />
+          </div>
+        </div>
+      );
+    }
+
+    if (selectedMeetingId) {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] px-6 py-3">
+            <button
+              type="button"
+              onClick={handleBackToDashboard}
+              className="btn-secondary inline-flex text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Dashboard
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <ResultViewer
+              key={selectedMeetingId}
+              meetingId={selectedMeetingId}
+              onMeetingUnavailable={() => setSelectedMeetingId(null)}
+              promptOptions={prompts.map((prompt) => ({
+                id: prompt.id,
+                name: prompt.name,
+                label: formatPromptLabel(prompt),
+                documentType: prompt.documentType,
+                isDefault: prompt.isDefault,
+              }))}
+              onTitleUpdate={handleResultTitleUpdate}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <TwoColumnLayout
@@ -116,71 +193,7 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
           showOnboarding={showOnboarding}
         />
       }
-      viewer={
-        activeView === 'settings' ? (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center gap-3 bg-slate-50/80 px-6 py-3 backdrop-blur-xl">
-              <button
-                type="button"
-                onClick={handleBackToDashboard}
-                className="btn-secondary inline-flex text-sm"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Dashboard
-              </button>
-              <span className="text-sm font-semibold text-slate-900">Settings</span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <SettingsInlineView prompts={prompts} />
-            </div>
-          </div>
-        ) : activeView === 'prompts' ? (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center gap-3 bg-slate-50/80 px-6 py-3 backdrop-blur-xl">
-              <button
-                type="button"
-                onClick={handleBackToDashboard}
-                className="btn-secondary inline-flex text-sm"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Dashboard
-              </button>
-              <span className="text-sm font-semibold text-slate-900">Prompts</span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <PromptsInlineView prompts={prompts} />
-            </div>
-          </div>
-        ) : selectedMeetingId ? (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center gap-3 border-b border-[var(--line-soft)] px-6 py-3">
-              <button
-                type="button"
-                onClick={handleBackToDashboard}
-                className="btn-secondary inline-flex text-sm"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Dashboard
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <ResultViewer
-                key={selectedMeetingId}
-                meetingId={selectedMeetingId}
-                onMeetingUnavailable={() => setSelectedMeetingId(null)}
-                promptOptions={prompts.map((prompt) => ({
-                  id: prompt.id,
-                  name: prompt.name,
-                  label: formatPromptLabel(prompt),
-                  documentType: prompt.documentType,
-                  isDefault: prompt.isDefault,
-                }))}
-                onTitleUpdate={handleResultTitleUpdate}
-              />
-            </div>
-          </div>
-        ) : null
-      }
+      viewer={renderViewer()}
     />
   );
 }

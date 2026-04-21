@@ -2,10 +2,15 @@
 
 import { memo } from 'react';
 import { AlertTriangle, Check, Loader2, RotateCcw, Trash2 } from 'lucide-react';
-import { MeetingCompletionState } from '../types/meeting-completion-state.enum';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import type { Meeting } from '../types/meeting.types';
 import { formatDate, formatDuration } from '@/lib/utils/date';
+import {
+  getCardSelectionClassName,
+  getMeetingStatusConfig,
+  getProcessingBannerClassName,
+  getProcessingBannerMessage,
+} from './meetingCardStatus';
 
 interface MeetingCardProps {
   meeting: Meeting;
@@ -19,60 +24,6 @@ interface MeetingCardProps {
   isSelected?: boolean;
   onToggleSelect?: () => void;
 }
-
-/* ── Status text color mapping (no icons, text only) ── */
-const statusConfig = {
-  recording: {
-    label: '진행 중',
-    colorClass: 'text-indigo-600',
-  },
-  processing: {
-    label: '정리 중',
-    colorClass: 'text-amber-600',
-  },
-  completed: {
-    label: '완료',
-    colorClass: 'text-slate-500',
-  },
-} as const;
-
-const processingPhaseConfig = {
-  [MeetingProcessingPhase.UPLOADING]: {
-    label: '업로드 중',
-    colorClass: 'text-sky-600',
-  },
-  [MeetingProcessingPhase.TRANSCRIBING]: {
-    label: '전사 중',
-    colorClass: 'text-amber-600',
-  },
-  [MeetingProcessingPhase.GENERATING]: {
-    label: '정리 중',
-    colorClass: 'text-amber-600',
-  },
-  [MeetingProcessingPhase.REGENERATING]: {
-    label: '재생성 중',
-    colorClass: 'text-indigo-600',
-  },
-} as const;
-
-const completionStateConfig = {
-  [MeetingCompletionState.SUCCEEDED]: {
-    label: '완료',
-    colorClass: 'text-slate-500',
-  },
-  [MeetingCompletionState.PARTIAL]: {
-    label: '부분 완료',
-    colorClass: 'text-orange-600',
-  },
-  [MeetingCompletionState.ATTENTION_REQUIRED]: {
-    label: '확인 필요',
-    colorClass: 'text-rose-600',
-  },
-  [MeetingCompletionState.FAILED]: {
-    label: '실패',
-    colorClass: 'text-rose-600',
-  },
-} as const;
 
 export const MeetingCard = memo(
   ({
@@ -91,37 +42,12 @@ export const MeetingCard = memo(
       ? (new Date(meeting.endedAt).getTime() - new Date(meeting.startedAt).getTime()) / 1000
       : 0;
 
-    const baseConfig = statusConfig[meeting.status];
-    const phaseConfig =
-      meeting.processingPhase &&
-      meeting.processingPhase in processingPhaseConfig
-        ? processingPhaseConfig[
-            meeting.processingPhase as keyof typeof processingPhaseConfig
-          ]
-        : null;
-    const completionConfig =
-      meeting.status === 'completed' &&
-      meeting.completionState &&
-      meeting.completionState in completionStateConfig
-        ? completionStateConfig[
-            meeting.completionState as keyof typeof completionStateConfig
-          ]
-        : null;
-    const config =
-      meeting.status === 'processing' && meeting.needsAttention
-        ? {
-            label: '확인 필요',
-            colorClass: 'text-rose-600',
-          }
-        : meeting.status === 'processing' && phaseConfig
-          ? phaseConfig
-          : meeting.status === 'completed' && meeting.needsAttention
-            ? completionStateConfig[MeetingCompletionState.ATTENTION_REQUIRED]
-        : meeting.status === 'completed' && completionConfig
-          ? completionConfig
-          : baseConfig;
-
+    const config = getMeetingStatusConfig(meeting);
     const isRecording = meeting.status === 'recording';
+    const cardSelectionClassName = getCardSelectionClassName({
+      isSelected,
+      isActive,
+    });
 
     const handleCardClick = () => {
       if (selectionMode) {
@@ -131,19 +57,13 @@ export const MeetingCard = memo(
       onClick?.();
     };
 
-    return (
-      <article
-        className={`group relative w-full rounded-xl px-5 py-3.5 transition-all ${
-          isRecording
-            ? 'border-l-4 border-l-[var(--tertiary)] bg-[var(--surface-container-low)]'
-            : 'bg-white'
-        } ${
-          isSelected
-            ? 'bg-indigo-50 shadow-md ring-2 ring-brand/30'
-            : isActive
-              ? 'bg-white shadow-md'
-              : 'hover:bg-[var(--surface-container-high)] hover:shadow-sm'
-        } ${selectionMode ? 'cursor-pointer' : ''}`}
+	    return (
+	      <article
+	        className={`group relative w-full rounded-xl px-5 py-3.5 transition-all ${
+	          isRecording
+	            ? 'border-l-4 border-l-[var(--tertiary)] bg-[var(--surface-container-low)]'
+	            : 'bg-white'
+	        } ${cardSelectionClassName} ${selectionMode ? 'cursor-pointer' : ''}`}
         onClick={selectionMode ? handleCardClick : undefined}
       >
         <div className="flex items-center gap-3">
@@ -220,28 +140,20 @@ export const MeetingCard = memo(
         </div>
 
         {/* Processing status banner */}
-        {(meeting.status === 'processing' || meeting.needsAttention) && (
-          <div
-            className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
-              meeting.needsAttention
-                ? 'bg-rose-50 text-rose-700'
-                : 'bg-amber-50 text-amber-700'
-            }`}
-          >
+	        {(meeting.status === 'processing' || meeting.needsAttention) && (
+	          <div
+	            className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
+	              getProcessingBannerClassName(meeting.needsAttention)
+	            }`}
+	          >
             {meeting.needsAttention ? (
               <AlertTriangle className="h-3.5 w-3.5" />
             ) : (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             )}
-            {meeting.needsAttention
-              ? '확인이 필요한 처리 이슈가 있습니다.'
-              : meeting.processingPhase === MeetingProcessingPhase.UPLOADING
-                ? '오디오 업로드 중...'
-                : meeting.processingPhase === MeetingProcessingPhase.TRANSCRIBING
-                  ? '전사 처리 중...'
-                  : '회의록 생성 중...'}
-          </div>
-        )}
+	            {getProcessingBannerMessage(meeting)}
+	          </div>
+	        )}
 
         {/* Trash mode actions */}
         {mode === 'trash' && !selectionMode ? (

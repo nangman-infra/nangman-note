@@ -273,11 +273,7 @@ function KpiCards({ meetingsTotal, isLoading }: KpiCardsProps) {
   const hoursLabel =
     totalTranscribedHours > 0 ? `${totalTranscribedHours.toFixed(1)} hrs` : '—';
 
-  const meetingsLabel = isLoading
-    ? '—'
-    : meetingsTotal < 0
-      ? '—'
-      : String(meetingsTotal);
+  const meetingsLabel = getMeetingsLabel({ isLoading, meetingsTotal });
 
   return (
     <>
@@ -313,6 +309,53 @@ function KpiCards({ meetingsTotal, isLoading }: KpiCardsProps) {
 
 const WEEKDAY_LABELS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 const MIN_BAR_PERCENT = 6;
+
+function getMeetingsLabel({
+  isLoading,
+  meetingsTotal,
+}: {
+  isLoading: boolean;
+  meetingsTotal: number;
+}): string {
+  if (isLoading || meetingsTotal < 0) {
+    return '—';
+  }
+
+  return String(meetingsTotal);
+}
+
+function getBucketPercent({
+  bucketCount,
+  hasData,
+  maxCount,
+}: {
+  bucketCount: number;
+  hasData: boolean;
+  maxCount: number;
+}): number {
+  if (!hasData || maxCount === 0) {
+    return MIN_BAR_PERCENT;
+  }
+
+  return Math.max(
+    MIN_BAR_PERCENT,
+    Math.round((bucketCount / maxCount) * 100),
+  );
+}
+
+function getBucketFillClass({
+  hasData,
+  isToday,
+}: {
+  hasData: boolean;
+  isToday: boolean;
+}): string {
+  if (!hasData) {
+    return 'bg-indigo-600/10';
+  }
+
+  return isToday ? 'bg-indigo-600' : 'bg-indigo-600/20';
+}
 
 function WeeklyMeetingChart() {
   const { meetings } = useMeetings();
@@ -367,17 +410,12 @@ function WeeklyMeetingChart() {
       <div className="flex h-32 items-end gap-2" aria-hidden={!hasData}>
         {buckets.map((bucket, i) => {
           const isToday = i === todayIndex;
-          const percent = hasData
-            ? Math.max(
-                MIN_BAR_PERCENT,
-                maxCount === 0 ? MIN_BAR_PERCENT : Math.round((bucket.count / maxCount) * 100),
-              )
-            : MIN_BAR_PERCENT;
-          const fillClass = hasData
-            ? isToday
-              ? 'bg-indigo-600'
-              : 'bg-indigo-600/20'
-            : 'bg-indigo-600/10';
+          const percent = getBucketPercent({
+            bucketCount: bucket.count,
+            hasData,
+            maxCount,
+          });
+          const fillClass = getBucketFillClass({ hasData, isToday });
           return (
             <div
               key={bucket.date.toISOString()}

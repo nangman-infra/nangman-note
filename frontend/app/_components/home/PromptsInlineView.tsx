@@ -207,7 +207,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
                   disabled={!inlineIsValid || isInlineSaving}
                   className="btn-primary inline-flex px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {isInlineSaving ? '저장 중...' : inlineEditingId ? '저장' : '생성'}
+                  {getInlinePromptSaveLabel(isInlineSaving, inlineEditingId)}
                 </button>
                 {inlineEditingId && (
                   <button
@@ -342,4 +342,13 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
       </ErrorBoundary>
     </div>
   );
+}
+
+function getInlinePromptSaveLabel(
+  isSaving: boolean,
+  editingId: string | null,
+): string {
+  if (isSaving) return '저장 중...';
+  if (editingId) return '저장';
+  return '생성';
 }

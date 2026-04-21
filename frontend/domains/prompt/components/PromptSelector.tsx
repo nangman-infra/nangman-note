@@ -4,19 +4,17 @@ import { useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
-  Edit3,
   Plus,
   Settings2,
-  Sparkles,
-  Trash2,
 } from 'lucide-react';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
 import { usePrompt } from '../hooks/usePrompt';
 import { PromptEditorDialog } from './PromptEditorDialog';
 import {
-  PROMPT_DOCUMENT_TYPE_LABELS,
+  type Prompt,
   type PromptDocumentType,
 } from '../types/prompt.types';
+import { PromptSelectorItem } from './PromptSelectorItem';
 
 interface PromptSelectorProps {
   selectedPromptId?: string;
@@ -76,12 +74,7 @@ export function PromptSelector({
     setEditorOpen(true);
   };
 
-  const openEdit = (prompt: {
-    id: string;
-    name: string;
-    content: string;
-    documentType: PromptDocumentType;
-  }) => {
+  const openEdit = (prompt: Prompt) => {
     setEditorMode('edit');
     setEditingPromptId(prompt.id);
     setEditorInitialName(prompt.name);
@@ -163,111 +156,16 @@ export function PromptSelector({
           {prompts.map((prompt) => {
             const isSelected = selectedPromptId === prompt.id;
             return (
-              <li key={prompt.id}>
-                {/* ── Menu Item ──
-                     Stitch-tone selection: tonal bg, no borders.
-                     - Selected: brand-tinted surface + brand ink.
-                     - Unselected: surface-container-low, lifts to
-                       surface-container-high on hover. */}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={isSelected}
-                  onClick={() => void handleChange(prompt.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      void handleChange(prompt.id);
-                    }
-                  }}
-                  className={`block w-full cursor-pointer rounded-lg p-3 text-left transition ${
-                    isSelected
-                      ? 'bg-[color-mix(in_srgb,var(--brand)_10%,transparent)]'
-                      : 'bg-[var(--surface-container-low)] hover:bg-[var(--surface-container-high)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="inline-flex items-center gap-2">
-                      {/* Radio indicator — tonal fill, no 1px borders.
-                          Selected: brand disk w/ inner dot.
-                          Unselected: tonal container disk. */}
-                      <span
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition ${
-                          isSelected
-                            ? 'bg-[var(--brand)]'
-                            : 'bg-[var(--surface-container-high)]'
-                        }`}
-                        aria-hidden="true"
-                      >
-                        {isSelected ? (
-                          <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                        ) : null}
-                      </span>
-                      <span
-                        className={`text-sm font-medium ${
-                          isSelected
-                            ? 'text-[var(--brand)]'
-                            : 'text-[var(--ink-strong)]'
-                        }`}
-                      >
-                        {prompt.name}
-                      </span>
-                      <span className="rounded-full bg-[color-mix(in_srgb,var(--brand)_10%,transparent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--brand)]">
-                        {PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {prompt.isDefault ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink-muted)]">
-                          <Sparkles className="h-3 w-3" />
-                          기본
-                        </span>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEdit(prompt);
-                            }}
-                            className="rounded-full p-1 text-[var(--ink-muted)] transition hover:bg-black/5 hover:text-[var(--ink-strong)]"
-                            aria-label="편집"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </button>
-                          {deleteConfirmId === prompt.id ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void handleDelete(prompt.id);
-                              }}
-                              className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-200"
-                            >
-                              삭제 확인
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteConfirmId(prompt.id);
-                              }}
-                              className="rounded-full p-1 text-[var(--ink-muted)] transition hover:bg-rose-50 hover:text-rose-600"
-                              aria-label="삭제"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-xs text-[var(--ink-muted)]">
-                    {prompt.content}
-                  </p>
-                </div>
-              </li>
+              <PromptSelectorItem
+                key={prompt.id}
+                prompt={prompt}
+                isSelected={isSelected}
+                deleteConfirmId={deleteConfirmId}
+                onChange={(promptId) => void handleChange(promptId)}
+                onEdit={openEdit}
+                onDelete={(promptId) => void handleDelete(promptId)}
+                onRequestDeleteConfirm={setDeleteConfirmId}
+              />
             );
           })}
 

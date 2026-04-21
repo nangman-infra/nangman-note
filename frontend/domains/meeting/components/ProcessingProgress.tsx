@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
-import { CheckCircle2, Cloud, FileText, Loader2, Mic } from 'lucide-react';
+import { CheckCircle2, Cloud, FileText, Mic } from 'lucide-react';
 import { meetingApi } from '../api/meetingApi';
 import { useMeetingStatus } from '@/hooks/useMeetingStatus';
 import type { MeetingStatusMessage } from '@/hooks/useMeetingStatus';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import { MeetingStatus } from '../types/meeting.types';
+import { ProcessingStepItem } from './ProcessingStepItem';
 
 type UploadState =
   | 'idle'
@@ -16,7 +17,7 @@ type UploadState =
   | 'completed'
   | 'failed';
 
-type ProcessingStep = 'uploading' | 'transcribing' | 'generating' | 'completed' | 'failed';
+export type ProcessingStep = 'uploading' | 'transcribing' | 'generating' | 'completed' | 'failed';
 
 const PROCESSING_STATUS_POLL_INTERVAL_MS = 5000;
 const ELAPSED_TIMER_INTERVAL_MS = 1000;
@@ -58,6 +59,21 @@ function ElapsedProcessingTimer() {
       )}
     </div>
   );
+}
+
+function getCurrentStep(uploadState: UploadState, backendStep: ProcessingStep): ProcessingStep {
+  if (uploadState === 'failed') return 'failed';
+  if (uploadState === 'completed') return backendStep;
+  return 'uploading';
+}
+
+function getUploadStepDescription(
+  uploadState: UploadState,
+  uploadProgress: number,
+): string {
+  if (uploadState === 'uploading') return `서버로 전송 중... ${uploadProgress}%`;
+  if (uploadState === 'requesting-url') return 'URL 준비 중...';
+  return '대기 중';
 }
 
 export function ProcessingProgress({
@@ -144,12 +160,7 @@ export function ProcessingProgress({
     };
   }, [backendStep, meetingId, notifyComplete, uploadState]);
 
-  const currentStep: ProcessingStep =
-    uploadState === 'failed'
-      ? 'failed'
-      : uploadState === 'completed'
-        ? backendStep
-        : 'uploading';
+  const currentStep = getCurrentStep(uploadState, backendStep);
   const error =
     uploadState === 'failed'
       ? uploadError || '오디오 업로드에 실패했습니다.'
@@ -164,12 +175,7 @@ export function ProcessingProgress({
     {
       key: 'uploading',
       label: '오디오 업로드',
-      description:
-        uploadState === 'uploading'
-          ? `서버로 전송 중... ${uploadProgress}%`
-          : uploadState === 'requesting-url'
-            ? 'URL 준비 중...'
-            : '대기 중',
+      description: getUploadStepDescription(uploadState, uploadProgress),
       icon: Cloud,
     },
     {
@@ -241,58 +247,20 @@ export function ProcessingProgress({
           const isActive = step.key === currentStep;
           const isDone = currentIndex > index;
           const isPending = currentIndex < index;
-          const StepIcon = step.icon;
 
           return (
-            <div
+            <ProcessingStepItem
               key={step.key}
-              className={`flex items-start gap-3 rounded-xl border p-3 transition ${
-                isActive
-                  ? 'border-brand/30 bg-brand/5'
-                  : isDone
-                    ? 'border-emerald-200 bg-emerald-50/50'
-                    : 'border-[var(--line-soft)] bg-white/50 opacity-50'
-              }`}
-            >
-              <div
-                className={`mt-0.5 rounded-full p-1.5 ${
-                  isActive
-                    ? 'bg-brand/15 text-brand'
-                    : isDone
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                {isActive && currentStep !== 'completed' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isDone ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <StepIcon className="h-4 w-4" />
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`text-sm font-semibold ${
-                    isPending ? 'text-slate-400' : ''
-                  }`}
-                >
-                  {step.label}
-                </p>
-                {(isActive || isDone) && (
-                  <p className="mt-0.5 text-xs text-muted">{step.description}</p>
-                )}
-                {isActive && step.key === 'uploading' && uploadState === 'uploading' && (
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-                    <div
-                      className="h-full rounded-full bg-brand transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
+              step={step}
+              currentStep={currentStep}
+              isActive={isActive}
+              isDone={isDone}
+              isPending={isPending}
+              uploadProgress={uploadProgress}
+              showUploadProgress={
+                isActive && step.key === 'uploading' && uploadState === 'uploading'
+              }
+            />
           );
         })}
       </div>

@@ -14,6 +14,11 @@ interface LayoutContextValue {
 }
 
 const LayoutContext = createContext<LayoutContextValue | null>(null);
+const COLUMN_INDEX_BY_NAME: Record<ActiveColumn, number> = {
+  sidebar: 0,
+  list: 1,
+  viewer: 2,
+};
 
 /**
  * @deprecated `ThreeColumnLayout`과 함께 쓰이는 레거시 컨텍스트 훅이다.
@@ -50,7 +55,7 @@ interface ThreeColumnLayoutProps {
 export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutProps) {
   const [activeColumn, setActiveColumn] = useState<ActiveColumn>('list');
 
-  const columnIndex = activeColumn === 'sidebar' ? 0 : activeColumn === 'list' ? 1 : 2;
+  const columnIndex = COLUMN_INDEX_BY_NAME[activeColumn];
 
   return (
     <LayoutContext.Provider value={{ setActiveColumn }}>

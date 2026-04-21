@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MarkdownWysiwygEditor } from '@/components/editor/MarkdownWysiwygEditor';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { copyToClipboard } from '@/lib/utils/markdown';
 import { useResult } from '../hooks/useResult';
 import { useResultTabData } from '../hooks/useResultTabData';
-import { ResultMarkdownPanel } from './ResultMarkdownPanel';
-import { ResultNotePanel } from './ResultNotePanel';
 import { ResultRegenerateConfirmDialog } from './ResultRegenerateConfirmDialog';
 import { ResultRegeneratePanel } from './ResultRegeneratePanel';
 import { ResultTabNav } from './ResultTabNav';
-import { ResultTranscriptPanel } from './ResultTranscriptPanel';
 import { ResultViewerHeader } from './ResultViewerHeader';
+import { ResultViewerTabContent } from './ResultViewerTabContent';
+import {
+  ResultViewerEmptyState,
+  ResultViewerLoadingState,
+} from './ResultViewerStates';
 import type { ResultPromptOption, ResultTab } from './resultViewerTypes';
 
 interface ResultViewerProps {
@@ -109,36 +110,15 @@ export function ResultViewer({
   const overflowSpeakerCount = Math.max(uniqueSpeakers.length - 3, 0);
 
   if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="surface-card w-full max-w-xl p-8 text-center">
-          <p className="text-sm font-semibold">회의록을 불러오는 중입니다</p>
-          <p className="mt-1 text-xs text-muted">AI 정리 결과를 준비하고 있어요.</p>
-        </div>
-      </div>
-    );
+    return <ResultViewerLoadingState />;
   }
 
   if (!result) {
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <div className="surface-card w-full max-w-xl p-8 text-center">
-          <p className="text-sm font-semibold">
-            {isPending
-              ? '전사 및 회의록을 생성하고 있습니다'
-              : isMissingMeeting
-                ? '선택한 회의를 찾을 수 없습니다'
-              : '선택한 회의의 결과가 아직 없습니다'}
-          </p>
-          <p className="mt-1 text-xs text-muted">
-            {isPending
-              ? '음성 전사와 AI 정리가 진행 중입니다. 완료 시 자동으로 표시됩니다.'
-              : isMissingMeeting
-                ? '목록에서 다른 회의를 선택해주세요.'
-              : '회의 종료 후 자동 생성된 문서가 여기에 표시됩니다.'}
-          </p>
-        </div>
-      </div>
+      <ResultViewerEmptyState
+        isPending={isPending}
+        isMissingMeeting={isMissingMeeting}
+      />
     );
   }
 
@@ -269,29 +249,18 @@ export function ResultViewer({
       <ResultTabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       <section className="scroll-muted flex-1 overflow-y-auto px-6 py-5">
-        {activeTab === 'result' && isEditing ? (
-          <div className="surface-card h-full min-h-[360px] overflow-hidden">
-            <MarkdownWysiwygEditor
-              value={editContent}
-              onChange={setEditContent}
-              placeholder="마크다운 문법이 입력 위치에서 바로 반영됩니다."
-              height="100%"
-            />
-          </div>
-        ) : activeTab === 'result' ? (
-          <ResultMarkdownPanel result={result} promptOptions={promptOptions} />
-        ) : null}
-
-        {activeTab === 'transcript' && (
-          <ResultTranscriptPanel
-            error={visibleTranscriptError}
-            transcripts={visibleTranscripts}
-          />
-        )}
-
-        {activeTab === 'note' && (
-          <ResultNotePanel error={visibleNoteError} content={visibleNoteContent} />
-        )}
+        <ResultViewerTabContent
+          activeTab={activeTab}
+          isEditing={isEditing}
+          result={result}
+          promptOptions={promptOptions}
+          editContent={editContent}
+          visibleTranscripts={visibleTranscripts}
+          visibleNoteContent={visibleNoteContent}
+          visibleTranscriptError={visibleTranscriptError}
+          visibleNoteError={visibleNoteError}
+          onEditContentChange={setEditContent}
+        />
       </section>
 
       {!isEditing && activeTab === 'result' && (
