@@ -1,13 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import MarkdownIt from 'markdown-it';
 import { ResultService } from '../../result/application/result.service';
 import type { ExportFormat } from '../domain/export-format.type';
 import type { ExportedDocument } from '../domain/exported-document.interface';
-import {
-  PDF_RENDERER,
-  type PdfRendererPort,
-} from './ports/pdf-renderer.port';
+import { PDF_RENDERER, type PdfRendererPort } from './ports/pdf-renderer.port';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 @Injectable()
@@ -26,7 +24,10 @@ export class DocumentOutputService {
     rawFormat?: string,
     ownerSub?: string,
   ): Promise<ExportedDocument> {
-    const result = await this.resultService.findByMeetingId(meetingId, ownerSub);
+    const result = await this.resultService.findByMeetingId(
+      meetingId,
+      ownerSub,
+    );
     const format = this.resolveFormat(rawFormat);
     const stamp = new Date().toISOString().slice(0, 10);
 

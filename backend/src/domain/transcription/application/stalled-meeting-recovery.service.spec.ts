@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { DataSource, Repository } from 'typeorm';
 import { ResultEntity } from '../../result/domain/result.entity';
 import { MeetingService } from '../../meeting/application/meeting.service';
@@ -15,9 +16,7 @@ import { TranscriptionResultCollectorService } from './transcription-result-coll
 describe('StalledMeetingRecoveryService', () => {
   let service: StalledMeetingRecoveryService;
   let meetingRepository: jest.Mocked<Pick<Repository<MeetingEntity>, 'find'>>;
-  let resultRepository: jest.Mocked<
-    Pick<Repository<ResultEntity>, 'findOne'>
-  >;
+  let resultRepository: jest.Mocked<Pick<Repository<ResultEntity>, 'findOne'>>;
   let transcriptionJobRepository: jest.Mocked<
     Pick<Repository<TranscriptionJobEntity>, 'findOne'>
   >;
@@ -137,7 +136,6 @@ describe('StalledMeetingRecoveryService', () => {
     transcriptionJobRepository.findOne.mockResolvedValue(null);
     transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
 
     expect(
@@ -156,7 +154,6 @@ describe('StalledMeetingRecoveryService', () => {
       jobId: 'job-1',
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
 
     expect(transcriptionService.recoverPendingBatchUpload).toHaveBeenCalledWith(
@@ -179,7 +176,6 @@ describe('StalledMeetingRecoveryService', () => {
       objectPresent: false,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
 
     expect(
@@ -194,7 +190,6 @@ describe('StalledMeetingRecoveryService', () => {
       meetingId: 'meeting-1',
     } as ResultEntity);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
 
     expect(meetingService.updateStatus).toHaveBeenCalledWith(
@@ -223,7 +218,6 @@ describe('StalledMeetingRecoveryService', () => {
     );
     transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
 
     expect(
@@ -242,7 +236,6 @@ describe('StalledMeetingRecoveryService', () => {
     );
     transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
 
     expect(
@@ -251,14 +244,12 @@ describe('StalledMeetingRecoveryService', () => {
   });
 
   it('uses a Postgres advisory lock when available', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (dataSource.options as any).type = 'postgres';
     dataSource.query
       .mockResolvedValueOnce([{ locked: true }])
       .mockResolvedValueOnce([]);
     meetingRepository.find.mockResolvedValue([]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (service as any).recoverStalledMeetings();
 
     expect(dataSource.query).toHaveBeenNthCalledWith(

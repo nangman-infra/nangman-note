@@ -621,8 +621,12 @@ describe('ResultService', () => {
         uncertainties: [],
       });
       bedrockService.generateMeetingResult.mockResolvedValue('# 레거시 결과');
-      resultRepository.create.mockImplementation((entity) => entity as ResultEntity);
-      resultRepository.save.mockImplementation((entity) => Promise.resolve(entity as ResultEntity));
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
 
       const result = await service.findByMeetingId('meeting-1');
 
@@ -691,10 +695,18 @@ describe('ResultService', () => {
         content: '테스트 노트',
       } as NoteEntity);
       transcriptRepository.find.mockResolvedValue([]);
-      bedrockService.extractStructuredNotes.mockRejectedValue(new Error('Bedrock error'));
-      bedrockService.generateMeetingResult.mockRejectedValue(new Error('Legacy error'));
-      resultRepository.create.mockImplementation((entity) => entity as ResultEntity);
-      resultRepository.save.mockImplementation((entity) => Promise.resolve(entity as ResultEntity));
+      bedrockService.extractStructuredNotes.mockRejectedValue(
+        new Error('Bedrock error'),
+      );
+      bedrockService.generateMeetingResult.mockRejectedValue(
+        new Error('Legacy error'),
+      );
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
 
       const result = await service.findByMeetingId('meeting-1');
 

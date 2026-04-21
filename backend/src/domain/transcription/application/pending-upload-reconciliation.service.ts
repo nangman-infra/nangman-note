@@ -1,8 +1,5 @@
-import {
-  Injectable,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
@@ -136,17 +133,19 @@ export class PendingUploadReconciliationService
     );
   }
 
-  private async withReconciliationLock(task: () => Promise<void>): Promise<void> {
+  private async withReconciliationLock(
+    task: () => Promise<void>,
+  ): Promise<void> {
     const dbType = this.dataSource.options.type;
     if (dbType !== 'postgres') {
       await task();
       return;
     }
 
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query(
       'SELECT pg_try_advisory_lock($1) AS locked',
       [RECONCILIATION_LOCK_KEY],
-    )) as Array<{ locked?: boolean }>;
+    );
 
     if (!rows[0]?.locked) {
       this.logger.debug('transcription.batch.upload.reconcile_lock_skipped', {

@@ -43,9 +43,10 @@ export function HeroSection() {
             <Link
               href="/landing/start"
               className="btn-neo inline-flex border-transparent bg-brand px-6 py-3.5 text-sm text-white shadow-[0_2px_16px_rgba(15,118,110,0.35)] hover:bg-brand-strong hover:text-white hover:shadow-[0_4px_24px_rgba(15,118,110,0.45)]"
+              style={{ color: '#ffffff' }}
             >
               무료로 시작하기
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" style={{ color: '#ffffff' }} />
             </Link>
             <Link
               href="/landing/guide"

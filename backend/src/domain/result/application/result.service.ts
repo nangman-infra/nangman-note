@@ -52,7 +52,10 @@ interface ValidationResult {
 export class ResultService {
   private readonly logger = new StructuredLogger(ResultService.name);
   private readonly regeneratingMeetings = new Set<string>();
-  private readonly generationInFlight = new Map<string, Promise<ResultEntity>>();
+  private readonly generationInFlight = new Map<
+    string,
+    Promise<ResultEntity>
+  >();
 
   constructor(
     @InjectRepository(ResultEntity)
@@ -158,16 +161,11 @@ export class ResultService {
     existing.metadata = generated.metadata;
 
     const saved = await this.resultRepository.save(existing);
-    await this.meetingService.updateProcessingPhase(
-      meetingId,
-      null,
-      ownerSub,
-      {
-        status: MeetingStatus.COMPLETED,
-        needsAttention: generated.needsAttention,
-        completionState: generated.completionState,
-      },
-    );
+    await this.meetingService.updateProcessingPhase(meetingId, null, ownerSub, {
+      status: MeetingStatus.COMPLETED,
+      needsAttention: generated.needsAttention,
+      completionState: generated.completionState,
+    });
     await this.meetingSearchDocumentService.refreshByMeetingId(meetingId);
     return saved;
   }
@@ -381,12 +379,13 @@ export class ResultService {
       return existing;
     }
 
-    let generationPromise: Promise<ResultEntity>;
-    generationPromise = this.generateAndSave(meetingId, ownerSub).finally(() => {
-      if (this.generationInFlight.get(meetingId) === generationPromise) {
-        this.generationInFlight.delete(meetingId);
-      }
-    });
+    const generationPromise = this.generateAndSave(meetingId, ownerSub).finally(
+      () => {
+        if (this.generationInFlight.get(meetingId) === generationPromise) {
+          this.generationInFlight.delete(meetingId);
+        }
+      },
+    );
 
     this.generationInFlight.set(meetingId, generationPromise);
     return generationPromise;
@@ -672,9 +671,7 @@ export class ResultService {
     const agendaSections =
       extracted.agendaItems.length > 0
         ? extracted.agendaItems.flatMap((item, index) => {
-            const contextParagraph = this.renderContextParagraph(
-              item.context as string | undefined,
-            );
+            const contextParagraph = this.renderContextParagraph(item.context);
             return [
               `### 안건 ${index + 1}: ${item.title}`,
               '',
@@ -745,7 +742,7 @@ export class ResultService {
       extracted.concepts.length > 0
         ? extracted.concepts.flatMap((concept, index) => {
             const contextParagraph = this.renderContextParagraph(
-              concept.context as string | undefined,
+              concept.context,
             );
             return [
               `### ${index + 1}. ${concept.name}`,
@@ -801,9 +798,7 @@ export class ResultService {
     const topicSections =
       extracted.topics.length > 0
         ? extracted.topics.flatMap((topic, index) => {
-            const contextParagraph = this.renderContextParagraph(
-              topic.context as string | undefined,
-            );
+            const contextParagraph = this.renderContextParagraph(topic.context);
             return [
               `### 주제 ${index + 1}: ${topic.title}`,
               '',
@@ -1389,5 +1384,4 @@ export class ResultService {
       return 'latin';
     return null;
   }
-
 }

@@ -3,4 +3,3 @@ export interface ExportedDocument {
   contentType: string;
   buffer: Buffer;
 }
-

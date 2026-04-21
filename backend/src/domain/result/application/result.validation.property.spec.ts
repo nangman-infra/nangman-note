@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unused-vars */
 import * as fc from 'fast-check';
 import { Repository } from 'typeorm';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
@@ -365,7 +366,9 @@ describe('Validation Property Tests - Quality (Property 10)', () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 10, maxLength: 200 }),
-        fc.string({ minLength: 1, maxLength: 200 }).filter((s) => s.trim().length > 0),
+        fc
+          .string({ minLength: 1, maxLength: 200 })
+          .filter((s) => s.trim().length > 0),
         (summary, transcript) => {
           const extracted: StructuredMeetingExtraction = {
             documentType: PromptDocumentType.MEETING,
@@ -562,7 +565,6 @@ describe('Validation Property Tests - Consistency (Property 11)', () => {
   });
 });
 
-
 // ── Property 12: Retry behavior ──
 
 describe('Retry Behavior Property Tests (Property 12)', () => {
@@ -583,13 +585,28 @@ describe('Retry Behavior Property Tests (Property 12)', () => {
     const legacyMock = jest.fn().mockResolvedValue('# Legacy fallback content');
 
     const service = new ResultService(
-      { findOne: jest.fn(), create: jest.fn(), save: jest.fn() } as unknown as Repository<ResultEntity>,
+      {
+        findOne: jest.fn(),
+        create: jest.fn(),
+        save: jest.fn(),
+      } as unknown as Repository<ResultEntity>,
       { findOne: jest.fn() } as unknown as Repository<NoteEntity>,
       { find: jest.fn() } as unknown as Repository<TranscriptSegmentEntity>,
-      { findById: jest.fn(), updatePrompt: jest.fn() } as unknown as MeetingService,
-      { refreshByMeetingId: jest.fn() } as unknown as MeetingSearchDocumentService,
-      { ensureExists: jest.fn(), findById: jest.fn() } as unknown as PromptService,
-      { extractStructuredNotes: extractMock, generateMeetingResult: legacyMock } as unknown as BedrockService,
+      {
+        findById: jest.fn(),
+        updatePrompt: jest.fn(),
+      } as unknown as MeetingService,
+      {
+        refreshByMeetingId: jest.fn(),
+      } as unknown as MeetingSearchDocumentService,
+      {
+        ensureExists: jest.fn(),
+        findById: jest.fn(),
+      } as unknown as PromptService,
+      {
+        extractStructuredNotes: extractMock,
+        generateMeetingResult: legacyMock,
+      } as unknown as BedrockService,
       { emit: jest.fn() } as unknown as EventEmitter2,
     );
 
@@ -627,13 +644,28 @@ describe('Retry Behavior Property Tests (Property 12)', () => {
     const legacyMock = jest.fn().mockRejectedValue(new Error('Legacy error'));
 
     const service = new ResultService(
-      { findOne: jest.fn(), create: jest.fn(), save: jest.fn() } as unknown as Repository<ResultEntity>,
+      {
+        findOne: jest.fn(),
+        create: jest.fn(),
+        save: jest.fn(),
+      } as unknown as Repository<ResultEntity>,
       { findOne: jest.fn() } as unknown as Repository<NoteEntity>,
       { find: jest.fn() } as unknown as Repository<TranscriptSegmentEntity>,
-      { findById: jest.fn(), updatePrompt: jest.fn() } as unknown as MeetingService,
-      { refreshByMeetingId: jest.fn() } as unknown as MeetingSearchDocumentService,
-      { ensureExists: jest.fn(), findById: jest.fn() } as unknown as PromptService,
-      { extractStructuredNotes: extractMock, generateMeetingResult: legacyMock } as unknown as BedrockService,
+      {
+        findById: jest.fn(),
+        updatePrompt: jest.fn(),
+      } as unknown as MeetingService,
+      {
+        refreshByMeetingId: jest.fn(),
+      } as unknown as MeetingSearchDocumentService,
+      {
+        ensureExists: jest.fn(),
+        findById: jest.fn(),
+      } as unknown as PromptService,
+      {
+        extractStructuredNotes: extractMock,
+        generateMeetingResult: legacyMock,
+      } as unknown as BedrockService,
       { emit: jest.fn() } as unknown as EventEmitter2,
     );
 

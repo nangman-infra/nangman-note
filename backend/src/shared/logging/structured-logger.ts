@@ -83,4 +83,3 @@ export class StructuredLogger {
     process.stdout.write(`${line}\n`);
   }
 }
-

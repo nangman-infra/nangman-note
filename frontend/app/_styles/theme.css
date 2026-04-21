@@ -64,26 +64,28 @@
   --font-body: 'Inter', var(--font-display), 'Pretendard', sans-serif;
 }
 
-* {
-  border-color: var(--line-soft);
-}
+@layer base {
+  * {
+    border-color: var(--line-soft);
+  }
 
-html,
-body {
-  height: 100%;
-}
+  html,
+  body {
+    height: 100%;
+  }
 
-body {
-  margin: 0;
-  color: var(--ink-strong);
-  font-family: 'Inter', var(--font-display), 'Pretendard', 'Noto Sans KR', sans-serif;
-  letter-spacing: -0.01em;
-  background: var(--bg-root);
-  -webkit-font-smoothing: antialiased;
-}
+  body {
+    margin: 0;
+    color: var(--ink-strong);
+    font-family: 'Inter', var(--font-display), 'Pretendard', 'Noto Sans KR', sans-serif;
+    letter-spacing: -0.01em;
+    background: var(--bg-root);
+    -webkit-font-smoothing: antialiased;
+  }
 
-a {
-  color: inherit;
+  a {
+    color: inherit;
+  }
 }
 
 ::selection {

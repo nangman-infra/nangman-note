@@ -28,9 +28,10 @@ export function BottomCta({ nextHref, nextLabel }: BottomCtaProps) {
             <Link
               href="/landing/start"
               className="btn-neo inline-flex border-transparent bg-brand px-6 py-3 text-sm text-white hover:bg-brand-strong hover:text-white"
+              style={{ color: '#ffffff' }}
             >
               무료로 시작하기
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" style={{ color: '#ffffff' }} />
             </Link>
             {nextHref && nextLabel && (
               <Link href={nextHref} className="btn-neo inline-flex px-6 py-3 text-sm">

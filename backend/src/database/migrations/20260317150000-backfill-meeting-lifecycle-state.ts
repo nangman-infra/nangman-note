@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class BackfillMeetingLifecycleState20260317150000
-  implements MigrationInterface
-{
+export class BackfillMeetingLifecycleState20260317150000 implements MigrationInterface {
   name = 'BackfillMeetingLifecycleState20260317150000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -155,6 +153,7 @@ export class BackfillMeetingLifecycleState20260317150000
     `);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async down(_queryRunner: QueryRunner): Promise<void> {
     // This migration only backfills derived lifecycle state from existing data.
     // The original rows remain intact; no safe reversible transformation exists.

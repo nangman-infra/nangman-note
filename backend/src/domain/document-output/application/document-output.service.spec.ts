@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method */
 import { BadRequestException } from '@nestjs/common';
 import { ResultService } from '../../result/application/result.service';
 import { ResultEntity } from '../../result/domain/result.entity';

@@ -20,9 +20,10 @@ export function MobileStickyCta() {
       <Link
         href="/landing/start"
         className="btn-neo inline-flex flex w-full items-center justify-center gap-2 border-transparent bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-strong hover:text-white"
+        style={{ color: '#ffffff' }}
       >
         무료로 시작하기
-        <ArrowRight className="h-4 w-4" />
+        <ArrowRight className="h-4 w-4" style={{ color: '#ffffff' }} />
       </Link>
     </div>
   );

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { DataSource, Repository } from 'typeorm';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
@@ -60,11 +61,9 @@ describe('PendingUploadReconciliationService', () => {
 
     await (service as any).reconcilePendingUploads();
 
-    expect(transcriptionService.reconcilePendingBatchUpload).toHaveBeenCalledWith(
-      'meeting-1',
-      'upload-1',
-      'user-1',
-    );
+    expect(
+      transcriptionService.reconcilePendingBatchUpload,
+    ).toHaveBeenCalledWith('meeting-1', 'upload-1', 'user-1');
   });
 
   it('skips uploads for completed meetings', async () => {

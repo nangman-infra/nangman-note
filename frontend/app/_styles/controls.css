@@ -78,13 +78,17 @@
   }
 }
 
-.btn-neo.bg-brand {
-  color: #ffffff;
+.btn-neo.bg-brand,
+.btn-neo.bg-brand:hover,
+.btn-neo.bg-brand:visited {
+  color: #ffffff !important;
 }
 
 .btn-neo.bg-brand svg,
-.btn-neo.bg-brand span {
-  color: #ffffff;
+.btn-neo.bg-brand span,
+.btn-neo.bg-brand:hover svg,
+.btn-neo.bg-brand:hover span {
+  color: #ffffff !important;
 }
 
 /* ─── Focus States ─── */

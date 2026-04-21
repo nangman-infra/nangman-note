@@ -109,7 +109,9 @@ export class S3AudioService {
     const withoutScheme = normalized.slice('s3://'.length);
     const slashIndex = withoutScheme.indexOf('/');
     if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
-      throw new BadRequestException('mediaUri must be a valid s3://bucket/key URI');
+      throw new BadRequestException(
+        'mediaUri must be a valid s3://bucket/key URI',
+      );
     }
 
     return {

@@ -382,8 +382,9 @@ export class TranscriptionService {
       );
     }
 
-    const objectExists =
-      await this.s3AudioService.objectExistsForMediaUri(dto.mediaUri);
+    const objectExists = await this.s3AudioService.objectExistsForMediaUri(
+      dto.mediaUri,
+    );
     if (!objectExists) {
       throw new BadRequestException(
         'Uploaded audio file is not available yet. Retry after the upload finishes.',
@@ -585,8 +586,7 @@ export class TranscriptionService {
       onPayload(payload);
     } catch (error) {
       this.logger.warn('transcription.payload.emit_failed', {
-        errorMessage:
-          error instanceof Error ? error.message : String(error),
+        errorMessage: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -640,7 +640,9 @@ export class TranscriptionService {
     });
 
     if (!upload) {
-      throw new BadRequestException('Upload session not found for this meeting');
+      throw new BadRequestException(
+        'Upload session not found for this meeting',
+      );
     }
 
     return upload;
@@ -680,14 +682,18 @@ export class TranscriptionService {
         if (options.markMissingObjectAsFailed) {
           upload.status = TranscriptionUploadStatus.FAILED;
           upload.errorMessage =
-            upload.errorMessage ?? 'Uploaded audio file not found during recovery';
+            upload.errorMessage ??
+            'Uploaded audio file not found during recovery';
           await this.transcriptionUploadRepository.save(upload);
-          this.logger.warn('transcription.batch.upload.recovery_missing_object', {
-            meetingId: meeting.id,
-            uploadId,
-            ownerSub,
-            s3Key: upload.s3Key,
-          });
+          this.logger.warn(
+            'transcription.batch.upload.recovery_missing_object',
+            {
+              meetingId: meeting.id,
+              uploadId,
+              ownerSub,
+              s3Key: upload.s3Key,
+            },
+          );
         } else {
           this.logger.debug('transcription.batch.upload.not_ready', {
             meetingId: meeting.id,
@@ -745,18 +751,16 @@ export class TranscriptionService {
       return task();
     }
 
-    await this.dataSource.query(
-      'SELECT pg_advisory_lock(hashtext($1))',
-      [`transcription-upload:${uploadId}`],
-    );
+    await this.dataSource.query('SELECT pg_advisory_lock(hashtext($1))', [
+      `transcription-upload:${uploadId}`,
+    ]);
 
     try {
       return await task();
     } finally {
-      await this.dataSource.query(
-        'SELECT pg_advisory_unlock(hashtext($1))',
-        [`transcription-upload:${uploadId}`],
-      );
+      await this.dataSource.query('SELECT pg_advisory_unlock(hashtext($1))', [
+        `transcription-upload:${uploadId}`,
+      ]);
     }
   }
 

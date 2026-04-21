@@ -51,4 +51,3 @@ export function updateRequestContext(
 
   Object.assign(current, compact(patch));
 }
-

@@ -16,9 +16,7 @@ const MAX_DYNAMIC_PDF_CONCURRENCY = 4;
 const PDF_RENDER_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024;
 
 @Injectable()
-export class PlaywrightPdfRenderer
-  implements PdfRendererPort, OnModuleDestroy
-{
+export class PlaywrightPdfRenderer implements PdfRendererPort, OnModuleDestroy {
   private readonly logger = new StructuredLogger(PlaywrightPdfRenderer.name);
   private activeRenderCount = 0;
   private readonly renderQueue: Array<() => void> = [];
@@ -26,9 +24,7 @@ export class PlaywrightPdfRenderer
   private browserInstance: Browser | null = null;
   private resolvedMaxConcurrentRenders: number | null = null;
 
-  constructor(
-    private readonly configService: ConfigService<AppEnv, true>,
-  ) {}
+  constructor(private readonly configService: ConfigService<AppEnv, true>) {}
 
   async render(input: PdfRenderInput): Promise<Buffer> {
     return this.withRenderSlot(async () => {
@@ -39,9 +35,13 @@ export class PlaywrightPdfRenderer
           throw error;
         }
 
-        this.logger.warn('document_output.pdf_render.retrying_after_browser_error', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-        });
+        this.logger.warn(
+          'document_output.pdf_render.retrying_after_browser_error',
+          {
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+          },
+        );
         await this.resetBrowser();
 
         return this.renderOnce(input);
@@ -258,8 +258,7 @@ export class PlaywrightPdfRenderer
     cpuSlots: number;
     memorySlots: number;
   } {
-    const availableParallelism =
-      this.getAvailableParallelism();
+    const availableParallelism = this.getAvailableParallelism();
     const constrainedMemoryBytes = this.getConstrainedMemoryBytes();
     const availableMemoryBytes = this.getAvailableMemoryBytes();
     const memoryBudgetBytes =
@@ -279,10 +278,7 @@ export class PlaywrightPdfRenderer
     );
     const maxConcurrentRenders = Math.min(
       MAX_DYNAMIC_PDF_CONCURRENCY,
-      Math.max(
-        1,
-        Math.min(cpuSlots, memorySlots, MAX_DYNAMIC_PDF_CONCURRENCY),
-      ),
+      Math.max(1, Math.min(cpuSlots, memorySlots, MAX_DYNAMIC_PDF_CONCURRENCY)),
     );
 
     return {

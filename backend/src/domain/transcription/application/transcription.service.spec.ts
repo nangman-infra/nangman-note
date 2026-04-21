@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { BadGatewayException, BadRequestException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { MeetingService } from '../../meeting/application/meeting.service';
@@ -30,7 +31,10 @@ describe('TranscriptionService', () => {
     >
   >;
   let transcriptionJobRepository: jest.Mocked<
-    Pick<Repository<TranscriptionJobEntity>, 'find' | 'findOne' | 'create' | 'save'>
+    Pick<
+      Repository<TranscriptionJobEntity>,
+      'find' | 'findOne' | 'create' | 'save'
+    >
   >;
   let transcriptionUploadRepository: jest.Mocked<
     Pick<Repository<TranscriptionUploadEntity>, 'findOne' | 'create' | 'save'>
@@ -38,7 +42,10 @@ describe('TranscriptionService', () => {
   let meetingService: jest.Mocked<
     Pick<
       MeetingService,
-      'findById' | 'updatePrompt' | 'updateProcessingPhase' | 'markNeedsAttention'
+      | 'findById'
+      | 'updatePrompt'
+      | 'updateProcessingPhase'
+      | 'markNeedsAttention'
     >
   >;
   let batchTranscriptionProvider: jest.Mocked<BatchTranscriptionProvider>;
@@ -636,9 +643,9 @@ describe('TranscriptionService', () => {
         buildMeeting({ status: MeetingStatus.COMPLETED }),
       );
 
-      await expect(service.issueBatchUpload('meeting-1')).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.issueBatchUpload('meeting-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

@@ -209,8 +209,7 @@ export class MeetingService {
         ownerSub,
         scope,
         keywordLength: keyword.length,
-        errorMessage:
-          error instanceof Error ? error.message : String(error),
+        errorMessage: error instanceof Error ? error.message : String(error),
       });
       return this.searchLegacy({
         scope,
@@ -272,7 +271,9 @@ export class MeetingService {
 
     // Sync title to result.metadata if title was changed and a result exists
     if (hasTitle) {
-      const result = await this.resultRepository.findOne({ where: { meetingId: id } });
+      const result = await this.resultRepository.findOne({
+        where: { meetingId: id },
+      });
       if (result && result.metadata?.title !== saved.title) {
         result.metadata = { ...result.metadata, title: saved.title };
         await this.resultRepository.save(result);
@@ -729,11 +730,9 @@ export class MeetingService {
       meetingId: row.meetingId,
       title: row.title,
       status: row.status as MeetingStatus,
-      processingPhase: (row.processingPhase as MeetingProcessingPhase | null | undefined) ?? null,
+      processingPhase: row.processingPhase ?? null,
       needsAttention: Boolean(row.needsAttention),
-      completionState:
-        (row.completionState as MeetingCompletionState | null | undefined) ??
-        null,
+      completionState: row.completionState ?? null,
       transcriptionMode: row.transcriptionMode as MeetingTranscriptionMode,
       matchedIn: matched.matchedIn,
       snippet: this.buildSnippet(matched.content, loweredKeyword) || keyword,
@@ -826,13 +825,17 @@ export class MeetingService {
       completionState?: MeetingCompletionState | null;
     },
   ): Promise<MeetingEntity> {
-    const updated = await this.updateLifecycle(meeting, next, 'meeting.status.updated');
+    const updated = await this.updateLifecycle(
+      meeting,
+      next,
+      'meeting.status.updated',
+    );
     this.emitStatusChanged(
       updated.id,
       updated.status,
       updated.status === MeetingStatus.COMPLETED
         ? 'completed'
-        : updated.processingPhase ?? undefined,
+        : (updated.processingPhase ?? undefined),
       updated.ownerSub,
       updated.needsAttention,
       updated.completionState,

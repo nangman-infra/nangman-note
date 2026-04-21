@@ -185,7 +185,7 @@ describe('Meeting Rendering Property Tests', () => {
       fc.property(meetingExtractionArb, (extracted) => {
         const md = render(extracted);
         for (const item of extracted.agendaItems) {
-          const ctx = item.context as string | undefined;
+          const ctx = item.context;
           if (ctx && ctx.trim().length > 0) {
             expect(md).toContain(ctx.trim());
           }
@@ -411,7 +411,7 @@ describe('Lecture Rendering Property Tests', () => {
       fc.property(lectureExtractionArb, (extracted) => {
         const md = render(extracted);
         for (const concept of extracted.concepts) {
-          const ctx = concept.context as string | undefined;
+          const ctx = concept.context;
           if (ctx && ctx.trim().length > 0) {
             expect(md).toContain(ctx.trim());
           }
@@ -532,7 +532,7 @@ describe('Mentoring Rendering Property Tests', () => {
       fc.property(mentoringExtractionArb, (extracted) => {
         const md = render(extracted);
         for (const topic of extracted.topics) {
-          const ctx = topic.context as string | undefined;
+          const ctx = topic.context;
           if (ctx && ctx.trim().length > 0) {
             expect(md).toContain(ctx.trim());
           }

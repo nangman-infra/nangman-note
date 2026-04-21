@@ -1,8 +1,5 @@
-import {
-  Injectable,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ResultEntity } from '../../result/domain/result.entity';
@@ -125,10 +122,12 @@ export class StalledMeetingRecoveryService
         });
 
         if (!latestJob) {
-          const latestUpload = await this.transcriptionUploadRepository.findOne({
-            where: { meetingId: meeting.id },
-            order: { createdAt: 'DESC' },
-          });
+          const latestUpload = await this.transcriptionUploadRepository.findOne(
+            {
+              where: { meetingId: meeting.id },
+              order: { createdAt: 'DESC' },
+            },
+          );
           if (latestUpload) {
             this.logger.warn('meeting.recovery.pending_upload_detected', {
               meetingId: meeting.id,
@@ -153,10 +152,14 @@ export class StalledMeetingRecoveryService
                 return;
               }
             } catch (error) {
-              this.logger.error('meeting.recovery.pending_upload_failed', error, {
-                meetingId: meeting.id,
-                uploadId: latestUpload.id,
-              });
+              this.logger.error(
+                'meeting.recovery.pending_upload_failed',
+                error,
+                {
+                  meetingId: meeting.id,
+                  uploadId: latestUpload.id,
+                },
+              );
               await this.transcriptionResultCollectorService.recoverMissingBatchJob(
                 meeting.id,
                 meeting.ownerSub,
@@ -223,10 +226,10 @@ export class StalledMeetingRecoveryService
       return;
     }
 
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query(
       'SELECT pg_try_advisory_lock($1) AS locked',
       [POSTGRES_LOCK_KEY],
-    )) as Array<{ locked?: boolean }>;
+    );
 
     if (!rows[0]?.locked) {
       this.logger.debug('meeting.recovery.lock_skipped', {

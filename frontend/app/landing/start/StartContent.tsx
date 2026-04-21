@@ -29,8 +29,9 @@ export function StartContent() {
                 <Link
                   href="/auth/signin"
                   className="btn-neo inline-flex border-transparent bg-brand px-6 py-3.5 text-sm text-white hover:bg-brand-strong hover:text-white"
+                  style={{ color: '#ffffff' }}
                 >
-                  <Lock className="h-4 w-4" />
+                  <Lock className="h-4 w-4" style={{ color: '#ffffff' }} />
                   로그인하고 시작하기
                 </Link>
                 <Link

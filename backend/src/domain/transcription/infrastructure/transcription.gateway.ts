@@ -63,7 +63,7 @@ export class TranscriptionGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  private readonly server: Server;
+  private readonly server!: Server;
 
   private readonly logger = new StructuredLogger(TranscriptionGateway.name);
 
@@ -162,13 +162,13 @@ export class TranscriptionGateway
         },
       );
     } catch (error) {
-      await runWithRequestContext(
+      runWithRequestContext(
         {
           transport: 'ws',
           socketId: client.id,
           meetingId,
         },
-        async () => {
+        () => {
           this.logger.warn('transcription.gateway.client.connection_failed', {
             meetingId,
             socketId: client.id,
@@ -187,14 +187,14 @@ export class TranscriptionGateway
 
   async handleDisconnect(client: Socket): Promise<void> {
     const meetingId = this.resolveMeetingId(client);
-    await runWithRequestContext(
+    runWithRequestContext(
       {
         transport: 'ws',
         socketId: client.id,
         meetingId,
         ownerSub: this.socketUsers.get(client.id),
       },
-      async () => {
+      () => {
         this.logger.debug('transcription.gateway.client.disconnected', {
           meetingId,
           socketId: client.id,

@@ -15,10 +15,7 @@ import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { ResultService } from '../../result/application/result.service';
 import { S3AudioService } from '../../../shared/aws/s3/s3.service';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
-import {
-  runWithRequestContext,
-  type RequestContextStore,
-} from '../../../shared/logging/request-context.storage';
+import { runWithRequestContext } from '../../../shared/logging/request-context.storage';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const POLL_INTERVAL_MS = 5_000; // 5초
@@ -725,7 +722,7 @@ export class TranscriptionResultCollectorService {
    */
   @OnEvent(MeetingStatusChangedEvent.EVENT_NAME, { async: true })
   async handleGeneratingPhase(event: MeetingStatusChangedEvent): Promise<void> {
-    if (event.phase !== 'generating') return;
+    if (event.phase !== MeetingProcessingPhase.GENERATING) return;
 
     this.logger.log('result.generation.phase_started', {
       meetingId: event.meetingId,

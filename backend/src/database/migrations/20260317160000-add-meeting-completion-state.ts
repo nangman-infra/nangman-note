@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddMeetingCompletionState20260317160000
-  implements MigrationInterface
-{
+export class AddMeetingCompletionState20260317160000 implements MigrationInterface {
   name = 'AddMeetingCompletionState20260317160000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

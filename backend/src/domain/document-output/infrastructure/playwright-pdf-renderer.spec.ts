@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/unbound-method */
 import { ConfigService } from '@nestjs/config';
 import { chromium } from 'playwright-core';
 import type { AppEnv } from '../../../shared/config/env.validation';
