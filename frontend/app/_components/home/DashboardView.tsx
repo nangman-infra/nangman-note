@@ -19,6 +19,7 @@ interface DashboardViewProps {
   selectedMeetingId?: string;
   timeFilter: SidebarTimeFilter;
   tagFilter: string | null;
+  promptFilters: Array<{ id: string; name: string }>;
   onTimeFilterChange: (f: SidebarTimeFilter) => void;
   onTagFilterChange: (t: string | null) => void;
   onMeetingsLoaded: (info: { total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean }) => void;
@@ -35,20 +36,21 @@ export function DashboardView({
   selectedMeetingId,
   timeFilter,
   tagFilter,
+  promptFilters,
   onTimeFilterChange,
   onTagFilterChange,
   onMeetingsLoaded,
   meetingsInfo,
   showOnboarding,
 }: DashboardViewProps) {
-  const isHistory = activeView === 'history';
+  const isMeetingManagement = activeView === 'history';
 
   return (
     <div className="flex h-full flex-col">
       {/* ── Stitch TopAppBar ── */}
       <header className="sticky top-0 z-40 flex items-center justify-between bg-slate-50/80 px-6 py-3 shadow-sm backdrop-blur-xl">
         <h2 className="font-headline text-xl font-bold tracking-tight text-slate-900">
-          {isHistory ? 'Meeting History' : 'Workspace Overview'}
+          {isMeetingManagement ? 'Meeting' : 'Workspace Overview'}
         </h2>
         <div className="flex items-center gap-3">
             <button type="button" className="rounded-full p-2 text-slate-500 transition hover:bg-indigo-50">
@@ -67,11 +69,12 @@ export function DashboardView({
       </header>
 
       {/* ── Main Content (scrollable) ── */}
-      <main className={`scroll-muted flex-1 overflow-y-auto ${isHistory ? '' : ''}`}>
-        {isHistory ? (
-          /* ── History View: Full-height MeetingList ── */
+      <main className={`scroll-muted flex-1 overflow-y-auto ${isMeetingManagement ? '' : ''}`}>
+        {isMeetingManagement ? (
+          /* ── Meeting management view: full-height MeetingList ── */
           <div className="flex h-full flex-col bg-white">
             <MeetingListWithAutoSwitch
+              variant="history"
               showTrash={showTrash}
               onShowTrashChange={onShowTrashChange}
               refreshToken={refreshToken}
@@ -79,6 +82,7 @@ export function DashboardView({
               selectedMeetingId={selectedMeetingId}
               timeFilter={timeFilter}
               tagFilter={tagFilter}
+              promptFilters={promptFilters}
               onTimeFilterChange={onTimeFilterChange}
               onTagFilterChange={onTagFilterChange}
               onMeetingsLoaded={onMeetingsLoaded}
@@ -175,22 +179,24 @@ export function DashboardView({
               </section>
             )}
 
-            {/* ── Meeting List — 고정 높이 영역 (카드 10개 + 헤더 + 더보기 버튼 수용) + 내부 스크롤 ── */}
+            {/* ── Meeting List — compact archive preview with show-more disclosure ── */}
             {!showOnboarding && (
-            <section className="flex h-[1040px] flex-col overflow-hidden rounded-2xl bg-white">
-              <MeetingListWithAutoSwitch
-                showTrash={showTrash}
-                onShowTrashChange={onShowTrashChange}
-                refreshToken={refreshToken}
-                onSelectMeeting={onSelectMeeting}
-                selectedMeetingId={selectedMeetingId}
-                timeFilter={timeFilter}
-                tagFilter={tagFilter}
-                onTimeFilterChange={onTimeFilterChange}
-                onTagFilterChange={onTagFilterChange}
-                onMeetingsLoaded={onMeetingsLoaded}
-              />
-            </section>
+              <section className="overflow-hidden rounded-2xl bg-white">
+                <MeetingListWithAutoSwitch
+                  variant="dashboard"
+                  showTrash={showTrash}
+                  onShowTrashChange={onShowTrashChange}
+                  refreshToken={refreshToken}
+                  onSelectMeeting={onSelectMeeting}
+                  selectedMeetingId={selectedMeetingId}
+                  timeFilter={timeFilter}
+                  tagFilter={tagFilter}
+                  promptFilters={promptFilters}
+                  onTimeFilterChange={onTimeFilterChange}
+                  onTagFilterChange={onTagFilterChange}
+                  onMeetingsLoaded={onMeetingsLoaded}
+                />
+              </section>
             )}
 
             {/* ── Bottom Bento: Stats + Promo ── */}

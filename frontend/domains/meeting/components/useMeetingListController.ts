@@ -17,6 +17,7 @@ import { useMeetingListSearch } from './useMeetingListSearch';
 import { useMeetingListSelection } from './useMeetingListSelection';
 
 export interface MeetingListControllerProps {
+  variant?: 'dashboard' | 'history';
   initialShowTrash?: boolean;
   showTrash?: boolean;
   onShowTrashChange?: (showTrash: boolean) => void;
@@ -25,6 +26,7 @@ export interface MeetingListControllerProps {
   selectedMeetingId?: string;
   timeFilter?: SidebarTimeFilter;
   tagFilter?: string | null;
+  promptFilters?: MeetingPromptFilterOption[];
   onTimeFilterChange?: (filter: SidebarTimeFilter) => void;
   onTagFilterChange?: (tag: string | null) => void;
   onMeetingsLoaded?: (info: {
@@ -35,7 +37,13 @@ export interface MeetingListControllerProps {
   }) => void;
 }
 
+export interface MeetingPromptFilterOption {
+  id: string;
+  name: string;
+}
+
 export function useMeetingListController({
+  variant = 'dashboard',
   initialShowTrash = false,
   showTrash: controlledShowTrash,
   onShowTrashChange,
@@ -44,6 +52,8 @@ export function useMeetingListController({
   selectedMeetingId,
   timeFilter = 'all',
   tagFilter = null,
+  onTimeFilterChange,
+  onTagFilterChange,
   onMeetingsLoaded,
 }: MeetingListControllerProps) {
   const {
@@ -215,7 +225,7 @@ export function useMeetingListController({
       result = result.filter((meeting) => new Date(meeting.startedAt) >= weekAgo);
     }
 
-    if (tagFilter && !search.isSearchApplied) {
+    if (tagFilter) {
       result = result.filter((meeting) => meeting.promptId === tagFilter);
     }
 
@@ -223,7 +233,6 @@ export function useMeetingListController({
   }, [
     activeFilter,
     meetings,
-    search.isSearchApplied,
     showTrash,
     tagFilter,
     timeFilter,
@@ -244,7 +253,9 @@ export function useMeetingListController({
     return sorted;
   }, [filteredMeetings, sortBy]);
 
-  const shouldClampList = !showTrash && !search.isSearchApplied && !showAll;
+  const isDashboardPreview = variant === 'dashboard';
+  const shouldClampList =
+    isDashboardPreview && !showTrash && !search.isSearchApplied && !showAll;
   const visibleMeetings = useMemo(
     () =>
       shouldClampList
@@ -253,6 +264,28 @@ export function useMeetingListController({
     [shouldClampList, sortedMeetings],
   );
   const hiddenCount = Math.max(0, sortedMeetings.length - visibleMeetings.length);
+
+  const handleStatusFilterChange = (filter: MeetingFilterKey) => {
+    setActiveFilter(filter);
+    setShowAll(false);
+  };
+
+  const handleTimeFilterChange = (filter: SidebarTimeFilter) => {
+    onTimeFilterChange?.(filter);
+    setShowAll(false);
+  };
+
+  const handleTagFilterChange = (tag: string | null) => {
+    onTagFilterChange?.(tag);
+    setShowAll(false);
+  };
+
+  const resetArchiveFilters = () => {
+    setActiveFilter('all');
+    onTimeFilterChange?.('all');
+    onTagFilterChange?.(null);
+    setShowAll(false);
+  };
 
   const visibleMeetingIds = useMemo(
     () => visibleMeetings.map((meeting) => meeting.id),
@@ -292,9 +325,12 @@ export function useMeetingListController({
     selection,
     actions,
     handlers: {
-      setActiveFilter,
+      setActiveFilter: handleStatusFilterChange,
       setSortBy,
       setShowAll,
+      setTimeFilter: handleTimeFilterChange,
+      setTagFilter: handleTagFilterChange,
+      resetArchiveFilters,
       toggleTrash: () => {
         setShowTrash((prev) => !prev);
         search.resetSearchState();

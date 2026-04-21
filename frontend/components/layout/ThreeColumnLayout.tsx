@@ -63,7 +63,7 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
       <div className="h-dvh bg-[var(--bg-root)] p-3 lg:hidden">
         {/* Mobile top bar */}
         <header className="mb-3 flex items-center justify-between rounded-xl bg-slate-50/80 px-4 py-2.5 shadow-sm backdrop-blur-xl motion-rise">
-          <span className="font-headline text-sm font-extrabold tracking-tighter text-indigo-700">Nangman Note</span>
+          <span className="font-headline text-sm font-extrabold tracking-tighter text-indigo-700">TransNote</span>
           <div className="inline-flex rounded-lg bg-[var(--surface-container-low)] p-1">
             <button
               type="button"

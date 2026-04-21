@@ -45,13 +45,13 @@ export function MeetingListSearchBox({
   onRunSearch,
 }: MeetingListSearchBoxProps) {
   return (
-    <form onSubmit={onSearchSubmit} className="mb-3">
+    <form onSubmit={onSearchSubmit} className="min-w-0">
       <label htmlFor="meeting-search" className="sr-only">
-        회의 제목 검색
+        회의 제목과 내용 검색
       </label>
 
       <div className="relative">
-        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
           <Search className="h-4 w-4 text-muted" />
         </span>
 
@@ -64,7 +64,7 @@ export function MeetingListSearchBox({
           onFocus={onSearchFocus}
           onBlur={onSearchBlur}
           onKeyDown={onSearchKeyDown}
-          placeholder="검색 (⌘K)"
+          placeholder={showTrash ? '휴지통에서는 검색할 수 없어요' : '회의 제목과 내용 검색 (⌘K)'}
           role="combobox"
           aria-expanded={isSuggestionOpen && suggestions.length > 0}
           aria-controls="meeting-search-listbox"
@@ -75,7 +75,7 @@ export function MeetingListSearchBox({
           }
           aria-autocomplete="list"
           aria-haspopup="listbox"
-          className={`input-shell h-9 rounded-full text-sm !pl-9 !pr-8 ${
+          className={`input-shell h-10 rounded-full text-sm !pl-10 !pr-8 ${
             showTrash ? 'bg-slate-100 opacity-60 cursor-not-allowed' : ''
           }`}
           disabled={showTrash}
@@ -97,7 +97,7 @@ export function MeetingListSearchBox({
             id="meeting-search-listbox"
             role="listbox"
             aria-label="추천 검색어"
-            className="surface-card absolute z-30 mt-2 w-full overflow-hidden border bg-white/95 p-1.5 shadow-[0_14px_28px_rgba(18,33,43,0.15)]"
+            className="surface-card absolute z-30 mt-2 w-full overflow-hidden bg-white/95 p-1.5 shadow-[0_14px_28px_rgba(18,33,43,0.15)]"
           >
             <div className="mb-1 flex items-center justify-between px-2 py-1">
               <p className="text-[11px] font-semibold tracking-wide text-muted">

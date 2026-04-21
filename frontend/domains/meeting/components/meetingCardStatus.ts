@@ -94,8 +94,8 @@ export function getCardSelectionClassName({
   isActive?: boolean;
 }): string {
   if (isSelected) return 'bg-indigo-50 shadow-md ring-2 ring-brand/30';
-  if (isActive) return 'bg-white shadow-md';
-  return 'hover:bg-[var(--surface-container-high)] hover:shadow-sm';
+  if (isActive) return 'bg-white shadow-md ring-1 ring-brand/10';
+  return 'hover:bg-white hover:shadow-sm';
 }
 
 export function getProcessingBannerClassName(needsAttention?: boolean): string {

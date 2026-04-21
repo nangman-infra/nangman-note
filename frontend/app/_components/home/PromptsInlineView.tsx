@@ -7,6 +7,7 @@ import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import {
   PROMPT_DOCUMENT_TYPE_HELP_TEXT,
   PROMPT_DOCUMENT_TYPE_LABELS,
+  getPromptDescription,
   type PromptDocumentType,
   usePrompt,
 } from '@/domains/prompt';
@@ -117,7 +118,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
               <div key={prompt.id} className="rounded-xl bg-[var(--surface-container-low)] p-5 transition hover:bg-[var(--surface-container-high)]">
                 <p className="text-sm font-bold text-slate-900">{prompt.name}</p>
                 <p className="mt-1.5 line-clamp-2 text-xs text-[var(--ink-muted)]">
-                  {prompt.content || PROMPT_DOCUMENT_TYPE_HELP_TEXT[prompt.documentType]}
+                  {getPromptDescription(prompt)}
                 </p>
                 <p className="mt-3 text-[11px] text-[var(--ink-muted)]">
                   {PROMPT_DOCUMENT_TYPE_LABELS[prompt.documentType]} · 기본 템플릿

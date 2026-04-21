@@ -3,8 +3,8 @@
 import { Edit3, Plus, Trash2 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import {
-  PROMPT_DOCUMENT_TYPE_HELP_TEXT,
   PROMPT_DOCUMENT_TYPE_LABELS,
+  getPromptDescription,
   type Prompt,
 } from '@/domains/prompt';
 import {
@@ -77,9 +77,7 @@ export function PromptTemplateLibrarySection({
               const tile =
                 DOCUMENT_TYPE_TILE[prompt.documentType] ?? SETTINGS_FALLBACK_TILE;
               const TileIcon = tile.icon;
-              const description =
-                prompt.content ||
-                PROMPT_DOCUMENT_TYPE_HELP_TEXT[prompt.documentType];
+              const description = getPromptDescription(prompt);
 
               return (
                 <li

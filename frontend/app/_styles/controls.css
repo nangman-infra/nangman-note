@@ -78,6 +78,15 @@
   }
 }
 
+.btn-neo.bg-brand {
+  color: #ffffff;
+}
+
+.btn-neo.bg-brand svg,
+.btn-neo.bg-brand span {
+  color: #ffffff;
+}
+
 /* ─── Focus States ─── */
 .btn-neo:focus-visible,
 .btn-primary:focus-visible,

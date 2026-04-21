@@ -44,7 +44,7 @@ export function InProgressHeader({
   return (
     <header className="z-40 sticky top-0 flex items-center justify-between w-full px-6 py-3 bg-slate-50/80 backdrop-blur-xl shadow-sm shadow-[inset_0_-1px_0_0_rgba(197,197,215,0.2)]">
       <div className="flex min-w-0 items-center gap-6">
-        <span className="font-headline text-xl font-extrabold tracking-tighter text-indigo-700">Nangman Note</span>
+        <span className="font-headline text-xl font-extrabold tracking-tighter text-indigo-700">TransNote</span>
         <div className="hidden sm:block h-6 w-px bg-[var(--outline-variant)]/30" aria-hidden="true" />
         <nav
           aria-label="Breadcrumb"

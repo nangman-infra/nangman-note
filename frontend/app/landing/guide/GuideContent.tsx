@@ -101,69 +101,101 @@ export function GuideContent() {
     <div className="landing-shell min-h-dvh">
       <ScrollProgress />
       <LandingNav />
-      <main className="pt-28">
-        {/* 페이지 헤더 */}
+      <main className="pt-24 sm:pt-28">
         <div className="mx-auto max-w-6xl px-5">
           <ScrollReveal>
-            <p className="text-center text-xs font-semibold tracking-widest text-muted">
-              GUIDE
-            </p>
-            <h1 className="mt-2 text-center text-3xl font-bold sm:text-4xl">
-              사용 가이드
-            </h1>
-            <p className="mx-auto mt-3 max-w-lg text-center text-sm text-muted">
-              회의 시작부터 결과 확인까지, 7단계로 TransNote의 모든 기능을 안내합니다.
-            </p>
+            <header className="glass-surface overflow-hidden p-6 sm:p-8 lg:p-10">
+              <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl">
+                  <p className="label-sm text-[var(--ink-muted)]">
+                    GUIDE
+                  </p>
+                  <h1 className="mt-2 font-headline text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
+                    사용 가이드
+                  </h1>
+                  <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
+                    회의 시작부터 결과 확인까지, 7단계로 TransNote의 모든 기능을 안내합니다.
+                  </p>
+                </div>
+                <div className="grid grid-cols-7 gap-1.5 rounded-2xl bg-white/70 p-2 shadow-sm">
+                  {flowSteps.map((step) => (
+                    <span
+                      key={step.num}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-container-low)] text-[11px] font-bold text-[var(--ink-muted)]"
+                      aria-label={`${step.num} ${step.title}`}
+                    >
+                      {step.num}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </header>
           </ScrollReveal>
         </div>
 
-        {/* 플로우 단계들 */}
-        <div className="mx-auto mt-16 max-w-5xl px-5">
-          {flowSteps.map((step, i) => (
-            <div key={step.num}>
-              <ScrollReveal>
-                <div className={`flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12 ${i % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
-                  {/* 텍스트 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-brand/10 text-xs font-bold text-brand">
+        <div className="mx-auto mt-8 grid max-w-6xl gap-6 px-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+          <ScrollReveal>
+            <aside className="glass-surface p-3 lg:sticky lg:top-24">
+              <p className="label-sm px-2 py-1 text-[var(--ink-muted)]">
+                7단계 흐름
+              </p>
+              <ol className="mt-2 space-y-1">
+                {flowSteps.map((step) => (
+                  <li key={step.num}>
+                    <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
+                      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--surface-container-low)] text-[11px] font-bold text-[var(--ink-muted)]">
                         {step.num}
                       </span>
-                      <h2 className="text-xl font-bold">{step.title}</h2>
+                      <span className="truncate font-semibold text-[var(--ink-subtle)]">
+                        {step.title}
+                      </span>
                     </div>
-                    <p className="mt-3 text-sm leading-relaxed text-muted">
-                      {step.description}
-                    </p>
+                  </li>
+                ))}
+              </ol>
+            </aside>
+          </ScrollReveal>
 
-                    {/* 팁 리스트 */}
-                    <ul className="mt-4 space-y-2">
-                      {step.tips.map((tip) => (
-                        <li key={tip} className="flex items-start gap-2 text-sm">
-                          <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand/40" />
-                          <span className="text-muted">{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+          <div className="space-y-4">
+            {flowSteps.map((step, i) => (
+              <ScrollReveal key={step.num} delay={i * 60}>
+                <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[var(--line-soft)]">
+                  <div className="grid gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
+                    <div className="flex flex-col p-5 sm:p-6">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--brand)] text-xs font-bold text-white">
+                          {step.num}
+                        </span>
+                        <h2 className="font-headline text-xl font-bold tracking-tight text-slate-950">
+                          {step.title}
+                        </h2>
+                      </div>
+                      <p className="mt-4 text-sm leading-relaxed text-[var(--ink-muted)]">
+                        {step.description}
+                      </p>
 
-                  {/* 목업 */}
-                  <div className="min-w-0 flex-1">
-                    {step.mock ? <step.mock /> : <EditExportMock />}
+                      <ul className="mt-5 space-y-2.5">
+                        {step.tips.map((tip) => (
+                          <li key={tip} className="flex items-start gap-2.5 text-sm">
+                            <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[var(--brand)]" />
+                            <span className="leading-relaxed text-[var(--ink-subtle)]">
+                              {tip}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="bg-[var(--surface-container-low)] p-4 sm:p-5">
+                      <div className="mx-auto max-w-xl">
+                        {step.mock ? <step.mock /> : <EditExportMock />}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </section>
               </ScrollReveal>
-
-              {/* 연결 화살표 */}
-              {i < flowSteps.length - 1 && (
-                <div className="flex justify-center py-8" aria-hidden="true">
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="h-8 w-px bg-[var(--line-soft)]" />
-                    <div className="h-2 w-2 rotate-45 border-b border-r border-[var(--line-soft)]" />
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="landing-section-divider mt-16" />
@@ -184,7 +216,7 @@ function EditExportMock() {
       </div>
       <div className="p-4">
         {/* 툴바 */}
-        <div className="mb-3 flex flex-wrap gap-1 rounded-lg border border-[var(--line-soft)] bg-white/60 px-2 py-1.5">
+        <div className="mb-3 flex flex-wrap gap-1 rounded-lg bg-[var(--surface-container-low)] px-2 py-1.5">
           {['H', 'B', 'I', 'S', '—', '❝', '•', '1.', '☑', '⊞', '🔗', '</>'].map((btn) => (
             <span key={btn} className="rounded px-1.5 py-0.5 text-[10px] text-muted hover:bg-white/80">
               {btn}

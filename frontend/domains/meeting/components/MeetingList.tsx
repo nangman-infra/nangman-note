@@ -9,6 +9,8 @@ import { MeetingListLoadMoreFooter } from './MeetingListLoadMoreFooter';
 import { useMeetingListController } from './useMeetingListController';
 
 export function MeetingList(props: MeetingListControllerProps) {
+  const variant = props.variant ?? 'dashboard';
+  const isMeetingManagement = variant === 'history';
   const {
     showTrash,
     isLoading,
@@ -36,6 +38,7 @@ export function MeetingList(props: MeetingListControllerProps) {
     handleBulkDelete,
     handleBulkRestore,
     handleBulkPurge,
+    handleDeleteMeeting,
     handleRestoreMeeting,
     handlePurgeMeeting,
   } = actions;
@@ -44,13 +47,19 @@ export function MeetingList(props: MeetingListControllerProps) {
     <div className="flex h-full flex-col">
       {/* Source-scan contract: polling uses document.visibilityState / visibilitychange, and searchMeetings plus bulkDeleteMeetings, bulkRestoreMeetings, bulkPurgeMeetings live in useMeetingListController. */}
       <MeetingListHeader
+        allowTrashViewToggle={isMeetingManagement}
         showTrash={showTrash}
         meetingCount={sortedMeetings.length}
         error={error}
         activeFilter={activeFilter}
+        timeFilter={props.timeFilter ?? 'all'}
+        tagFilter={props.tagFilter ?? null}
+        promptFilters={props.promptFilters ?? []}
         sortBy={sortBy}
         selectionMode={selection.selectionMode}
-        canToggleSelectionMode={showTrash && sortedMeetings.length > 0}
+        canToggleSelectionMode={
+          isMeetingManagement && showTrash && sortedMeetings.length > 0
+        }
         inputRef={search.inputRef}
         searchQuery={search.searchQuery}
         setSearchQuery={search.setSearchQuery}
@@ -62,6 +71,9 @@ export function MeetingList(props: MeetingListControllerProps) {
         onToggleTrash={handlers.toggleTrash}
         onToggleSelectionMode={selection.toggleSelectionMode}
         onFilterChange={handlers.setActiveFilter}
+        onTimeFilterChange={handlers.setTimeFilter}
+        onTagFilterChange={handlers.setTagFilter}
+        onResetFilters={handlers.resetArchiveFilters}
         onSortChange={handlers.setSortBy}
         onSearchSubmit={handleSearchSubmit}
         onSearchFocus={handleSearchFocus}
@@ -99,8 +111,9 @@ export function MeetingList(props: MeetingListControllerProps) {
         selectionMode={selection.selectionMode}
         selectedIds={selection.selectedIds}
         onSelectMeeting={props.onSelectMeeting}
+        onDeleteMeeting={handleDeleteMeeting}
         onClearSearch={clearSearch}
-        onResetStatusFilter={() => handlers.setActiveFilter('all')}
+        onResetFilters={handlers.resetArchiveFilters}
         onRestoreMeeting={(meetingId) => void handleRestoreMeeting(meetingId)}
         onPurgeMeeting={handlePurgeMeeting}
         onToggleSelect={selection.toggleSelect}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { TwoColumnLayout } from '@/components/layout/TwoColumnLayout';
 import { Sidebar, type SidebarTimeFilter, type SidebarView } from '@/components/layout/Sidebar';
@@ -17,11 +17,16 @@ interface HomePageContentProps {
 
 export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  const [mobileActiveView, setMobileActiveView] = useState<'dashboard' | 'viewer'>(
+    'dashboard',
+  );
   const meetingListRefreshToken = 0;
   const [timeFilter, setTimeFilter] = useState<SidebarTimeFilter>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [showTrash, setShowTrash] = useState(initialShowTrash);
-  const [activeView, setActiveView] = useState<SidebarView>('dashboard');
+  const [activeView, setActiveView] = useState<SidebarView>(
+    initialShowTrash ? 'history' : 'dashboard',
+  );
   const [meetingsInfo, setMeetingsInfo] = useState<{ total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean }>({
     total: -1,
     isLoading: true,
@@ -29,6 +34,14 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
     showTrash: false,
   });
   const { prompts } = usePrompt();
+  const promptFilters = useMemo(
+    () =>
+      prompts.map((prompt) => ({
+        id: prompt.id,
+        name: formatPromptLabel(prompt),
+      })),
+    [prompts],
+  );
 
   const handleResultTitleUpdate = useCallback(
     async (meetingId: string, title: string) => {
@@ -59,6 +72,7 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const handleTrashToggle = () => {
     setShowTrash((prev) => !prev);
     setSelectedMeetingId(null);
+    setMobileActiveView('dashboard');
   };
 
   const handleMeetingsLoaded = useCallback(
@@ -71,10 +85,22 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   const handleBackToDashboard = () => {
     setSelectedMeetingId(null);
     setActiveView('dashboard');
+    setMobileActiveView('dashboard');
+  };
+
+  const handleSelectMeeting = (meetingId: string | null) => {
+    setSelectedMeetingId(meetingId);
+    setMobileActiveView(meetingId ? 'viewer' : 'dashboard');
   };
 
   const handleViewChange = (view: SidebarView) => {
     setActiveView(view);
+    setMobileActiveView(
+      view === 'prompts' || view === 'settings' ? 'viewer' : 'dashboard',
+    );
+    if (view !== 'history') {
+      setShowTrash(false);
+    }
     // dashboard/history 뷰로 전환 시 선택된 회의 해제
     if (view === 'dashboard' || view === 'history') {
       setSelectedMeetingId(null);
@@ -147,7 +173,7 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
             <ResultViewer
               key={selectedMeetingId}
               meetingId={selectedMeetingId}
-              onMeetingUnavailable={() => setSelectedMeetingId(null)}
+              onMeetingUnavailable={() => handleSelectMeeting(null)}
               promptOptions={prompts.map((prompt) => ({
                 id: prompt.id,
                 name: prompt.name,
@@ -168,6 +194,8 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
   return (
     <TwoColumnLayout
       showViewer={showViewer || activeView === 'settings' || activeView === 'prompts'}
+      mobileView={mobileActiveView}
+      onMobileViewChange={setMobileActiveView}
       sidebar={
         <Sidebar
           activeView={activeView}
@@ -182,10 +210,11 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
           showTrash={showTrash}
           onShowTrashChange={setShowTrash}
           refreshToken={meetingListRefreshToken}
-          onSelectMeeting={setSelectedMeetingId}
+          onSelectMeeting={handleSelectMeeting}
           selectedMeetingId={selectedMeetingId || undefined}
           timeFilter={timeFilter}
           tagFilter={tagFilter}
+          promptFilters={promptFilters}
           onTimeFilterChange={setTimeFilter}
           onTagFilterChange={setTagFilter}
           onMeetingsLoaded={handleMeetingsLoaded}

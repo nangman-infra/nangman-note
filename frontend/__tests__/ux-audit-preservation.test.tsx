@@ -45,7 +45,14 @@ describe('Preservation 3.1 — SSO login success redirects via callbackUrl', () 
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     const filePath = path.resolve(__dirname, '../app/auth/signin/page.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const componentPath = path.resolve(
+      __dirname,
+      '../app/auth/signin/_components/AuthEntryPage.tsx',
+    );
+    const source = [
+      await fs.readFile(filePath, 'utf-8'),
+      await fs.readFile(componentPath, 'utf-8'),
+    ].join('\n');
 
     // The sign-in page should read callbackUrl from searchParams and pass it to signIn
     expect(source).toContain('callbackUrl');
@@ -57,7 +64,14 @@ describe('Preservation 3.1 — SSO login success redirects via callbackUrl', () 
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     const filePath = path.resolve(__dirname, '../app/auth/signin/page.tsx');
-    const source = await fs.readFile(filePath, 'utf-8');
+    const componentPath = path.resolve(
+      __dirname,
+      '../app/auth/signin/_components/AuthEntryPage.tsx',
+    );
+    const source = [
+      await fs.readFile(filePath, 'utf-8'),
+      await fs.readFile(componentPath, 'utf-8'),
+    ].join('\n');
 
     // normalizeCallbackUrl should exist and return '/' as fallback
     expect(source).toContain('normalizeCallbackUrl');

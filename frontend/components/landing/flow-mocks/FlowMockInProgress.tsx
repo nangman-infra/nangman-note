@@ -19,7 +19,7 @@ export function FlowMockInProgress() {
       <header className="flex items-center justify-between bg-slate-50/80 px-3 py-2 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
           <span className="font-headline text-[11px] font-extrabold tracking-tighter text-indigo-700">
-            Nangman Note
+            TransNote
           </span>
           <nav
             aria-label="Breadcrumb"

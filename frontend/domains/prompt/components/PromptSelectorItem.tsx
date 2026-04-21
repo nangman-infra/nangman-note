@@ -5,6 +5,7 @@ import {
   PROMPT_DOCUMENT_TYPE_LABELS,
   type Prompt,
 } from '../types/prompt.types';
+import { getPromptDescription } from '../lib/getPromptDescription';
 
 interface PromptSelectorItemProps {
   prompt: Prompt;
@@ -67,7 +68,7 @@ export function PromptSelectorItem({
           </div>
         </div>
         <p className="mt-2 line-clamp-2 text-xs text-[var(--ink-muted)]">
-          {prompt.content}
+          {getPromptDescription(prompt)}
         </p>
       </div>
     </li>

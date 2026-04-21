@@ -30,7 +30,7 @@ interface SidebarProps {
 
 const NAV_ITEMS: Array<{ key: SidebarView; icon: typeof LayoutDashboard; label: string }> = [
   { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { key: 'history', icon: FileText, label: 'History' },
+  { key: 'history', icon: FileText, label: 'Meeting' },
   { key: 'prompts', icon: Sparkles, label: 'Prompts' },
   { key: 'settings', icon: Settings, label: 'Settings' },
 ];
@@ -51,7 +51,7 @@ export function Sidebar({
           </div>
           <div>
             <h1 className="font-headline text-lg font-extrabold leading-none text-indigo-700">
-              Nangman Note
+              TransNote
             </h1>
             <p className="label-sm mt-1 text-slate-500">Cognitive Workspace</p>
           </div>
@@ -90,8 +90,8 @@ export function Sidebar({
           className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-gradient py-4 text-sm font-bold text-white shadow-lg shadow-brand/20 transition hover:opacity-90 active:scale-95"
           aria-current={pathname === '/meeting/new' ? 'page' : undefined}
         >
-          <Plus className="h-5 w-5" />
-          New Meeting
+          <Plus className="h-5 w-5 text-white" />
+          <span className="text-white">New Meeting</span>
         </Link>
       </div>
     </div>
