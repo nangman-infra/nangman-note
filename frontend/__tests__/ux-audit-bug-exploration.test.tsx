@@ -47,7 +47,7 @@ describe('Bug 1.37 — CSS Specificity: .btn-neo should not override Tailwind ut
     const cssContent = await readGlobalStyleSources();
 
     // The .btn-neo block should be wrapped in @layer components { ... }
-    const layerComponentsRegex = /@layer\s+components\s*\{[^}]*\.btn-neo\s*\{/s;
+    const layerComponentsRegex = /@layer\s+components\s*\{[^}]*\.btn-neo\s*\{/;
     expect(cssContent).toMatch(layerComponentsRegex);
   });
 
@@ -85,9 +85,9 @@ describe('Bug 1.7 — Compact mode: meeting selection should auto-switch to view
     // We check for evidence of this auto-switch pattern.
     const hasAutoSwitchToViewer =
       // Pattern 1: setActiveColumn('viewer') triggered by meeting selection
-      /onSelectMeeting.*setActiveColumn.*viewer/s.test(source) ||
+      /onSelectMeeting[\s\S]*setActiveColumn[\s\S]*viewer/.test(source) ||
       // Pattern 2: useEffect watching selectedMeetingId to switch to viewer
-      /selectedMeeting.*setActiveColumn\s*\(\s*['"]viewer['"]\s*\)/s.test(source) ||
+      /selectedMeeting[\s\S]*setActiveColumn\s*\(\s*['"]viewer['"]\s*\)/.test(source) ||
       // Pattern 3: LayoutContext providing setActiveColumn for child components
       /LayoutContext|layoutContext/i.test(source) && /setActiveColumn/i.test(source);
 
@@ -154,7 +154,7 @@ describe('Bug 1.36 — PromptEditorDialog should use <dialog> element for access
     const source = await fs.readFile(filePath, 'utf-8');
 
     // The fixed code should not have <div className="fixed inset-0 ..."> as the modal root
-    const usesDivOverlay = /return\s*\(\s*<div\s+className="fixed\s+inset-0/s.test(source);
+    const usesDivOverlay = /return\s*\(\s*<div\s+className="fixed\s+inset-0/.test(source);
     expect(usesDivOverlay).toBe(false);
   });
 });
