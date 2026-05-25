@@ -59,6 +59,9 @@ coverage/
 *.tmp
 *.temp
 
+# Local working notes (작업 메모)
+scratchpad.md
+
 # ========================================
 # Backend (Nest.js)
 # ========================================
