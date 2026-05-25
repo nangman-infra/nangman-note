@@ -9,7 +9,7 @@ import { getRuntimeEnv } from '@/lib/config/runtime-env';
  * - 빈 문자열이면: same-origin 연결 (io(undefined, ...))
  *
  * 개발 환경: WS_URL=http://localhost:9999 → 백엔드 직접 연결
- * 운영 환경: WS_URL=https://app.example.com → NPM /ws/ 프록시 경유
+ * 운영 환경: WS_URL=https://app.example.com → 리버스 프록시 /ws/ 경유
  *
  * @param path  socket.io path (예: '/ws/transcribe', '/ws/meeting-status')
  * @param query 쿼리 파라미터 (예: { meetingId })

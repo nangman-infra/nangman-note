@@ -136,11 +136,13 @@ export default function RootLayout({
         <AuthSessionProvider>
           <FeedbackProvider>{children}</FeedbackProvider>
         </AuthSessionProvider>
-        <Script
-          src="https://analytics.example.com/api/script.js"
-          data-site-id="REDACTED-SITE-ID"
-          strategy="afterInteractive"
-        />
+        {process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL && (
+          <Script
+            src={process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL}
+            data-site-id={process.env.NEXT_PUBLIC_ANALYTICS_SITE_ID}
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );

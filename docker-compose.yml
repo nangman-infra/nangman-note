@@ -96,6 +96,10 @@ services:
       NEXT_PUBLIC_ENABLE_OFFLINE: "false"
       NEXT_PUBLIC_AUTO_SAVE_DELAY: "3000"
 
+      # ─── Analytics (optional, self-hosted) ───
+      NEXT_PUBLIC_ANALYTICS_SCRIPT_URL: ${NEXT_PUBLIC_ANALYTICS_SCRIPT_URL:-}
+      NEXT_PUBLIC_ANALYTICS_SITE_ID: ${NEXT_PUBLIC_ANALYTICS_SITE_ID:-}
+
       # ─── Auth.js + Authentik ───
       NEXTAUTH_URL: ${CORS_ORIGIN}
       AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER_FE}
