@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 # ARM64 빌드용 필수 라이브러리 추가
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
@@ -7,7 +7,7 @@ COPY . .
 # frontend 프로젝트만 prune
 RUN turbo prune frontend --docker
 
-FROM node:22-alpine AS installer
+FROM --platform=$BUILDPLATFORM node:22-alpine AS installer
 RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 RUN npm i -g pnpm
