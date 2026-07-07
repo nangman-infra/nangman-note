@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package meeting;
+
+// gRPC 서비스 정의 (API 명세서 역할)
+service MeetingService {
+  // 회의 생성 (REST의 POST /meetings 와 동일)
+  rpc CreateMeeting (CreateMeetingRequest) returns (MeetingResponse) {}
+  
+  // 회의 요약 처리 (AI 서비스 호출용)
+  rpc SummarizeMeeting (SummarizeRequest) returns (SummaryResponse) {}
+}
+
+// 요청(Request) 데이터 구조
+message CreateMeetingRequest {
+  string title = 1;
+  string user_id = 2;
+}
+
+// 응답(Response) 데이터 구조
+message MeetingResponse {
+  string meeting_id = 1;
+  string status = 2;
+}
+
+message SummarizeRequest {
+  string meeting_id = 1;
+}
+
+message SummaryResponse {
+  string summary_text = 1;
+  repeated string action_items = 2;
+}

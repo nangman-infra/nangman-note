@@ -1,0 +1,54 @@
+name: Docker Build and Publish (GHCR)
+
+on:
+  push:
+    branches: 
+      - "main"
+      - "feature/msa-migration"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    # 🌟 행렬(Matrix) 전략: 5개의 마이크로서비스를 동시에 병렬로 빌드합니다!
+    strategy:
+      matrix:
+        app: [api-gateway, meeting-service, note-service, ai-processing-service, frontend]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ARM64 (Raspberry Pi 5) 아키텍처로 굽기 위한 에뮬레이터 세팅
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # GHCR(Github Container Registry) 로그인
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # 깃허브가 자체적으로 발급해주는 보안 토큰
+
+      # 도커 이미지 빌드 및 업로드 (Push)
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # 프론트엔드는 전용 Dockerfile, 나머지는 최상단 공용 Dockerfile 사용
+          file: ${{ matrix.app == 'frontend' && 'apps/frontend/Dockerfile' || 'Dockerfile' }}
+          push: true
+          platforms: linux/arm64 # 타겟 아키텍처 명시
+          build-args: APP_NAME=${{ matrix.app }} # 아까 Dockerfile에서 가지치기할 앱 이름 전달
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.app }}:latest
