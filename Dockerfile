@@ -35,6 +35,7 @@ RUN pnpm turbo run build --filter=${APP_NAME}...
 FROM node:22-alpine AS runner
 WORKDIR /app
 ARG APP_NAME
+ENV APP_NAME=${APP_NAME}
 ENV NODE_ENV=production
 
 # 빌드된 최종 산출물(dist)과 의존성 모듈만 복사 (모노레포 경로 구조 유지)
