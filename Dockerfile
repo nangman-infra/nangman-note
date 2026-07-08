@@ -42,7 +42,7 @@ COPY --from=installer /app/node_modules ./node_modules
 COPY --from=installer /app/apps/${APP_NAME}/package.json ./apps/${APP_NAME}/package.json
 COPY --from=installer /app/apps/${APP_NAME}/dist ./apps/${APP_NAME}/dist
 COPY --from=installer /app/apps/${APP_NAME}/node_modules ./apps/${APP_NAME}/node_modules
-COPY --from=installer /app/packages/proto ./packages/proto
+COPY --from=builder /app/packages/proto ./packages/proto
 
 # 컨테이너 시작 시 실행할 명령어 (경로 유지)
 CMD [ "sh", "-c", "node apps/${APP_NAME}/dist/main.js" ]
