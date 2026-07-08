@@ -37,11 +37,12 @@ WORKDIR /app
 ARG APP_NAME
 ENV NODE_ENV=production
 
-# 빌드된 최종 산출물(dist)과 의존성 모듈만 복사 (소스코드 원본 제거)
-COPY --from=installer /app/apps/${APP_NAME}/package.json .
-COPY --from=installer /app/apps/${APP_NAME}/dist ./dist
+# 빌드된 최종 산출물(dist)과 의존성 모듈만 복사 (모노레포 경로 구조 유지)
 COPY --from=installer /app/node_modules ./node_modules
+COPY --from=installer /app/apps/${APP_NAME}/package.json ./apps/${APP_NAME}/package.json
+COPY --from=installer /app/apps/${APP_NAME}/dist ./apps/${APP_NAME}/dist
 COPY --from=installer /app/apps/${APP_NAME}/node_modules ./apps/${APP_NAME}/node_modules
+COPY --from=installer /app/packages/proto ./packages/proto
 
-# 컨테이너 시작 시 실행할 명령어
-CMD [ "node", "dist/main.js" ]
+# 컨테이너 시작 시 실행할 명령어 (경로 유지)
+CMD [ "sh", "-c", "node apps/${APP_NAME}/dist/main.js" ]
