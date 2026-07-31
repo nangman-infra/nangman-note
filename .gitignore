@@ -65,6 +65,8 @@ scratchpad.md
 # ========================================
 # Backend (Nest.js)
 # ========================================
+dist/
+**/dist/
 backend/dist/
 backend/data/*.db
 backend/data/*.db-journal
