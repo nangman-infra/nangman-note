@@ -1,0 +1,142 @@
+import { ConfigService } from '@nestjs/config';
+import { Socket } from 'socket.io';
+import type { AuthUser } from '../../../shared/auth/auth-user.interface';
+import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
+import { AppEnv } from '../../../shared/config/env.validation';
+import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
+import { MeetingService } from '../application/meeting.service';
+import { MeetingStatusGateway } from './meeting-status.gateway';
+
+type MockSocket = Pick<
+  Socket,
+  'id' | 'handshake' | 'emit' | 'join' | 'disconnect'
+>;
+
+describe('MeetingStatusGateway', () => {
+  let gateway: MeetingStatusGateway;
+
+  let configService: any;
+  let tokenVerifier: jest.Mocked<
+    Pick<OidcTokenVerifierService, 'isAuthEnabled' | 'verifyAccessToken'>
+  >;
+  let meetingService: jest.Mocked<Pick<MeetingService, 'findById'>>;
+  let serverEmit: jest.Mock;
+  let serverTo: jest.Mock;
+
+  const createSocket = (meetingId?: string): MockSocket =>
+    ({
+      id: 'socket-status-1',
+      emit: jest.fn(),
+      disconnect: jest.fn(),
+      join: jest.fn().mockResolvedValue(undefined),
+      handshake: {
+        query: meetingId ? { meetingId } : {},
+        headers: {
+          origin: 'http://localhost:3000',
+        },
+        auth: {},
+      },
+    }) as unknown as MockSocket;
+
+  beforeEach(() => {
+    configService = {
+      get: jest.fn((key: keyof AppEnv) => {
+        if (key === 'CORS_ORIGIN') return 'http://localhost:3000';
+        if (key === 'NODE_ENV') return 'development';
+        return undefined;
+      }),
+    };
+
+    tokenVerifier = {
+      isAuthEnabled: jest.fn().mockReturnValue(false),
+      verifyAccessToken: jest.fn(),
+    };
+
+    meetingService = {
+      findById: jest.fn(),
+    };
+
+    gateway = new MeetingStatusGateway(
+      configService as unknown as ConfigService<AppEnv, true>,
+      tokenVerifier as unknown as OidcTokenVerifierService,
+      meetingService as unknown as MeetingService,
+    );
+    serverEmit = jest.fn();
+    serverTo = jest.fn().mockReturnValue({ emit: serverEmit });
+    (
+      gateway as unknown as {
+        server: {
+          to: jest.Mock;
+        };
+      }
+    ).server = {
+      to: serverTo,
+    };
+  });
+
+  it('rejects query token when auth is enabled', async () => {
+    tokenVerifier.isAuthEnabled.mockReturnValue(true);
+    const socket = createSocket('11111111-1111-4111-8111-111111111111');
+    socket.handshake.query = {
+      meetingId: '11111111-1111-4111-8111-111111111111',
+      token: 'query-token',
+    };
+
+    await gateway.handleConnection(socket as unknown as Socket);
+
+    expect(tokenVerifier.verifyAccessToken).not.toHaveBeenCalled();
+    expect(socket.disconnect).toHaveBeenCalledWith(true);
+  });
+
+  it('accepts handshake auth token when auth is enabled', async () => {
+    tokenVerifier.isAuthEnabled.mockReturnValue(true);
+    tokenVerifier.verifyAccessToken.mockResolvedValue({
+      sub: 'user-1',
+      scope: [],
+      raw: {
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      },
+    } as AuthUser);
+
+    const socket = createSocket('11111111-1111-4111-8111-111111111111');
+    socket.handshake.auth = { token: 'auth-token' };
+
+    await gateway.handleConnection(socket as unknown as Socket);
+
+    expect(tokenVerifier.verifyAccessToken).toHaveBeenCalledWith('auth-token');
+    expect(meetingService.findById).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      'user-1',
+    );
+    expect(socket.join).toHaveBeenNthCalledWith(
+      1,
+      'meeting-status:user:user-1',
+    );
+    expect(socket.join).toHaveBeenNthCalledWith(
+      2,
+      'meeting-status:meeting:11111111-1111-4111-8111-111111111111',
+    );
+    expect(socket.disconnect).not.toHaveBeenCalled();
+
+    gateway.handleDisconnect(socket as unknown as Socket);
+  });
+
+  it('broadcasts result regenerate events to the meeting room', () => {
+    gateway.handleResultRegenerate(
+      new ResultRegenerateEvent(
+        '11111111-1111-4111-8111-111111111111',
+        'completed',
+        'user-1',
+      ),
+    );
+
+    expect(serverTo).toHaveBeenCalledWith(
+      'meeting-status:meeting:11111111-1111-4111-8111-111111111111',
+    );
+    expect(serverEmit).toHaveBeenCalledWith('result:regenerate', {
+      meetingId: '11111111-1111-4111-8111-111111111111',
+      phase: 'completed',
+      errorMessage: undefined,
+    });
+  });
+});

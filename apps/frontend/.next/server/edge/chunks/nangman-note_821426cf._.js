@@ -1,0 +1,3 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["chunks/nangman-note_821426cf._.js",45351,e=>{"use strict";async function n(){}e.s(["register",()=>n])},90854,(e,n,t)=>{self._ENTRIES||={};let s=Promise.resolve().then(()=>e.i(45351));s.catch(()=>{}),self._ENTRIES.middleware_instrumentation=new Proxy(s,{get(e,n){if("then"===n)return(n,t)=>e.then(n,t);let t=(...t)=>e.then(e=>(0,e[n])(...t));return t.then=(t,s)=>e.then(e=>e[n]).then(t,s),t}})}]);
+
+//# sourceMappingURL=nangman-note_821426cf._.js.map

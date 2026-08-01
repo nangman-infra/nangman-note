@@ -1,20 +1,23 @@
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { join } from 'path';
+import { loadSecrets } from './shared/aws/secrets-manager/secrets-loader';
+import { applyGlobalAppConfig } from './bootstrap/apply-global-app-config';
+import type { AppEnv } from './shared/config/env.validation';
+
 
 async function bootstrap() {
-  // REST API(HTTP)가 아닌 gRPC 마이크로서비스로 구동
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
-    transport: Transport.GRPC,
-    options: {
-      package: 'meeting',
-      // 아까 작성한 proto 파일의 경로를 지정
-      protoPath: join(__dirname, '../../../packages/proto/meeting.proto'),
-      // gRPC 서버가 수신 대기할 포트
-      url: '0.0.0.0:50051',
-    },
-  });
-  await app.listen();
+  await loadSecrets();
+
+  const { AppModule } = await import('./app.module.js');
+
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  const configService = app.get(ConfigService<AppEnv, true>);
+  const port = configService.get('PORT', { infer: true }) ?? 3002;
+  app.enableShutdownHooks();
+  applyGlobalAppConfig(app, configService);
+
+  await app.listen(port);
 }
-bootstrap();
+
+void bootstrap();

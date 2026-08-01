@@ -1,0 +1,11 @@
+{
+  "pages": {},
+  "app": {
+    "[project]/nangman-note/apps/frontend/app/meeting/in-progress/page": [
+      "static/media/a343f882a40d2cc9-s.p.71e1367e.woff2",
+      "static/media/83afe278b6a6bb3c-s.p.3a6ba036.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pagesUsingSizeAdjust": false
+}

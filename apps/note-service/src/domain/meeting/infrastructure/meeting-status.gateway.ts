@@ -1,0 +1,261 @@
+import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
+import { isUUID } from 'class-validator';
+import { Server, Socket } from 'socket.io';
+import { AppEnv } from '../../../shared/config/env.validation';
+import {
+  isAllowedCorsOrigin,
+  parseAllowedOrigins,
+} from '../../../shared/config/cors-origin.util';
+import { createWsCorsOriginHandler } from '../../../shared/config/ws-cors.factory';
+import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
+import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
+import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
+import { MeetingService } from '../application/meeting.service';
+import { StructuredLogger } from '../../../shared/logging/structured-logger';
+
+interface SocketAuthContext {
+  ownerSub?: string;
+  expiresAtMs?: number;
+}
+
+@WebSocketGateway({
+  path: '/ws/meeting-status',
+  cors: {
+    origin: createWsCorsOriginHandler(),
+    credentials: true,
+  },
+  transports: ['websocket'],
+  pingTimeout: 10000,
+  pingInterval: 5000,
+})
+export class MeetingStatusGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
+  private readonly logger = new StructuredLogger(MeetingStatusGateway.name);
+
+  @WebSocketServer()
+  private readonly server!: Server;
+  private readonly socketAuthExpiryTimers = new Map<string, NodeJS.Timeout>();
+
+  constructor(
+    private readonly configService: ConfigService<AppEnv, true>,
+    private readonly tokenVerifier: OidcTokenVerifierService,
+    private readonly meetingService: MeetingService,
+  ) {}
+
+  async handleConnection(client: Socket): Promise<void> {
+    if (!this.isAllowedOrigin(client.handshake.headers.origin)) {
+      client.emit('error', { message: 'Origin is not allowed' });
+      client.disconnect(true);
+      return;
+    }
+
+    try {
+      const authContext = await this.resolveSocketAuthContext(client);
+      const ownerSub = authContext?.ownerSub;
+      const meetingId = this.resolveMeetingId(client);
+      if (meetingId) {
+        await this.meetingService.findById(meetingId, ownerSub);
+      }
+      await client.join(this.userRoom(ownerSub));
+      if (meetingId) {
+        await client.join(this.meetingRoom(meetingId));
+      }
+      this.registerSocketAuthExpiry(client, authContext?.expiresAtMs);
+
+      this.logger.debug('meeting-status.gateway.client.connected', {
+        socketId: client.id,
+        ownerSub,
+        meetingId,
+      });
+    } catch {
+      client.emit('error', {
+        message: 'Meeting status socket connection failed',
+      });
+      client.disconnect(true);
+    }
+  }
+
+  handleDisconnect(client: Socket): void {
+    this.unregisterSocketAuthExpiry(client.id);
+    this.logger.debug('meeting-status.gateway.client.disconnected', {
+      socketId: client.id,
+    });
+  }
+
+  /**
+   * EventEmitter 를 통해 도메인 이벤트를 수신하고,
+   * 해당 meetingId 룸에 WebSocket 메시지를 브로드캐스트합니다.
+   */
+  @OnEvent(MeetingStatusChangedEvent.EVENT_NAME)
+  handleMeetingStatusChanged(event: MeetingStatusChangedEvent): void {
+    const ownerSub = event.ownerSub;
+
+    this.logger.log('meeting-status.gateway.broadcast.status_changed', {
+      meetingId: event.meetingId,
+      status: event.status,
+      phase: event.phase,
+      ownerSub,
+      completionState: event.completionState,
+    });
+    this.server.to(this.userRoom(ownerSub)).emit('meeting:status', {
+      meetingId: event.meetingId,
+      status: event.status,
+      phase: event.phase,
+      needsAttention: event.needsAttention,
+      completionState: event.completionState,
+    });
+  }
+
+  /**
+   * 회의록 재생성 진행/완료/실패 이벤트를 WebSocket으로 브로드캐스트합니다.
+   */
+  @OnEvent(ResultRegenerateEvent.EVENT_NAME)
+  handleResultRegenerate(event: ResultRegenerateEvent): void {
+    this.logger.log('meeting-status.gateway.broadcast.result_regenerate', {
+      meetingId: event.meetingId,
+      phase: event.phase,
+      ownerSub: event.ownerSub,
+    });
+    this.server
+      .to(this.meetingRoom(event.meetingId))
+      .emit('result:regenerate', {
+        meetingId: event.meetingId,
+        phase: event.phase,
+        errorMessage: event.errorMessage,
+      });
+  }
+
+  private resolveMeetingId(client: Socket): string | undefined {
+    const rawValue = client.handshake.query.meetingId;
+
+    if (typeof rawValue === 'string' && rawValue.trim().length > 0) {
+      const candidate = rawValue.trim();
+      return isUUID(candidate, 'all') ? candidate : undefined;
+    }
+
+    if (Array.isArray(rawValue) && rawValue.length > 0) {
+      const candidate = rawValue[0];
+      if (typeof candidate === 'string' && candidate.trim().length > 0) {
+        const trimmed = candidate.trim();
+        return isUUID(trimmed, 'all') ? trimmed : undefined;
+      }
+    }
+
+    return undefined;
+  }
+
+  private isAllowedOrigin(
+    originHeader: string | string[] | undefined,
+  ): boolean {
+    const allowedOrigins = parseAllowedOrigins(
+      this.configService.get('CORS_ORIGIN', { infer: true }),
+    );
+    const nodeEnv = this.configService.get('NODE_ENV', { infer: true });
+    const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
+
+    return isAllowedCorsOrigin({
+      origin,
+      allowedOrigins,
+      nodeEnv,
+      allowWithoutOrigin: false,
+    });
+  }
+
+  private userRoom(ownerSub?: string): string {
+    return `meeting-status:user:${ownerSub ?? 'anonymous'}`;
+  }
+
+  private meetingRoom(meetingId: string): string {
+    return `meeting-status:meeting:${meetingId}`;
+  }
+
+  private async resolveSocketAuthContext(
+    client: Socket,
+  ): Promise<SocketAuthContext | undefined> {
+    if (!this.tokenVerifier.isAuthEnabled()) {
+      return undefined;
+    }
+
+    const token = this.extractSocketToken(client);
+    if (!token) {
+      throw new Error('Missing socket auth token');
+    }
+    const user = await this.tokenVerifier.verifyAccessToken(token);
+    const expiresAtMs =
+      typeof user.raw.exp === 'number' ? user.raw.exp * 1000 : undefined;
+
+    return {
+      ownerSub: user.sub,
+      expiresAtMs,
+    };
+  }
+
+  private extractSocketToken(client: Socket): string | undefined {
+    const authPayload = client.handshake.auth as
+      | Record<string, unknown>
+      | undefined;
+    const fromAuth = authPayload?.token;
+    if (typeof fromAuth === 'string' && fromAuth.trim().length > 0) {
+      return fromAuth.trim();
+    }
+
+    const authHeader = client.handshake.headers.authorization;
+    if (typeof authHeader === 'string') {
+      const [scheme, credentials] = authHeader.split(' ');
+      if (scheme?.toLowerCase() === 'bearer' && credentials) {
+        return credentials.trim();
+      }
+    }
+
+    return undefined;
+  }
+
+  private registerSocketAuthExpiry(client: Socket, expiresAtMs?: number): void {
+    this.unregisterSocketAuthExpiry(client.id);
+
+    if (!expiresAtMs) {
+      return;
+    }
+
+    const disconnectDelayMs = expiresAtMs - Date.now() + 1000;
+    if (disconnectDelayMs <= 0) {
+      this.disconnectExpiredSocket(client);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      this.disconnectExpiredSocket(client);
+    }, disconnectDelayMs);
+
+    if (typeof timer.unref === 'function') {
+      timer.unref();
+    }
+
+    this.socketAuthExpiryTimers.set(client.id, timer);
+  }
+
+  private unregisterSocketAuthExpiry(clientId: string): void {
+    const timer = this.socketAuthExpiryTimers.get(clientId);
+    if (timer) {
+      clearTimeout(timer);
+      this.socketAuthExpiryTimers.delete(clientId);
+    }
+  }
+
+  private disconnectExpiredSocket(client: Socket): void {
+    this.logger.warn('meeting-status.gateway.socket.auth_expired', {
+      socketId: client.id,
+      meetingId: this.resolveMeetingId(client),
+    });
+    client.emit('error', { message: 'Authentication expired' });
+    client.disconnect(true);
+  }
+}

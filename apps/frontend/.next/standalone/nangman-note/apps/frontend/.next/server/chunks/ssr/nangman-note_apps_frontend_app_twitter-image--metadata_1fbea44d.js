@@ -1,0 +1,3 @@
+module.exports=[33663,a=>{"use strict";a.i(24135),a.i(54718);var b=a.i(45285);let c={alt:"TransNote - Realtime transcript and note workflow",contentType:"image/png",size:{width:1200,height:600}};async function d(a){let{__metadata_id__:d,...e}=await a.params,f=(0,b.fillMetadataSegment)("/",e,"twitter-image");return[function(a,b){let c={alt:a.alt,type:a.contentType||"image/png",url:f+"?8a4ca4e7f46e5a82"},{size:d}=a;return d&&(c.width=d.width,c.height=d.height),c}(c,0)]}a.s(["default",0,d],33663)}];
+
+//# sourceMappingURL=nangman-note_apps_frontend_app_twitter-image--metadata_1fbea44d.js.map

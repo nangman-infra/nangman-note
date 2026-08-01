@@ -1,0 +1,12 @@
+{
+  "sorted_middleware": [],
+  "middleware": {},
+  "instrumentation": {
+    "files": [
+      "server/edge/chunks/nangman-note_821426cf._.js",
+      "server/edge/chunks/c5bde_next_dist_esm_build_templates_edge-wrapper_fb8476e0.js"
+    ],
+    "name": "instrumentation"
+  },
+  "functions": {}
+}

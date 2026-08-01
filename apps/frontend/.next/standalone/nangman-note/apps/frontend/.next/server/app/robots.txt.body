@@ -1,0 +1,9 @@
+User-Agent: *
+Allow: /
+Disallow: /api/
+Disallow: /ws/
+Disallow: /meeting/
+Disallow: /settings/
+
+Host: http://localhost:3000
+Sitemap: http://localhost:3000/sitemap.xml

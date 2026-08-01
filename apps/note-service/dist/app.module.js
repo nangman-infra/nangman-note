@@ -8,14 +8,54 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
+const typeorm_1 = require("@nestjs/typeorm");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
+const note_module_1 = require("./domain/note/note.module");
+const auth_module_1 = require("./shared/auth/auth.module");
+const crypto_module_1 = require("./shared/crypto/crypto.module");
+const env_validation_1 = require("./shared/config/env.validation");
+const typeorm_options_factory_1 = require("./shared/config/typeorm-options.factory");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [],
+        imports: [
+            config_1.ConfigModule.forRoot({
+                isGlobal: true,
+                envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
+                validate: env_validation_1.validateEnv,
+            }),
+            typeorm_1.TypeOrmModule.forRootAsync({
+                inject: [config_1.ConfigService],
+                useFactory: (configService) => {
+                    return (0, typeorm_options_factory_1.buildTypeOrmModuleOptions)({
+                        NODE_ENV: configService.get('NODE_ENV', { infer: true }),
+                        DB_ENGINE: configService.get('DB_ENGINE', { infer: true }),
+                        DB_MIGRATIONS_RUN: configService.get('DB_MIGRATIONS_RUN', { infer: true }),
+                        DB_PATH: configService.get('DB_PATH', { infer: true }),
+                        DB_HOST: configService.get('DB_HOST', { infer: true }),
+                        DB_PORT: configService.get('DB_PORT', { infer: true }),
+                        DB_NAME: configService.get('DB_NAME', { infer: true }),
+                        DB_USER: configService.get('DB_USER', { infer: true }),
+                        DB_PASSWORD: configService.get('DB_PASSWORD', { infer: true }),
+                        DB_IAM_AUTH: configService.get('DB_IAM_AUTH', { infer: true }),
+                        AWS_REGION: configService.get('AWS_REGION', { infer: true }),
+                        DB_SSL: configService.get('DB_SSL', { infer: true }),
+                        DB_SSL_REJECT_UNAUTHORIZED: configService.get('DB_SSL_REJECT_UNAUTHORIZED', { infer: true }),
+                        DB_POOL_MAX: configService.get('DB_POOL_MAX', { infer: true }),
+                        DB_CONNECTION_TIMEOUT_MS: configService.get('DB_CONNECTION_TIMEOUT_MS', { infer: true }),
+                        DB_IDLE_TIMEOUT_MS: configService.get('DB_IDLE_TIMEOUT_MS', { infer: true }),
+                        DB_STATEMENT_TIMEOUT_MS: configService.get('DB_STATEMENT_TIMEOUT_MS', { infer: true }),
+                    });
+                },
+            }),
+            crypto_module_1.CryptoModule,
+            auth_module_1.AuthModule,
+            note_module_1.NoteModule,
+        ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
     })
