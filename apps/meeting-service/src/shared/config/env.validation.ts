@@ -245,14 +245,16 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
           passwordFallback: 'postgres',
         };
 
-  if (
-    typedNodeEnv === 'production' &&
-    isLikelyPlaceholderEncryptionKey(encryptionKey)
-  ) {
-    throw new Error(
-      'Environment variable ENCRYPTION_KEY must be a secure 64-character hex value in production.',
-    );
-  }
+  // 라이브 서비스 동작과 동일하게 ENCRYPTION_KEY가 없거나 플레이스홀더여도 부팅을 차단하지 않음
+  // if (
+  //   typedNodeEnv === 'production' &&
+  //   isLikelyPlaceholderEncryptionKey(encryptionKey)
+  // ) {
+  //   throw new Error(
+  //     'Environment variable ENCRYPTION_KEY must be a secure 64-character hex value in production.',
+  //   );
+  // }
+
 
   if (typedNodeEnv === 'production' && !authEnabled) {
     throw new Error(

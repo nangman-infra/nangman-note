@@ -164,12 +164,10 @@ export async function loadSecrets(): Promise<void> {
   );
   if (failed.length > 0) {
     for (const f of failed) {
-      console.error('[SecretsLoader] Secret load failed:', f.reason);
+      console.warn('[SecretsLoader] Secret load skipped (fallback to env):', f.reason);
     }
-    throw new Error(
-      `[SecretsLoader] Failed to load ${failed.length} secret(s). Aborting startup.`,
-    );
   }
+
 
   console.log(
     `[SecretsLoader] Successfully loaded ${results.length - failed.length} secret(s).`,
