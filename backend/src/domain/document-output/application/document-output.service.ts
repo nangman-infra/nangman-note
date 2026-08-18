@@ -1,12 +1,37 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  ExternalHyperlink,
+  HeadingLevel,
+  LevelFormat,
+  Packer,
+  Paragraph,
+  ShadingType,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  WidthType,
+  type IParagraphOptions,
+} from 'docx';
 import MarkdownIt from 'markdown-it';
 import { ResultService } from '../../result/application/result.service';
 import type { ExportFormat } from '../domain/export-format.type';
 import type { ExportedDocument } from '../domain/exported-document.interface';
 import { PDF_RENDERER, type PdfRendererPort } from './ports/pdf-renderer.port';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
+
+type DocxBlock = Paragraph | Table;
+
+interface InlineStyle {
+  bold?: boolean;
+  italics?: boolean;
+  strike?: boolean;
+  code?: boolean;
+}
 
 @Injectable()
 export class DocumentOutputService {
@@ -151,39 +176,51 @@ export class DocumentOutputService {
     return markdown;
   }
 
+  /**
+   * Markdown → 서식 보존 DOCX 변환.
+   * 헤딩 레벨, 불릿/번호 리스트, 표, 인용, 코드블록, 인라인 서식
+   * (굵게/기울임/취소선/코드/링크)을 실제 Word 요소로 매핑합니다.
+   */
   private async renderDocxBuffer(
     title: string,
     content: string,
   ): Promise<Buffer> {
-    const bodyLines = this.convertMarkdownToPlainLines(content);
-    const children: Paragraph[] = [
+    const children: DocxBlock[] = [
       new Paragraph({
-        children: [
-          new TextRun({
-            text: title,
-            bold: true,
-            size: 32,
-          }),
-        ],
+        heading: HeadingLevel.TITLE,
+        children: [new TextRun({ text: title, bold: true })],
+        spacing: { after: 240 },
       }),
-      new Paragraph({ text: '' }),
+      ...this.convertMarkdownToDocxBlocks(content),
     ];
 
-    for (const line of bodyLines) {
-      const cleaned = line.trim();
-      if (cleaned.length === 0) {
-        children.push(new Paragraph({ text: '' }));
-        continue;
-      }
-
-      children.push(
-        new Paragraph({
-          children: [new TextRun({ text: cleaned, size: 22 })],
-        }),
-      );
-    }
-
     const document = new Document({
+      numbering: {
+        config: [
+          {
+            reference: 'md-ordered-list',
+            levels: [0, 1, 2, 3].map((level) => ({
+              level,
+              format: LevelFormat.DECIMAL,
+              text: `%${level + 1}.`,
+              alignment: AlignmentType.START,
+              style: {
+                paragraph: {
+                  indent: { left: 720 * (level + 1), hanging: 360 },
+                },
+              },
+            })),
+          },
+        ],
+      },
+      styles: {
+        default: {
+          document: {
+            run: { size: 22, font: 'Malgun Gothic' },
+            paragraph: { spacing: { after: 120, line: 300 } },
+          },
+        },
+      },
       sections: [
         {
           properties: {},
@@ -195,123 +232,313 @@ export class DocumentOutputService {
     return Packer.toBuffer(document);
   }
 
-  private convertMarkdownToPlainLines(markdown: string): string[] {
+  private convertMarkdownToDocxBlocks(markdown: string): DocxBlock[] {
     const sourceLines = markdown.replace(/\r\n/g, '\n').split('\n');
-    const lines: string[] = [];
+    const blocks: DocxBlock[] = [];
     let inCodeBlock = false;
+    let codeBlockLines: string[] = [];
+    let tableRows: string[][] = [];
+
+    const flushTable = () => {
+      if (tableRows.length === 0) return;
+      blocks.push(this.buildDocxTable(tableRows));
+      tableRows = [];
+    };
+
+    const flushCodeBlock = () => {
+      for (const codeLine of codeBlockLines) {
+        blocks.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: codeLine.length > 0 ? codeLine : ' ',
+                font: 'Consolas',
+                size: 18,
+              }),
+            ],
+            shading: {
+              type: ShadingType.CLEAR,
+              fill: 'F1F5F9',
+            },
+            spacing: { after: 0 },
+          }),
+        );
+      }
+      codeBlockLines = [];
+    };
 
     for (const rawLine of sourceLines) {
       const trimmed = rawLine.trim();
 
+      // 코드블록 경계
       if (trimmed.startsWith('```')) {
+        if (inCodeBlock) {
+          flushCodeBlock();
+        } else {
+          flushTable();
+        }
         inCodeBlock = !inCodeBlock;
-        lines.push('');
         continue;
       }
-
       if (inCodeBlock) {
-        lines.push(rawLine.length > 0 ? `    ${rawLine}` : '');
+        codeBlockLines.push(rawLine);
         continue;
       }
 
+      // 표 행
+      const tableRowMatch = rawLine.match(/^\s*\|(.+)\|\s*$/);
+      if (tableRowMatch) {
+        const cells = tableRowMatch[1].split('|').map((cell) => cell.trim());
+        // 구분선 행 (|---|---|)은 스킵
+        if (cells.every((cell) => /^:?-{2,}:?$/.test(cell) || cell === '')) {
+          continue;
+        }
+        tableRows.push(cells);
+        continue;
+      }
+      flushTable();
+
+      if (trimmed.length === 0) {
+        continue;
+      }
+
+      // 수평선
       if (/^([-*_])\1{2,}$/.test(trimmed)) {
-        lines.push('');
-        continue;
-      }
-
-      const headingMatch = rawLine.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
-      if (headingMatch) {
-        lines.push(this.stripMarkdownInline(headingMatch[2]).trim());
-        lines.push('');
-        continue;
-      }
-
-      const quoteMatch = rawLine.match(/^\s{0,3}>\s?(.*)$/);
-      if (quoteMatch) {
-        const quoteContent = this.stripMarkdownInline(quoteMatch[1]).trim();
-        lines.push(quoteContent.length > 0 ? `인용: ${quoteContent}` : '');
-        continue;
-      }
-
-      const unorderedMatch = rawLine.match(/^(\s*)[-*+]\s+(.*)$/);
-      if (unorderedMatch) {
-        const indent = Math.min(Math.floor(unorderedMatch[1].length / 2), 3);
-        const bulletContent = this.stripMarkdownInline(
-          unorderedMatch[2],
-        ).trim();
-        lines.push(`${'  '.repeat(indent)}• ${bulletContent}`);
-        continue;
-      }
-
-      const orderedMatch = rawLine.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
-      if (orderedMatch) {
-        const indent = Math.min(Math.floor(orderedMatch[1].length / 2), 3);
-        const numberContent = this.stripMarkdownInline(orderedMatch[3]).trim();
-        lines.push(
-          `${'  '.repeat(indent)}${orderedMatch[2]}. ${numberContent}`,
+        blocks.push(
+          new Paragraph({
+            border: {
+              bottom: {
+                style: BorderStyle.SINGLE,
+                size: 6,
+                color: 'D1D5DB',
+              },
+            },
+            spacing: { after: 160 },
+          }),
         );
         continue;
       }
 
-      const tableRowMatch = rawLine.match(/^\s*\|(.+)\|\s*$/);
-      if (tableRowMatch) {
-        const cells = tableRowMatch[1].split('|').map((cell) => cell.trim());
-        if (cells.every((cell) => /^[-:]+$/.test(cell))) {
-          continue;
-        }
-        lines.push(cells.filter((cell) => cell.length > 0).join(' | '));
+      // 헤딩
+      const headingMatch = rawLine.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        blocks.push(
+          new Paragraph({
+            heading: this.mapHeadingLevel(level),
+            children: this.parseInlineRuns(headingMatch[2]),
+            spacing: { before: 240, after: 120 },
+          }),
+        );
         continue;
       }
 
-      lines.push(this.stripMarkdownInline(rawLine).trim());
-    }
-
-    return this.compressBlankLines(lines);
-  }
-
-  private stripMarkdownInline(source: string): string {
-    let line = source;
-
-    line = line.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, altText: string) =>
-      altText?.trim().length > 0 ? `[이미지: ${altText.trim()}]` : '[이미지]',
-    );
-    line = line.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
-    line = line.replace(/`([^`]+)`/g, '$1');
-    line = line.replace(/\*\*([^*]+)\*\*/g, '$1');
-    line = line.replace(/__([^_]+)__/g, '$1');
-    line = line.replace(/\*([^*]+)\*/g, '$1');
-    line = line.replace(/_([^_]+)_/g, '$1');
-    line = line.replace(/~~([^~]+)~~/g, '$1');
-    line = line.replace(/\\([\\`*_{}()[\]#+\-.!>])/g, '$1');
-    line = line.replace(/\s+/g, ' ');
-
-    return line;
-  }
-
-  private compressBlankLines(lines: string[]): string[] {
-    const compact: string[] = [];
-    let previousWasBlank = false;
-
-    for (const line of lines) {
-      const isBlank = line.trim().length === 0;
-      if (isBlank) {
-        if (!previousWasBlank) {
-          compact.push('');
-        }
-      } else {
-        compact.push(line);
+      // 인용
+      const quoteMatch = rawLine.match(/^\s{0,3}>\s?(.*)$/);
+      if (quoteMatch) {
+        blocks.push(
+          new Paragraph({
+            children: this.parseInlineRuns(quoteMatch[1], {
+              italics: true,
+            }),
+            indent: { left: 360 },
+            border: {
+              left: {
+                style: BorderStyle.SINGLE,
+                size: 18,
+                color: 'CBD5E1',
+              },
+            },
+          }),
+        );
+        continue;
       }
-      previousWasBlank = isBlank;
+
+      // 불릿 리스트
+      const unorderedMatch = rawLine.match(/^(\s*)[-*+]\s+(.*)$/);
+      if (unorderedMatch) {
+        const level = Math.min(Math.floor(unorderedMatch[1].length / 2), 3);
+        blocks.push(
+          new Paragraph({
+            children: this.parseInlineRuns(unorderedMatch[2]),
+            bullet: { level },
+            spacing: { after: 60 },
+          }),
+        );
+        continue;
+      }
+
+      // 번호 리스트
+      const orderedMatch = rawLine.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
+      if (orderedMatch) {
+        const level = Math.min(Math.floor(orderedMatch[1].length / 2), 3);
+        blocks.push(
+          new Paragraph({
+            children: this.parseInlineRuns(orderedMatch[3]),
+            numbering: { reference: 'md-ordered-list', level },
+            spacing: { after: 60 },
+          }),
+        );
+        continue;
+      }
+
+      // 일반 문단
+      blocks.push(
+        new Paragraph({
+          children: this.parseInlineRuns(rawLine.trim()),
+        }),
+      );
     }
 
-    while (compact.length > 0 && compact[0] === '') {
-      compact.shift();
+    if (inCodeBlock) {
+      flushCodeBlock();
     }
-    while (compact.length > 0 && compact[compact.length - 1] === '') {
-      compact.pop();
+    flushTable();
+
+    if (blocks.length === 0) {
+      blocks.push(new Paragraph({ text: '문서 내용이 없습니다.' }));
     }
 
-    return compact;
+    return blocks;
+  }
+
+  private mapHeadingLevel(
+    level: number,
+  ): NonNullable<IParagraphOptions['heading']> {
+    switch (level) {
+      case 1:
+        return HeadingLevel.HEADING_1;
+      case 2:
+        return HeadingLevel.HEADING_2;
+      case 3:
+        return HeadingLevel.HEADING_3;
+      case 4:
+        return HeadingLevel.HEADING_4;
+      case 5:
+        return HeadingLevel.HEADING_5;
+      default:
+        return HeadingLevel.HEADING_6;
+    }
+  }
+
+  private buildDocxTable(rows: string[][]): Table {
+    const columnCount = Math.max(...rows.map((row) => row.length));
+
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: rows.map(
+        (cells, rowIndex) =>
+          new TableRow({
+            tableHeader: rowIndex === 0,
+            children: Array.from({ length: columnCount }, (_, columnIndex) => {
+              const cellText = cells[columnIndex] ?? '';
+              return new TableCell({
+                shading:
+                  rowIndex === 0
+                    ? { type: ShadingType.CLEAR, fill: 'F8FAFC' }
+                    : undefined,
+                children: [
+                  new Paragraph({
+                    children: this.parseInlineRuns(cellText, {
+                      bold: rowIndex === 0 || undefined,
+                    }),
+                    spacing: { after: 0 },
+                  }),
+                ],
+              });
+            }),
+          }),
+      ),
+    });
+  }
+
+  /**
+   * 인라인 마크다운(굵게/기울임/취소선/코드/링크)을 docx Run으로 변환.
+   */
+  private parseInlineRuns(
+    source: string,
+    baseStyle: InlineStyle = {},
+  ): Array<TextRun | ExternalHyperlink> {
+    const runs: Array<TextRun | ExternalHyperlink> = [];
+    // 이미지 → 대체 텍스트
+    const text = source.replace(
+      /!\[([^\]]*)\]\(([^)]+)\)/g,
+      (_, altText: string) =>
+        altText?.trim().length > 0 ? `[이미지: ${altText.trim()}]` : '[이미지]',
+    );
+
+    const INLINE_PATTERN =
+      /(\*\*([^*]+)\*\*)|(__([^_]+)__)|(~~([^~]+)~~)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(\*([^*\s][^*]*)\*)|(\b_([^_\s][^_]*)_\b)/g;
+
+    let cursor = 0;
+    let match: RegExpExecArray | null;
+
+    const pushPlain = (plain: string) => {
+      if (!plain) return;
+      runs.push(this.buildTextRun(plain, baseStyle));
+    };
+
+    while ((match = INLINE_PATTERN.exec(text)) !== null) {
+      pushPlain(text.slice(cursor, match.index));
+      cursor = match.index + match[0].length;
+
+      if (match[2] !== undefined || match[4] !== undefined) {
+        // **bold** / __bold__
+        runs.push(
+          this.buildTextRun(match[2] ?? match[4], { ...baseStyle, bold: true }),
+        );
+      } else if (match[6] !== undefined) {
+        // ~~strike~~
+        runs.push(this.buildTextRun(match[6], { ...baseStyle, strike: true }));
+      } else if (match[8] !== undefined) {
+        // `code`
+        runs.push(this.buildTextRun(match[8], { ...baseStyle, code: true }));
+      } else if (match[10] !== undefined && match[11] !== undefined) {
+        // [text](url)
+        runs.push(
+          new ExternalHyperlink({
+            link: match[11],
+            children: [
+              new TextRun({
+                text: match[10],
+                style: 'Hyperlink',
+                bold: baseStyle.bold,
+                italics: baseStyle.italics,
+              }),
+            ],
+          }),
+        );
+      } else if (match[13] !== undefined || match[15] !== undefined) {
+        // *italic* / _italic_
+        runs.push(
+          this.buildTextRun(match[13] ?? match[15], {
+            ...baseStyle,
+            italics: true,
+          }),
+        );
+      }
+    }
+
+    pushPlain(text.slice(cursor));
+
+    if (runs.length === 0) {
+      runs.push(this.buildTextRun(' ', baseStyle));
+    }
+
+    return runs;
+  }
+
+  private buildTextRun(text: string, style: InlineStyle): TextRun {
+    return new TextRun({
+      text,
+      bold: style.bold,
+      italics: style.italics,
+      strike: style.strike,
+      font: style.code ? 'Consolas' : undefined,
+      shading: style.code
+        ? { type: ShadingType.CLEAR, fill: 'F1F5F9' }
+        : undefined,
+    });
   }
 
   private escapeHtml(value: string): string {

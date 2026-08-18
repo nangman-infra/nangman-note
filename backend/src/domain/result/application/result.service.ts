@@ -19,7 +19,10 @@ import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-s
 import { RegenerateResultDto } from './dto/regenerate-result.dto';
 import { UpdateResultDto } from './dto/update-result.dto';
 import { ResultEntity } from '../domain/result.entity';
-import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
+import {
+  BedrockMaxTokensError,
+  BedrockService,
+} from '../../../shared/aws/bedrock/bedrock.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
 import {
@@ -71,8 +74,21 @@ export class ResultService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  isRegenerating(meetingId: string): boolean {
-    return this.regeneratingMeetings.has(meetingId);
+  /**
+   * 재생성 진행 여부.
+   * 인메모리 Set은 단일 인스턴스 fast-path일 뿐이며, 진실 원천은 DB의
+   * processing_phase입니다 (다중 인스턴스·서버 재시작에서도 일관되도록).
+   */
+  async isRegenerating(meetingId: string): Promise<boolean> {
+    if (this.regeneratingMeetings.has(meetingId)) {
+      return true;
+    }
+    try {
+      const meeting = await this.meetingService.findById(meetingId);
+      return meeting.processingPhase === MeetingProcessingPhase.REGENERATING;
+    } catch {
+      return false;
+    }
   }
 
   async findByMeetingId(
@@ -179,13 +195,23 @@ export class ResultService {
     dto: RegenerateResultDto,
     ownerSub?: string,
   ): Promise<void> {
-    if (this.regeneratingMeetings.has(meetingId)) {
+    const meeting = await this.meetingService.findById(meetingId, ownerSub);
+
+    // 중복 재생성 방지 — DB phase 기반 (다중 인스턴스 대응).
+    // 단, phase가 REGENERATING인 채 오래 방치된 경우(서버 재시작으로 락 유실)는
+    // 고착으로 간주하고 새 재생성을 허용한다.
+    const REGENERATION_STALE_MS = 15 * 60 * 1000;
+    const isPhaseRegenerating =
+      meeting.processingPhase === MeetingProcessingPhase.REGENERATING &&
+      Date.now() - meeting.updatedAt.getTime() < REGENERATION_STALE_MS;
+    if (this.regeneratingMeetings.has(meetingId) || isPhaseRegenerating) {
       throw new BadRequestException(
         `Meeting ${meetingId} is already being regenerated`,
       );
     }
 
-    // 프롬프트 존재 확인 + 변경 (동기)
+    // 프롬프트 존재 확인 + 변경 (동기) — 실패 시 롤백을 위해 원본 보관
+    const originalPromptId = meeting.promptId;
     await this.promptService.ensureExists(dto.promptId, ownerSub);
     await this.meetingService.updatePrompt(
       meetingId,
@@ -198,12 +224,19 @@ export class ResultService {
 
     // 중복 방지 잠금 + started 이벤트
     this.regeneratingMeetings.add(meetingId);
-    await this.meetingService.updateProcessingPhase(
-      meetingId,
-      MeetingProcessingPhase.REGENERATING,
-      ownerSub,
-      { status: MeetingStatus.COMPLETED },
-    );
+    try {
+      await this.meetingService.updateProcessingPhase(
+        meetingId,
+        MeetingProcessingPhase.REGENERATING,
+        ownerSub,
+        { status: MeetingStatus.COMPLETED },
+      );
+    } catch (error) {
+      // phase 기록 실패 시 인메모리 락을 반드시 해제한다.
+      // (해제하지 않으면 서버 재시작 전까지 재생성이 영구 400으로 막힌다)
+      this.regeneratingMeetings.delete(meetingId);
+      throw error;
+    }
     this.logger.log('result.regeneration.started', {
       meetingId,
       promptId: dto.promptId,
@@ -218,6 +251,7 @@ export class ResultService {
     void this.executeRegenerateInBackground(
       meetingId,
       dto.promptId,
+      originalPromptId,
       ownerSub,
       getRequestContext(),
     );
@@ -226,6 +260,7 @@ export class ResultService {
   private executeRegenerateInBackground(
     meetingId: string,
     promptId: string,
+    originalPromptId: string,
     ownerSub?: string,
     requestContext?: RequestContextStore,
   ): void {
@@ -287,12 +322,43 @@ export class ResultService {
             promptId,
             ownerSub,
           });
-          await this.meetingService.updateProcessingPhase(
-            meetingId,
-            null,
-            ownerSub,
-            { status: MeetingStatus.COMPLETED },
-          );
+
+          // 재생성이 실패했으므로 회의의 프롬프트를 원래대로 되돌린다.
+          // (프롬프트만 바뀐 채 결과 내용은 이전 것으로 남는 불일치 방지)
+          try {
+            await this.meetingService.updatePrompt(
+              meetingId,
+              { promptId: originalPromptId },
+              ownerSub,
+            );
+          } catch (revertError) {
+            this.logger.warn('result.regeneration.prompt_revert_failed', {
+              meetingId,
+              originalPromptId,
+              errorMessage:
+                revertError instanceof Error
+                  ? revertError.message
+                  : 'Unknown error',
+            });
+          }
+
+          try {
+            await this.meetingService.updateProcessingPhase(
+              meetingId,
+              null,
+              ownerSub,
+              { status: MeetingStatus.COMPLETED },
+            );
+          } catch (phaseError) {
+            // phase 초기화 실패는 stalled recovery가 정리한다 — 크래시 방지
+            this.logger.warn('result.regeneration.phase_reset_failed', {
+              meetingId,
+              errorMessage:
+                phaseError instanceof Error
+                  ? phaseError.message
+                  : 'Unknown error',
+            });
+          }
 
           this.eventEmitter.emit(
             ResultRegenerateEvent.EVENT_NAME,
@@ -593,6 +659,12 @@ export class ResultService {
           errorMessage:
             error instanceof Error ? error.message : 'Unknown error',
         });
+
+        // max_tokens 잘림은 같은 파라미터로 재시도해도 동일하게 실패하므로
+        // 즉시 레거시 폴백 경로로 넘어간다.
+        if (error instanceof BedrockMaxTokensError) {
+          break;
+        }
       }
     }
 
@@ -1031,8 +1103,10 @@ export class ResultService {
   ): AiTranscriptSegment[] {
     if (segments.length === 0) return [];
 
-    // 한국어 필러/간투사 정규식 (한국음성학회 담화표지 '아','어','음' 연구 + Quizlet 필러 목록 기반)
-    const FILLER_ONLY_REGEX = /^[어음아네예응그저막자뭐에오]+[.?!]?$/;
+    // 한국어 필러/간투사 정규식 (한국음성학회 담화표지 '아','어','음' 연구 기반)
+    // 주의: '네', '예', '응' 같은 짧은 대답은 회의에서 합의/승인 신호이므로
+    // 제거 대상에서 제외한다 (망설임 소리만 필터링).
+    const FILLER_ONLY_REGEX = /^[어음아으흠에]+[.?!]?$/;
     const PUNCTUATION_ONLY_REGEX = /^[.?!,;:…]+$/;
 
     // 1. startTime 기준 정렬 (안전장치)

@@ -12,6 +12,8 @@ export interface StreamingTranscriptEvent {
   endTime: number;
   /** 결과 ID (Transcribe ResultId) */
   resultId: string;
+  /** 세그먼트 평균 confidence (0~1, 제공되지 않으면 undefined) */
+  confidence?: number;
   /** 감지된 언어 코드 (IdentifyLanguage 사용 시) */
   detectedLanguage?: string;
   /** Speaker Diarization 라벨 (e.g. 'spk_0') */

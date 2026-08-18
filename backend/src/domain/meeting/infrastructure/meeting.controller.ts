@@ -54,6 +54,12 @@ export class MeetingController {
     return this.meetingService.search(query, user?.sub);
   }
 
+  /** 사용자의 전체 회의 데이터(노트·결과·전사 포함)를 JSON으로 내보내기 */
+  @Get('export')
+  async exportAll(@CurrentUser() user?: AuthUser) {
+    return this.meetingService.exportAllData(user?.sub);
+  }
+
   @Post('bulk/delete')
   async bulkRemove(
     @Body() dto: BulkMeetingIdsDto,

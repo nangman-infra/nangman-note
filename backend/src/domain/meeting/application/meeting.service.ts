@@ -119,6 +119,63 @@ export class MeetingService {
     };
   }
 
+  /**
+   * 사용자의 전체 회의 데이터를 노트·결과·전사 포함으로 직렬화합니다.
+   * (설정 화면의 "전체 회의 내보내기(JSON)" 기능)
+   */
+  async exportAllData(ownerSub?: string): Promise<{
+    exportedAt: string;
+    meetingCount: number;
+    meetings: Array<Record<string, unknown>>;
+  }> {
+    const meetings = await this.meetingRepository.find({
+      where: ownerSub ? { ownerSub } : undefined,
+      relations: ['note', 'result', 'transcripts'],
+      order: { startedAt: 'DESC' },
+    });
+
+    return {
+      exportedAt: new Date().toISOString(),
+      meetingCount: meetings.length,
+      meetings: meetings.map((meeting) => ({
+        id: meeting.id,
+        title: meeting.title,
+        agenda: meeting.agenda,
+        status: meeting.status,
+        transcriptionMode: meeting.transcriptionMode,
+        languageCode: meeting.languageCode,
+        translateTargetLanguage: meeting.translateTargetLanguage,
+        startedAt: meeting.startedAt,
+        endedAt: meeting.endedAt,
+        deletedAt: meeting.deletedAt,
+        note: meeting.note
+          ? {
+              content: meeting.note.content,
+              updatedAt: meeting.note.updatedAt,
+            }
+          : null,
+        result: meeting.result
+          ? {
+              content: meeting.result.content,
+              metadata: meeting.result.metadata,
+              updatedAt: meeting.result.updatedAt,
+            }
+          : null,
+        transcripts: (meeting.transcripts ?? [])
+          .slice()
+          .sort((a, b) => a.startTime - b.startTime)
+          .map((segment) => ({
+            startTime: segment.startTime,
+            endTime: segment.endTime,
+            text: segment.text,
+            translatedText: segment.translatedText,
+            speakerLabel: segment.speakerLabel,
+            detectedLanguage: segment.detectedLanguage,
+          })),
+      })),
+    };
+  }
+
   async listTrash(
     query: ListMeetingsQueryDto,
     ownerSub?: string,
@@ -289,6 +346,18 @@ export class MeetingService {
     ownerSub?: string,
   ): Promise<MeetingEntity> {
     const meeting = await this.findById(id, ownerSub);
+
+    // 상태 전이 가드: 이미 종결된 회의를 다시 PROCESSING으로 되돌리지 않는다.
+    // (이중 클릭, 두 탭, 프론트의 실패 후 재호출 등에서 COMPLETED가
+    // PROCESSING으로 회귀하며 상태 플래그가 덮어써지는 문제 방지)
+    if (meeting.status === MeetingStatus.COMPLETED) {
+      this.logger.log('meeting.complete.idempotent_skip', {
+        meetingId: meeting.id,
+        ownerSub: meeting.ownerSub,
+      });
+      return meeting;
+    }
+
     const skipTranscription = options?.skipTranscription ?? false;
     const markAttentionRequired = options?.markAttentionRequired ?? false;
 

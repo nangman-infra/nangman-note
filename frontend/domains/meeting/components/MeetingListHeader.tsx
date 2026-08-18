@@ -13,6 +13,7 @@ import type { SidebarTimeFilter } from '@/components/layout/Sidebar';
 import type { MeetingFilterKey, MeetingSortKey } from './meetingListConfig';
 import { MeetingListFilterToolbar } from './MeetingListFilterToolbar';
 import { MeetingListSearchBox } from './MeetingListSearchBox';
+import type { MeetingSearchScope } from './useMeetingListSearch';
 import type { MeetingPromptFilterOption } from './useMeetingListController';
 
 interface MeetingListHeaderProps {
@@ -30,6 +31,8 @@ interface MeetingListHeaderProps {
   inputRef: RefObject<HTMLInputElement | null>;
   searchQuery: string;
   setSearchQuery: Dispatch<SetStateAction<string>>;
+  searchScope?: MeetingSearchScope;
+  onSearchScopeChange?: (scope: MeetingSearchScope) => void;
   isSearchApplied: boolean;
   isSuggestionOpen: boolean;
   activeDescendantIndex: number;
@@ -66,6 +69,8 @@ export function MeetingListHeader({
   inputRef,
   searchQuery,
   setSearchQuery,
+  searchScope,
+  onSearchScopeChange,
   isSearchApplied,
   isSuggestionOpen,
   activeDescendantIndex,
@@ -155,6 +160,8 @@ export function MeetingListHeader({
           inputRef={inputRef}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          searchScope={searchScope}
+          onSearchScopeChange={onSearchScopeChange}
           isSuggestionOpen={isSuggestionOpen}
           activeDescendantIndex={activeDescendantIndex}
           recentSearches={recentSearches}

@@ -7,11 +7,9 @@ const runtimeMode = runtimeModeSchema.parse(process.env.NODE_ENV || 'development
 const commonSchema = z.object({
   NEXT_PUBLIC_APP_NAME: z.string().trim().min(1).default('TransNote'),
   NEXT_PUBLIC_APP_VERSION: z.string().trim().min(1).default('1.0.0'),
-  NEXT_PUBLIC_ENABLE_OFFLINE: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((value) => value === 'true'),
   NEXT_PUBLIC_AUTO_SAVE_DELAY: z.coerce.number().int().min(500).max(10000).default(3000),
+  NEXT_PUBLIC_ANALYTICS_SCRIPT_URL: z.string().trim().default(''),
+  NEXT_PUBLIC_ANALYTICS_SITE_ID: z.string().trim().default(''),
 });
 
 /**
@@ -31,8 +29,10 @@ const parsedEnv = envSchema.safeParse({
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
   NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
-  NEXT_PUBLIC_ENABLE_OFFLINE: process.env.NEXT_PUBLIC_ENABLE_OFFLINE,
   NEXT_PUBLIC_AUTO_SAVE_DELAY: process.env.NEXT_PUBLIC_AUTO_SAVE_DELAY,
+  NEXT_PUBLIC_ANALYTICS_SCRIPT_URL:
+    process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL,
+  NEXT_PUBLIC_ANALYTICS_SITE_ID: process.env.NEXT_PUBLIC_ANALYTICS_SITE_ID,
 });
 
 if (!parsedEnv.success) {
@@ -49,8 +49,10 @@ export const env = Object.freeze({
   API_URL: parsedEnv.data.NEXT_PUBLIC_API_URL,
   APP_NAME: parsedEnv.data.NEXT_PUBLIC_APP_NAME,
   APP_VERSION: parsedEnv.data.NEXT_PUBLIC_APP_VERSION,
-  ENABLE_OFFLINE: parsedEnv.data.NEXT_PUBLIC_ENABLE_OFFLINE,
   AUTO_SAVE_DELAY: parsedEnv.data.NEXT_PUBLIC_AUTO_SAVE_DELAY,
+  /** opt-in 웹 분석 스크립트 (빈 문자열이면 비활성) */
+  ANALYTICS_SCRIPT_URL: parsedEnv.data.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL,
+  ANALYTICS_SITE_ID: parsedEnv.data.NEXT_PUBLIC_ANALYTICS_SITE_ID,
 });
 
 /**

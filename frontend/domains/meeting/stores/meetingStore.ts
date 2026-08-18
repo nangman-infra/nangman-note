@@ -20,6 +20,11 @@ interface MeetingState {
   elapsedTime: number;
   meetings: Meeting[];
   trashMeetings: Meeting[];
+  /** 서버에 더 불러올 이전 회의가 남아 있는지 */
+  hasMoreMeetings: boolean;
+  /** 현재까지 로드한 서버 페이지 수 */
+  meetingsPage: number;
+  isLoadingMore: boolean;
   isLoading: boolean;
   error: string | null;
   startMeeting: (dto: CreateMeetingDto) => Promise<Meeting | null>;
@@ -29,6 +34,8 @@ interface MeetingState {
   }) => Promise<boolean>;
   updatePrompt: (promptId: string) => Promise<Meeting | null>;
   fetchMeetings: (options?: { silent?: boolean }) => Promise<void>;
+  /** 다음 페이지의 이전 회의를 이어서 로드 (서버 페이지네이션) */
+  loadMoreMeetings: () => Promise<void>;
   fetchTrashMeetings: (options?: { silent?: boolean }) => Promise<void>;
   searchMeetings: (query: string, scope?: string) => Promise<void>;
   deleteMeeting: (id: string) => Promise<boolean>;
@@ -51,6 +58,8 @@ interface MeetingState {
   }) => void;
 }
 
+const MEETINGS_PAGE_SIZE = 50;
+
 function mapSearchResultToMeeting(result: SearchResult): Meeting {
   const fallbackCompletionState =
     result.completionState ?? getFallbackCompletionState(result);
@@ -67,6 +76,9 @@ function mapSearchResultToMeeting(result: SearchResult): Meeting {
     startedAt: result.startedAt,
     createdAt: result.startedAt,
     updatedAt: result.startedAt,
+    // 검색 문맥 정보 보존 — 검색 결과 카드에서 매치 위치·스니펫 표시
+    searchMatchedIn: result.matchedIn,
+    searchSnippet: result.snippet,
   };
 }
 
@@ -84,6 +96,9 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   elapsedTime: 0,
   meetings: [],
   trashMeetings: [],
+  hasMoreMeetings: false,
+  meetingsPage: 1,
+  isLoadingMore: false,
   isLoading: false,
   error: null,
 
@@ -148,12 +163,36 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       if (shouldShowLoading) {
         set({ isLoading: true, error: null });
       }
-      const meetings = await meetingApi.list();
-      set((state) => ({
-        meetings,
-        error: null,
-        isLoading: shouldShowLoading ? false : state.isLoading,
-      }));
+      // silent 갱신은 사용자가 이미 펼친 페이지 범위를 모두 다시 읽는다.
+      // 첫 페이지만 새 응답에 섞으면 삭제된 tail 회의를 구분할 수 없어
+      // 유령 항목으로 남는다.
+      const loadedPageCount = options?.silent ? get().meetingsPage : 1;
+      const pages = await Promise.all(
+        Array.from({ length: loadedPageCount }, (_, index) =>
+          meetingApi.list({
+            page: index + 1,
+            limit: MEETINGS_PAGE_SIZE,
+          }),
+        ),
+      );
+      const meetings = pages.flat();
+      const lastPage = pages[pages.length - 1] ?? [];
+      set((state) => {
+        const seenIds = new Set<string>();
+        const uniqueMeetings = meetings.filter((meeting) => {
+          if (seenIds.has(meeting.id)) return false;
+          seenIds.add(meeting.id);
+          return true;
+        });
+
+        return {
+          meetings: uniqueMeetings,
+          hasMoreMeetings: lastPage.length === MEETINGS_PAGE_SIZE,
+          meetingsPage: options?.silent ? loadedPageCount : 1,
+          error: null,
+          isLoading: shouldShowLoading ? false : state.isLoading,
+        };
+      });
     } catch (error) {
       if (shouldShowLoading) {
         set({
@@ -161,6 +200,38 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
           isLoading: false,
         });
       }
+    }
+  },
+
+  loadMoreMeetings: async () => {
+    const { meetingsPage, isLoadingMore, hasMoreMeetings } = get();
+    if (isLoadingMore || !hasMoreMeetings) return;
+
+    try {
+      set({ isLoadingMore: true });
+      const nextPage = meetingsPage + 1;
+      const older = await meetingApi.list({
+        page: nextPage,
+        limit: MEETINGS_PAGE_SIZE,
+      });
+      set((state) => {
+        const existingIds = new Set(state.meetings.map((meeting) => meeting.id));
+        const appended = older.filter((meeting) => !existingIds.has(meeting.id));
+        return {
+          meetings: [...state.meetings, ...appended],
+          meetingsPage: nextPage,
+          hasMoreMeetings: older.length === MEETINGS_PAGE_SIZE,
+          isLoadingMore: false,
+        };
+      });
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to load more meetings',
+        isLoadingMore: false,
+      });
     }
   },
 

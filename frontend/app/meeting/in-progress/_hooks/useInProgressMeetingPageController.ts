@@ -23,6 +23,7 @@ import {
   type UploadState,
   useMediaRecorder,
   useTranscription,
+  useWakeLock,
 } from '@/domains/transcription';
 import type { InProgressWorkspace } from '../_components/InProgressWorkspace';
 import {
@@ -75,6 +76,8 @@ export interface InProgressMeetingViewProps {
   onMobilePanelChange: (panel: MobilePanel) => void;
   onProcessingComplete: () => void;
   onProcessingGoHome: () => void;
+  onRetryUpload: () => void | Promise<void>;
+  onContinueWithoutAudio: () => void | Promise<void>;
   onShowSummaryInfo: () => void;
   onSaveNote: () => Promise<void>;
   onEndConfirm: () => void | Promise<void>;
@@ -88,7 +91,7 @@ export type InProgressMeetingPageState =
 
 export function useInProgressMeetingPageController(): InProgressMeetingPageState {
   const router = useRouter();
-  const { pushToast, pushUndoToast } = useFeedback();
+  const { pushToast } = useFeedback();
   const { currentMeeting, isLoading, error, endMeeting, setCurrentMeeting } =
     useMeeting();
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -122,6 +125,7 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
     error: recorderError,
     startRecording,
     stopRecording,
+    assembleSessions,
     cleanupChunks,
   } = useMediaRecorder();
   const {
@@ -198,9 +202,14 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
     showEndDialog,
     setShowEndDialog,
     isEnding,
+    isUploadingAudio,
+    uploadFailed,
     handleEndConfirm,
+    handleRetryUpload,
+    handleContinueWithoutAudio,
   } = useInProgressEndMeetingFlow({
     meetingId,
+    meetingStartedAt: currentMeeting?.startedAt ?? null,
     transcriptionMode,
     isRealtimeMode,
     recorderState,
@@ -210,10 +219,10 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
     stopStreaming,
     stopTranscriptionSession,
     stopRecording,
+    assembleSessions,
     uploadAudio,
     cleanupChunks,
     pushToast,
-    pushUndoToast,
     setCurrentMeeting,
     setMeetingIdFromQuery,
     setShowProcessing,
@@ -230,7 +239,19 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
     (isRealtimeMode &&
       (audioStreamingState === 'streaming' || audioStreamingState === 'stopping'));
   const noteIsDirty = useNoteStore((s) => s.isDirty);
-  useBeforeUnloadGuard(isActiveRecording || noteIsDirty);
+  // 종료 확정~업로드 완료 구간에도 이탈 가드를 유지한다.
+  // (이 구간에서 탭을 닫으면 회의가 RECORDING/업로드 미완 상태로 고착된다)
+  // 업로드 실패 후 재시도 대기 중에도 가드 — 이탈하면 보존된 청크에
+  // 다시 도달할 방법이 없어 데이터 유실이 확정된다.
+  useBeforeUnloadGuard(
+    isActiveRecording ||
+      noteIsDirty ||
+      isEnding ||
+      isUploadingAudio ||
+      uploadFailed,
+  );
+  // 녹음/스트리밍 중 화면 잠금으로 캡처가 끊기지 않도록 wake lock 유지
+  useWakeLock(isActiveRecording || isEnding || isUploadingAudio);
 
   useEffect(() => {
     if (!currentMeeting?.startedAt) return;
@@ -496,6 +517,8 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
       onMobilePanelChange: setMobilePanel,
       onProcessingComplete: handleProcessingComplete,
       onProcessingGoHome: handleProcessingGoHome,
+      onRetryUpload: handleRetryUpload,
+      onContinueWithoutAudio: handleContinueWithoutAudio,
       onShowSummaryInfo: handleShowSummaryInfo,
       onSaveNote: handleSaveNote,
       onEndConfirm: handleEndConfirm,

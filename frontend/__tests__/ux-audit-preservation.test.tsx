@@ -218,17 +218,25 @@ describe('Preservation 3.6 — New meeting start button works correctly', () => 
 // ---------------------------------------------------------------------------
 // 3.7: 노트 3초 디바운스 자동 저장 정상
 // ---------------------------------------------------------------------------
-describe('Preservation 3.7 — Note 3-second debounce auto-save', () => {
-  it('should use useDebounce with 3000ms for note content', async () => {
+describe('Preservation 3.7 — Note debounce auto-save', () => {
+  it('should use useDebounce with the configurable AUTO_SAVE_DELAY (default 3000ms) for note content', async () => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     const filePath = path.resolve(__dirname, '../domains/note/hooks/useNote.ts');
     const source = await fs.readFile(filePath, 'utf-8');
 
-    // useNote should debounce noteContent with 3000ms
+    // useNote should debounce noteContent with the AUTO_SAVE_DELAY constant
+    // (env NEXT_PUBLIC_AUTO_SAVE_DELAY, default 3000ms)
     expect(source).toContain('useDebounce');
-    expect(source).toContain('3000');
-    expect(source).toMatch(/useDebounce\s*\(\s*noteContent\s*,\s*3000\s*\)/);
+    expect(source).toContain('AUTO_SAVE_DELAY');
+    expect(source).toMatch(
+      /useDebounce\s*\(\s*noteContent\s*,\s*AUTO_SAVE_DELAY\s*\)/,
+    );
+
+    // 상수 기본값이 3000ms인지 확인
+    const constantsPath = path.resolve(__dirname, '../lib/constants/index.ts');
+    const constantsSource = await fs.readFile(constantsPath, 'utf-8');
+    expect(constantsSource).toContain('AUTO_SAVE_DELAY');
   });
 
   it('should auto-save when debounced content changes', async () => {

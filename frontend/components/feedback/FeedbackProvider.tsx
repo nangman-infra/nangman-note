@@ -78,24 +78,59 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  /**
+   * undo 토스트를 "실행 확정"으로 닫는다 (X 버튼 등).
+   * onExpire 콜백에 중요한 후속 동작(예: 회의 종료 처리)이 매달려 있을 수 있으므로,
+   * 단순 dismiss로 콜백을 증발시키지 않고 즉시 실행한 뒤 닫는다.
+   */
+  const settleUndoToast = useCallback(
+    (id: string) => {
+      const expire = expireCallbackMapRef.current.get(id);
+      dismissToast(id);
+      if (expire) {
+        expire();
+      }
+    },
+    [dismissToast],
+  );
+
   const MAX_TOASTS = 3;
+
+  /**
+   * 토스트 개수 초과 시 오래된 것부터 제거하되:
+   * - undo 토스트는 evict 대상에서 제외 (onExpire에 걸린 동작이 유실되면 안 됨)
+   * - 제거되는 토스트의 타이머·카운트다운·콜백을 모두 정리 (누수 방지)
+   */
+  const evictOverflowToasts = useCallback((next: ToastItem[]): ToastItem[] => {
+    while (next.length > MAX_TOASTS) {
+      const removableIndex = next.findIndex((toast) => !toast.isUndo);
+      if (removableIndex === -1) break; // 전부 undo 토스트면 제거하지 않음
+
+      const [removed] = next.splice(removableIndex, 1);
+      const timerId = timeoutMapRef.current.get(removed.id);
+      if (timerId) {
+        window.clearTimeout(timerId);
+        timeoutMapRef.current.delete(removed.id);
+      }
+      const countdownId = countdownMapRef.current.get(removed.id);
+      if (countdownId) {
+        window.clearInterval(countdownId);
+        countdownMapRef.current.delete(removed.id);
+      }
+      expireCallbackMapRef.current.delete(removed.id);
+    }
+    return next;
+  }, []);
 
   const pushToast = useCallback(
     ({ title, description, variant = 'info', durationMs = 2800 }: ToastOptions) => {
       const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      setToasts((prev) => {
-        const next = [...prev, { id, title, description, variant, durationMs }];
-        // Remove oldest toasts if exceeding the limit
-        while (next.length > MAX_TOASTS) {
-          const removed = next.shift()!;
-          const timerId = timeoutMapRef.current.get(removed.id);
-          if (timerId) {
-            window.clearTimeout(timerId);
-            timeoutMapRef.current.delete(removed.id);
-          }
-        }
-        return next;
-      });
+      setToasts((prev) =>
+        evictOverflowToasts([
+          ...prev,
+          { id, title, description, variant, durationMs },
+        ]),
+      );
 
       const timerId = window.setTimeout(() => {
         dismissToast(id);
@@ -103,7 +138,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
 
       timeoutMapRef.current.set(id, timerId);
     },
-    [dismissToast],
+    [dismissToast, evictOverflowToasts],
   );
 
   const pushUndoToast = useCallback(
@@ -111,8 +146,8 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       const id = `undo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const totalSeconds = Math.ceil(durationMs / 1000);
 
-      setToasts((prev) => {
-        const next = [
+      setToasts((prev) =>
+        evictOverflowToasts([
           ...prev,
           {
             id,
@@ -124,17 +159,8 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
             remainingSeconds: totalSeconds,
             onUndo,
           },
-        ];
-        while (next.length > MAX_TOASTS) {
-          const removed = next.shift()!;
-          const timerId = timeoutMapRef.current.get(removed.id);
-          if (timerId) {
-            window.clearTimeout(timerId);
-            timeoutMapRef.current.delete(removed.id);
-          }
-        }
-        return next;
-      });
+        ]),
+      );
 
       // Store the expire callback so we can call it when the timer fires
       expireCallbackMapRef.current.set(id, onExpire);
@@ -164,7 +190,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
 
       return id;
     },
-    [dismissToast],
+    [dismissToast, evictOverflowToasts],
   );
 
   // Handle undo click — dismiss toast and invoke onUndo callback
@@ -226,7 +252,9 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   aria-label="닫기"
-                  onClick={() => dismissToast(toast.id)}
+                  onClick={() =>
+                    toast.isUndo ? settleUndoToast(toast.id) : dismissToast(toast.id)
+                  }
                   className="rounded-md p-1 hover:bg-black/5"
                 >
                   <X className="h-3.5 w-3.5" />

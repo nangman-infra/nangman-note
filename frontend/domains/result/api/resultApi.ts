@@ -45,4 +45,13 @@ export const resultApi = {
     );
     return response.data;
   },
+
+  // Markdown 원문 다운로드
+  exportMD: async (meetingId: string): Promise<Blob> => {
+    const response = await apiClient.get(
+      `/api/v1/meetings/${meetingId}/result/export?format=md`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
 };

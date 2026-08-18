@@ -92,3 +92,114 @@
   color: #ffffff;
   background-color: rgba(32, 53, 189, 0.82);
 }
+
+/* ─── Dark Theme ─── */
+[data-theme='dark'] {
+  /* Surface hierarchy */
+  --bg-root: #0f1216;
+  --bg-elevated: rgba(24, 28, 34, 0.9);
+  --bg-card: #171b21;
+  --surface-container-low: #1c2129;
+  --surface-container: #21262f;
+  --surface-container-high: #262c36;
+  --surface-container-highest: #2c323d;
+
+  /* Ink */
+  --ink-strong: #e7eaee;
+  --ink-muted: #9aa1ad;
+  --ink-subtle: #c3c7d0;
+
+  /* Lines */
+  --line-soft: rgba(148, 163, 184, 0.14);
+  --line-strong: rgba(148, 163, 184, 0.28);
+  --outline-variant: #3d4450;
+
+  /* Brand */
+  --brand: #93a2ff;
+  --brand-strong: #a7b3ff;
+  --brand-container: #3e51d5;
+  --brand-fixed: #2a3466;
+  --brand-fixed-dim: #38427a;
+  --on-brand: #10143a;
+  --on-brand-container: #d6d9ff;
+
+  /* Tertiary */
+  --tertiary: #6fe3f5;
+  --tertiary-container: #00505a;
+  --tertiary-fixed: #073d46;
+  --tertiary-fixed-dim: #00b3c9;
+  --on-tertiary: #00272d;
+
+  /* Secondary */
+  --secondary: #aebad2;
+  --secondary-container: #2b3854;
+  --on-secondary-container: #cbd8f5;
+
+  /* Semantic */
+  --accent: #f0a04b;
+  --danger: #ff8f88;
+  --error-container: #5a1f1c;
+  --success: #4ade80;
+}
+
+[data-theme='dark'] ::selection {
+  background-color: rgba(147, 162, 255, 0.5);
+}
+
+/*
+ * 하드코딩된 Tailwind 팔레트 유틸리티의 다크 매핑.
+ * (컴포넌트 전반이 bg-white/text-slate-* 등을 직접 사용하므로,
+ * 다크 모드에서 해당 유틸리티를 표면/잉크 토큰으로 재매핑한다)
+ */
+[data-theme='dark'] .bg-white {
+  background-color: var(--bg-card);
+}
+[data-theme='dark'] .bg-white\/80,
+[data-theme='dark'] .bg-white\/90 {
+  background-color: rgba(23, 27, 33, 0.85);
+}
+[data-theme='dark'] .bg-slate-50,
+[data-theme='dark'] .bg-slate-100,
+[data-theme='dark'] .bg-slate-50\/80 {
+  background-color: var(--surface-container-low);
+}
+[data-theme='dark'] .bg-indigo-50,
+[data-theme='dark'] .bg-indigo-50\/40,
+[data-theme='dark'] .bg-indigo-50\/60,
+[data-theme='dark'] .bg-indigo-100 {
+  background-color: var(--brand-fixed);
+}
+[data-theme='dark'] .text-slate-900,
+[data-theme='dark'] .text-slate-800 {
+  color: var(--ink-strong);
+}
+[data-theme='dark'] .text-slate-700,
+[data-theme='dark'] .text-slate-600 {
+  color: var(--ink-subtle);
+}
+[data-theme='dark'] .text-slate-500,
+[data-theme='dark'] .text-slate-400 {
+  color: var(--ink-muted);
+}
+[data-theme='dark'] .text-indigo-600,
+[data-theme='dark'] .text-indigo-700 {
+  color: var(--brand);
+}
+[data-theme='dark'] .border-slate-200 {
+  border-color: var(--line-strong);
+}
+[data-theme='dark'] .hover\:bg-slate-50:hover,
+[data-theme='dark'] .hover\:bg-slate-100:hover,
+[data-theme='dark'] .hover\:bg-indigo-50:hover,
+[data-theme='dark'] .hover\:bg-indigo-50\/60:hover {
+  background-color: var(--surface-container-high);
+}
+[data-theme='dark'] .shadow-sm,
+[data-theme='dark'] .shadow-lg,
+[data-theme='dark'] .shadow-xl,
+[data-theme='dark'] .shadow-2xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.55);
+}
+[data-theme='dark'] .ring-white {
+  --tw-ring-color: var(--bg-card);
+}

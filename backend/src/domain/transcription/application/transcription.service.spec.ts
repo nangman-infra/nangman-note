@@ -594,6 +594,84 @@ describe('TranscriptionService', () => {
       expect(afterClearPayload?.startTime).toBe(1); // 오프셋 0
       expect(afterClearPayload?.endTime).toBe(5);
     });
+
+    it('does not compound the offset across multiple finals within the same session', async () => {
+      const payloads: RealtimeTranscriptPayload[] = [];
+
+      let onTranscriptHandler:
+        | ((event: {
+            type: 'partial' | 'final';
+            resultId: string;
+            text: string;
+            startTime: number;
+            endTime: number;
+          }) => void)
+        | undefined;
+
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({
+          transcriptionMode: MeetingTranscriptionMode.REALTIME,
+        }),
+      );
+
+      streamingProvider.startSession.mockImplementation((options) => {
+        onTranscriptHandler = options.onTranscript;
+        return Promise.resolve();
+      });
+
+      transcriptRepository.create.mockImplementation(
+        (entity) => entity as TranscriptSegmentEntity,
+      );
+      transcriptRepository.save.mockImplementation((entity) =>
+        Promise.resolve({ id: 'seg-x', ...entity } as TranscriptSegmentEntity),
+      );
+
+      // 이전 세션 누적분: DB 오프셋 100초
+      transcriptRepository.findOne.mockResolvedValueOnce({
+        endTime: 100,
+      } as TranscriptSegmentEntity);
+
+      await service.startRealtimeSession(
+        'meeting-1',
+        (payload) => payloads.push(payload),
+        jest.fn(),
+        jest.fn(),
+      );
+
+      // Transcribe Streaming 타임스탬프는 세션 시작 기준 누적값:
+      // final#1: 0~5s, final#2: 5~9s, final#3: 9~14s
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r1',
+        text: '첫 발화',
+        startTime: 0,
+        endTime: 5,
+      });
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r2',
+        text: '두 번째 발화',
+        startTime: 5,
+        endTime: 9,
+      });
+      onTranscriptHandler?.({
+        type: 'final',
+        resultId: 'r3',
+        text: '세 번째 발화',
+        startTime: 9,
+        endTime: 14,
+      });
+
+      const finals = payloads.filter(
+        (p): p is RealtimeTranscriptContentPayload =>
+          p.type === 'final' && 'startTime' in p,
+      );
+
+      // 세션 오프셋(100)이 고정 적용되어야 함 — 복리 누적 금지
+      expect(finals[0]).toMatchObject({ startTime: 100, endTime: 105 });
+      expect(finals[1]).toMatchObject({ startTime: 105, endTime: 109 });
+      expect(finals[2]).toMatchObject({ startTime: 109, endTime: 114 });
+    });
   });
 
   describe('listBatchJobsByMeetingId', () => {
@@ -839,20 +917,39 @@ describe('TranscriptionService', () => {
       });
     });
 
-    it('rejects queueing when meeting is not in batch mode', async () => {
+    it('auto-switches non-batch meetings to batch mode instead of rejecting', async () => {
+      // 실시간→배치 폴백 시 프론트의 모드 변경 API가 실패했을 수 있으므로,
+      // 배치 잡 요청 자체를 배치 전환 의사표시로 간주해 모드를 자동 전환한다.
       meetingService.findById.mockResolvedValue(
         buildMeeting({ transcriptionMode: MeetingTranscriptionMode.REALTIME }),
       );
-
-      await expect(
-        service.queueBatchJob('meeting-1', {
-          mediaUri: 's3://bucket/audio.wav',
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-
-      expect(batchTranscriptionProvider.submitBatchJob.mock.calls).toHaveLength(
-        0,
+      meetingService.updatePrompt.mockResolvedValue(
+        buildMeeting({ transcriptionMode: MeetingTranscriptionMode.BATCH }),
       );
+      batchTranscriptionProvider.submitBatchJob.mockResolvedValue({
+        providerJobId: 'aws-job-queued',
+        status: TranscriptionJobStatus.QUEUED,
+      });
+      transcriptionJobRepository.create.mockImplementation(
+        (entity) => entity as TranscriptionJobEntity,
+      );
+      transcriptionJobRepository.save.mockImplementation((entity) =>
+        Promise.resolve({
+          ...(entity as object),
+          id: (entity as TranscriptionJobEntity).id ?? 'job-1',
+        } as TranscriptionJobEntity),
+      );
+
+      const result = await service.queueBatchJob('meeting-1', {
+        mediaUri: 's3://bucket/audio.wav',
+      });
+
+      expect(meetingService.updatePrompt).toHaveBeenCalledWith(
+        'meeting-1',
+        { transcriptionMode: MeetingTranscriptionMode.BATCH },
+        undefined,
+      );
+      expect(result.status).toBe(TranscriptionJobStatus.QUEUED);
     });
 
     it('stores failed job and throws BadGatewayException when provider fails', async () => {

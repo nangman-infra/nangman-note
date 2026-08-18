@@ -129,6 +129,7 @@ export class AwsStreamingTranscriptionProvider
   private readonly sessions = new Map<string, ActiveSession>();
   private readonly client: TranscribeStreamingClient;
   private readonly maxBufferedAudioBytes: number;
+  private readonly vocabularyName: string | undefined;
 
   constructor(
     private readonly awsClientFactory: AwsClientFactory,
@@ -141,6 +142,14 @@ export class AwsStreamingTranscriptionProvider
         infer: true,
       }) || DEFAULT_MAX_BUFFERED_AUDIO_BYTES,
     );
+    // 커스텀 어휘 (전문용어 사전) — 설정된 경우에만 전달
+    const vocabulary = this.configService.get(
+      'AWS_TRANSCRIBE_VOCABULARY_NAME',
+      {
+        infer: true,
+      },
+    );
+    this.vocabularyName = vocabulary?.trim() || undefined;
   }
 
   onModuleInit(): void {
@@ -207,6 +216,10 @@ export class AwsStreamingTranscriptionProvider
       // 특정 언어 지정 — ShowSpeakerLabel은 LanguageCode 모드에서만 사용 가능
       commandInput.LanguageCode = languageCode as LanguageCode;
       commandInput.ShowSpeakerLabel = true;
+      // 커스텀 어휘는 언어 지정 모드에서만 지원
+      if (this.vocabularyName) {
+        commandInput.VocabularyName = this.vocabularyName;
+      }
     } else {
       // 자동 언어 감지
       commandInput.IdentifyLanguage = true;
@@ -225,8 +238,8 @@ export class AwsStreamingTranscriptionProvider
       sampleRate: effectiveSampleRate,
     });
 
-    // 비동기로 결과 수신 루프 실행
-    this.runResultLoop(meetingId, command, onTranscript, onError, onClose);
+    // 비동기로 결과 수신 루프 실행 (세션 객체를 넘겨 identity 기반으로 정리)
+    this.runResultLoop(session, command, onTranscript, onError, onClose);
   }
 
   feedAudio(meetingId: string, chunk: Buffer): boolean {
@@ -237,16 +250,28 @@ export class AwsStreamingTranscriptionProvider
 
   stopSession(meetingId: string): Promise<void> {
     const session = this.sessions.get(meetingId);
-    if (!session) return Promise.resolve();
+    if (!session || session.closed) return Promise.resolve();
 
     this.logger.log('transcription.streaming.session.stopping', {
       meetingId,
     });
 
     session.closed = true;
+    // 오디오 큐를 닫아 AWS가 잔여 오디오에 대한 마지막 final을 반환하도록 한다.
+    // 즉시 abort하면 사용자의 마지막 발화가 회의록에서 유실된다.
     session.audioQueue.end();
-    session.abortController.abort();
-    this.sessions.delete(meetingId);
+
+    // 드레인이 hang되지 않도록 일정 시간 후 강제 abort (안전망)
+    const forceAbortTimer = setTimeout(() => {
+      if (!session.abortController.signal.aborted) {
+        this.logger.warn('transcription.streaming.session.force_aborted', {
+          meetingId,
+        });
+        session.abortController.abort();
+      }
+    }, 5_000);
+    forceAbortTimer.unref?.();
+
     return Promise.resolve();
   }
 
@@ -261,6 +286,8 @@ export class AwsStreamingTranscriptionProvider
   }
 
   getActiveSessionCount(): number {
+    // 드레인 중(closed) 세션도 최대 5초간 실제 AWS 스트림을 점유하므로
+    // 용량 계산에 포함한다 (한도 초과 → LimitExceededException 연쇄 방지)
     return this.sessions.size;
   }
 
@@ -278,23 +305,32 @@ export class AwsStreamingTranscriptionProvider
 
   /**
    * Transcribe Streaming 결과 수신 루프 (비동기 실행)
+   *
+   * 세션 객체 identity를 기준으로 수명을 관리합니다.
+   * meetingId만으로 판별하면 세션 교체(replace) 시 구 루프가 신 세션을
+   * 파괴하거나(finally), 구 루프가 계속 살아서 이벤트를 emit하는 버그가
+   * 발생합니다.
    */
   private runResultLoop(
-    meetingId: string,
+    session: ActiveSession,
     command: StartStreamTranscriptionCommand,
     onTranscript: (event: StreamingTranscriptEvent) => void,
     onError: (error: Error) => void,
     onClose: () => void,
   ): void {
+    const meetingId = session.meetingId;
     void (async () => {
       try {
         this.logger.debug('transcription.streaming.command.sending', {
           meetingId,
         });
-        const response = await this.client.send(command);
-        const activeSession = this.sessions.get(meetingId);
-        if (activeSession) {
-          activeSession.ready = true;
+        // abortSignal을 실제로 연결 — 연결하지 않으면 stopSession의 abort()가
+        // 아무 효과 없는 dead code가 되어 hang된 스트림을 끊을 수 없다.
+        const response = await this.client.send(command, {
+          abortSignal: session.abortController.signal,
+        });
+        if (this.sessions.get(meetingId) === session) {
+          session.ready = true;
         }
         this.logger.debug('transcription.streaming.command.accepted', {
           meetingId,
@@ -318,8 +354,9 @@ export class AwsStreamingTranscriptionProvider
               keys: Object.keys(event),
             });
           }
-          // 세션이 이미 종료되었으면 루프 탈출
-          if (!this.sessions.has(meetingId)) break;
+          // 이 세션이 다른 세션으로 교체되었으면 루프 탈출.
+          // (closed 상태여도 map에 남아있는 동안은 잔여 final을 드레인한다)
+          if (this.sessions.get(meetingId) !== session) break;
 
           if (event.TranscriptEvent?.Transcript?.Results) {
             for (const result of event.TranscriptEvent.Transcript.Results) {
@@ -353,12 +390,33 @@ export class AwsStreamingTranscriptionProvider
                 }
               }
 
+              // 단어별 confidence 평균 (스트리밍 이벤트의 실제 신뢰도 전파)
+              let confidenceSum = 0;
+              let confidenceCount = 0;
+              for (const item of items) {
+                const itemConfidence = (item as Record<string, unknown>)
+                  .Confidence as number | undefined;
+                if (typeof itemConfidence === 'number') {
+                  confidenceSum += itemConfidence;
+                  confidenceCount += 1;
+                }
+              }
+              const confidence =
+                confidenceCount > 0
+                  ? confidenceSum / confidenceCount
+                  : undefined;
+
               const transcriptEvent: StreamingTranscriptEvent = {
                 type: result.IsPartial ? 'partial' : 'final',
                 text,
                 startTime: result.StartTime ?? 0,
                 endTime: result.EndTime ?? 0,
-                resultId: result.ResultId ?? '',
+                // ResultId 누락 시 빈 문자열이면 프론트 중복 제거가
+                // 모든 final을 중복으로 오인하므로 고유 폴백 ID를 생성
+                resultId:
+                  result.ResultId ??
+                  `${meetingId}-${result.StartTime ?? 0}-${result.EndTime ?? 0}`,
+                confidence,
                 detectedLanguage: result.LanguageCode ?? undefined,
                 speakerLabel,
               };
@@ -397,11 +455,11 @@ export class AwsStreamingTranscriptionProvider
           }
         }
       } finally {
-        // 세션 정리
-        const session = this.sessions.get(meetingId);
-        if (session) {
-          session.closed = true;
-          session.ready = false;
+        // 세션 정리 — identity가 일치할 때만 map에서 제거한다.
+        // (교체된 신 세션을 구 루프가 삭제하는 버그 방지)
+        session.closed = true;
+        session.ready = false;
+        if (this.sessions.get(meetingId) === session) {
           this.sessions.delete(meetingId);
         }
 

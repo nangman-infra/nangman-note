@@ -61,10 +61,12 @@ export class ResultController {
     };
   }
 
-  private toResultResponse(result: ResultEntity): ResultResponse {
+  private async toResultResponse(
+    result: ResultEntity,
+  ): Promise<ResultResponse> {
     return {
       ...result,
-      isRegenerating: this.resultService.isRegenerating(result.meetingId),
+      isRegenerating: await this.resultService.isRegenerating(result.meetingId),
     };
   }
 }

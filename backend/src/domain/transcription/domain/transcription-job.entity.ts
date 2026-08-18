@@ -71,6 +71,17 @@ export class TranscriptionJobEntity {
   })
   collectedAt?: Date | null;
 
+  /**
+   * 이 잡의 오디오가 회의 시작 기준 몇 초 지점부터 녹음됐는지 (멀티 세션 녹음 지원).
+   * 수집 시 세그먼트 타임스탬프에 이 값을 더해 회의 타임라인으로 정렬합니다.
+   */
+  @Column({
+    name: 'start_offset_seconds',
+    type: 'float',
+    nullable: true,
+  })
+  startOffsetSeconds?: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

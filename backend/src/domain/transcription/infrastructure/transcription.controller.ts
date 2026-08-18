@@ -9,6 +9,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { CreateBatchTranscriptionJobDto } from '../application/dto/create-batch-transcription-job.dto';
+import { IssueBatchUploadDto } from '../application/dto/issue-batch-upload.dto';
 import { TranscriptionService } from '../application/transcription.service';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { CurrentUser } from '../../../shared/auth/current-user.decorator';
@@ -32,9 +33,13 @@ export class TranscriptionController {
   @HttpCode(HttpStatus.OK)
   async generateUploadUrl(
     @Param('meetingId', ParseUUIDPipe) meetingId: string,
+    @Body() dto?: IssueBatchUploadDto,
     @CurrentUser() user?: AuthUser,
   ) {
-    return this.transcriptionService.issueBatchUpload(meetingId, user?.sub);
+    return this.transcriptionService.issueBatchUpload(meetingId, user?.sub, {
+      startOffsetSeconds: dto?.startOffsetSeconds,
+      contentType: dto?.contentType,
+    });
   }
 
   @Get()

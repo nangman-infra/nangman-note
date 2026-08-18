@@ -8,18 +8,21 @@ import type { BatchTranscriptionProvider } from './ports/batch-transcription-pro
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 
 describe('TranscriptionResultCollectorService', () => {
   let service: TranscriptionResultCollectorService;
   let jobRepository: jest.Mocked<
-    Pick<Repository<TranscriptionJobEntity>, 'findOne' | 'save'>
+    Pick<Repository<TranscriptionJobEntity>, 'findOne' | 'save' | 'count'>
   >;
   let segmentRepository: jest.Mocked<
     Pick<Repository<TranscriptSegmentEntity>, 'create'>
   >;
   let dataSource: DataSource;
-  let transactionManager: jest.Mocked<Pick<EntityManager, 'delete' | 'save'>>;
+  let transactionManager: jest.Mocked<
+    Pick<EntityManager, 'delete' | 'save' | 'find'>
+  >;
   let batchProvider: jest.Mocked<
     Pick<BatchTranscriptionProvider, 'getJobStatus'>
   >;
@@ -35,6 +38,9 @@ describe('TranscriptionResultCollectorService', () => {
   let resultService: jest.Mocked<Pick<ResultService, 'generateForPipeline'>>;
   let s3AudioService: jest.Mocked<
     Pick<S3AudioService, 'getObjectAsStringFromBucket' | 'deleteAudioFile'>
+  >;
+  let uploadRepository: jest.Mocked<
+    Pick<Repository<TranscriptionUploadEntity>, 'find'>
   >;
 
   const buildJob = (
@@ -57,6 +63,7 @@ describe('TranscriptionResultCollectorService', () => {
     jobRepository = {
       findOne: jest.fn(),
       save: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     };
     segmentRepository = {
       create: jest.fn(),
@@ -64,6 +71,7 @@ describe('TranscriptionResultCollectorService', () => {
     transactionManager = {
       delete: jest.fn(),
       save: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
     dataSource = {
       options: { type: 'sqljs' },
@@ -99,9 +107,14 @@ describe('TranscriptionResultCollectorService', () => {
       deleteAudioFile: jest.fn(),
     };
 
+    uploadRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     service = new TranscriptionResultCollectorService(
       jobRepository as unknown as Repository<TranscriptionJobEntity>,
       segmentRepository as unknown as Repository<TranscriptSegmentEntity>,
+      uploadRepository as unknown as Repository<TranscriptionUploadEntity>,
       batchProvider as unknown as BatchTranscriptionProvider,
       meetingService as unknown as MeetingService,
       resultService as unknown as ResultService,
@@ -186,7 +199,10 @@ describe('TranscriptionResultCollectorService', () => {
     expect(jobRepository.save.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(transactionManager.delete).toHaveBeenCalledWith(
       TranscriptSegmentEntity,
-      { meetingId: 'meeting-1' },
+      {
+        meetingId: 'meeting-1',
+        transcriptionJobId: 'job-1',
+      },
     );
     expect(transactionManager.save).toHaveBeenCalledTimes(1);
     expect(s3AudioService.deleteAudioFile).toHaveBeenCalledWith(
@@ -222,9 +238,8 @@ describe('TranscriptionResultCollectorService', () => {
     const result = await service.pollAndCollect('meeting-1', 'job-1');
 
     expect(result).toEqual({ success: false, segmentCount: 0 });
-    expect(s3AudioService.deleteAudioFile).toHaveBeenCalledWith(
-      'meeting-1/audio.webm',
-    );
+    // 실패 시 원본 오디오는 보존한다 (재시도 가능성 유지)
+    expect(s3AudioService.deleteAudioFile).not.toHaveBeenCalled();
     expect(meetingService.updateStatus).not.toHaveBeenCalled();
     expect(resultService.generateForPipeline).not.toHaveBeenCalled();
     expect(meetingService.markNeedsAttention).toHaveBeenCalledWith(
@@ -301,7 +316,10 @@ describe('TranscriptionResultCollectorService', () => {
     expect(result).toEqual({ success: true, segmentCount: 1 });
     expect(transactionManager.delete).toHaveBeenCalledWith(
       TranscriptSegmentEntity,
-      { meetingId: 'meeting-1' },
+      {
+        meetingId: 'meeting-1',
+        transcriptionJobId: 'job-1',
+      },
     );
     expect(transactionManager.save).toHaveBeenCalledTimes(1);
     expect(meetingService.markNeedsAttention).not.toHaveBeenCalled();
@@ -315,9 +333,11 @@ describe('TranscriptionResultCollectorService', () => {
     );
   });
 
-  it('marks stale jobs failed and falls back to generating when provider remains stuck', async () => {
+  it('marks stale jobs failed and falls back to generating when provider remains stuck past job lifetime', async () => {
     const job = buildJob({
       status: TranscriptionJobStatus.PROCESSING,
+      // 잡 수명(6시간)을 초과한 오래된 잡
+      createdAt: new Date(Date.now() - 7 * 60 * 60 * 1000),
     });
     jobRepository.findOne.mockResolvedValue(job);
     jobRepository.save.mockImplementation((entity) =>
@@ -338,9 +358,11 @@ describe('TranscriptionResultCollectorService', () => {
     expect(jobRepository.save).toHaveBeenLastCalledWith(
       expect.objectContaining({
         status: TranscriptionJobStatus.FAILED,
-        errorMessage: 'Batch transcription stalled for over 1 hour',
+        errorMessage: 'Batch transcription did not finish within 6h',
       }),
     );
+    // 최종 실패여도 원본 오디오는 보존
+    expect(s3AudioService.deleteAudioFile).not.toHaveBeenCalled();
     expect(meetingService.markNeedsAttention).toHaveBeenCalledWith(
       'meeting-1',
       'user-1',
@@ -353,6 +375,39 @@ describe('TranscriptionResultCollectorService', () => {
         status: MeetingStatus.PROCESSING,
       }),
     );
+  });
+
+  it('resumes polling instead of failing when provider is still processing within job lifetime', async () => {
+    const job = buildJob({
+      status: TranscriptionJobStatus.PROCESSING,
+      // 최근 생성된 잡 (수명 이내)
+      createdAt: new Date(Date.now() - 30 * 60 * 1000),
+    });
+    jobRepository.findOne.mockResolvedValue(job);
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
+    batchProvider.getJobStatus.mockResolvedValue({
+      status: TranscriptionJobStatus.PROCESSING,
+    });
+    const pollSpy = jest
+      .spyOn(service, 'pollAndCollect')
+      .mockResolvedValue({ success: true, segmentCount: 0 });
+
+    const result = await service.recoverStalledBatchJob(
+      'meeting-1',
+      'job-1',
+      'user-1',
+    );
+
+    expect(result).toEqual({ success: false, segmentCount: 0 });
+    expect(pollSpy).toHaveBeenCalledWith('meeting-1', 'job-1');
+    // 진행 중인 잡은 실패로 마킹하지 않는다
+    expect(jobRepository.save).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: TranscriptionJobStatus.FAILED }),
+    );
+    expect(meetingService.markNeedsAttention).not.toHaveBeenCalled();
+    expect(s3AudioService.deleteAudioFile).not.toHaveBeenCalled();
   });
 
   it('still marks meeting completed when result generation fails on generating phase', async () => {

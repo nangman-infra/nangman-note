@@ -63,6 +63,8 @@ export interface FinalSegment {
   startTime: number;
   endTime: number;
   detectedLanguage?: string;
+  /** Speaker Diarization 라벨 (e.g. 'spk_0') */
+  speakerLabel?: string;
 }
 
 /** 진행중 partial 세그먼트 (최신 1개만 유지) */
@@ -86,6 +88,21 @@ interface TranscriptionState {
 
   // Actions
   handlePayload: (payload: RealtimeTranscriptPayload) => void;
+  /**
+   * 재연결 후 DB 세그먼트로 재동기화.
+   * 단절 중 emit돼 놓친 final을 복구한다 (서버가 진실 원천).
+   */
+  syncSegmentsFromServer: (
+    serverSegments: Array<{
+      id: string;
+      text: string;
+      translatedText?: string;
+      startTime: number;
+      endTime: number;
+      detectedLanguage?: string;
+      speakerLabel?: string;
+    }>,
+  ) => void;
   clearTranscripts: () => void;
   toggleExpanded: () => void;
   setConnected: (connected: boolean) => void;
@@ -194,11 +211,47 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
               startTime: payload.startTime,
               endTime: payload.endTime,
               detectedLanguage: payload.detectedLanguage,
+              speakerLabel: payload.speakerLabel,
             },
           ];
         })(),
       }));
     }
+  },
+
+  syncSegmentsFromServer: (serverSegments) => {
+    set((state) => {
+      if (serverSegments.length === 0) {
+        return state;
+      }
+
+      const synced: FinalSegment[] = serverSegments
+        .slice()
+        .sort((a, b) => a.startTime - b.startTime)
+        .map((segment) => ({
+          resultId: `server-${segment.id}`,
+          text: sanitizeTranscriptText(segment.text),
+          translatedText: segment.translatedText,
+          translationStatus: segment.translatedText
+            ? ('done' as const)
+            : undefined,
+          startTime: segment.startTime,
+          endTime: segment.endTime,
+          detectedLanguage: segment.detectedLanguage,
+          speakerLabel: segment.speakerLabel,
+        }));
+
+      // 아직 서버에 반영되지 않았을 수 있는 로컬 최신 세그먼트는 보존
+      const maxServerEndTime = synced[synced.length - 1]?.endTime ?? 0;
+      const localTail = state.segments.filter(
+        (segment) => segment.endTime > maxServerEndTime + 0.5,
+      );
+
+      return {
+        ...state,
+        segments: [...synced, ...localTail],
+      };
+    });
   },
 
   clearTranscripts: () => {

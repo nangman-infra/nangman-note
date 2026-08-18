@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Download, LogOut, Mail, Moon, Sun } from 'lucide-react';
+import { Download, Loader2, LogOut, Mail, Moon, Sun } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { ErrorBoundary } from '@/components/feedback/ErrorBoundary';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
@@ -10,8 +10,14 @@ import {
   type PromptDocumentType,
   usePrompt,
 } from '@/domains/prompt';
+import { meetingApi } from '@/domains/meeting';
 import { useUserSettingsStore } from '@/domains/settings';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
+import {
+  isNotifyOnCompleteEnabled,
+  setNotifyOnCompleteEnabled,
+} from '@/lib/notifications/notifications';
+import { getStoredTheme, setTheme, type ThemeMode } from '@/lib/theme/theme';
 import { MeetingTranscriptionMode } from '@/lib/transcription/transcriptionMode';
 
 /* ================================================================== */
@@ -47,12 +53,96 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
     isLoading: isPromptLoading,
   } = usePrompt();
 
-  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [isExportingData, setIsExportingData] = useState(false);
+
+  // 저장된 테마·알림 설정 복원
+  useEffect(() => {
+    setThemeMode(getStoredTheme());
+    setNotificationsEnabled(isNotifyOnCompleteEnabled());
+  }, []);
 
   useEffect(() => {
     if (!isHydrated) void fetchSettings();
   }, [fetchSettings, isHydrated]);
+
+  const handleThemeToggle = () => {
+    const next: ThemeMode = themeMode === 'light' ? 'dark' : 'light';
+    setThemeMode(next);
+    setTheme(next);
+    pushToast({
+      title: next === 'dark' ? '다크 모드로 전환했습니다' : '라이트 모드로 전환했습니다',
+      variant: 'success',
+    });
+  };
+
+  const handleNotificationsToggle = async () => {
+    const next = !notificationsEnabled;
+    const outcome = await setNotifyOnCompleteEnabled(next);
+
+    if (outcome === 'enabled') {
+      setNotificationsEnabled(true);
+      pushToast({
+        title: '회의 완료 알림을 켰습니다',
+        description: '탭이 백그라운드일 때 브라우저 알림으로 알려드립니다.',
+        variant: 'success',
+      });
+      return;
+    }
+    if (outcome === 'disabled') {
+      setNotificationsEnabled(false);
+      pushToast({ title: '회의 완료 알림을 껐습니다', variant: 'info' });
+      return;
+    }
+    if (outcome === 'permission-denied') {
+      setNotificationsEnabled(false);
+      pushToast({
+        title: '브라우저 알림 권한이 차단되어 있습니다',
+        description: '브라우저 설정에서 이 사이트의 알림을 허용해주세요.',
+        variant: 'error',
+      });
+      return;
+    }
+    setNotificationsEnabled(false);
+    pushToast({
+      title: '이 브라우저는 알림을 지원하지 않습니다',
+      variant: 'error',
+    });
+  };
+
+  const handleExportData = async () => {
+    if (isExportingData) return;
+    setIsExportingData(true);
+    try {
+      const data = await meetingApi.exportAll();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `transnote_export_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+      pushToast({
+        title: '전체 회의 데이터를 내보냈습니다',
+        description: `회의 ${data.meetingCount}건이 JSON 파일로 저장되었습니다.`,
+        variant: 'success',
+      });
+    } catch (error) {
+      pushToast({
+        title: '데이터 내보내기에 실패했습니다',
+        description:
+          error instanceof Error ? error.message : '잠시 후 다시 시도해주세요.',
+        variant: 'error',
+      });
+    } finally {
+      setIsExportingData(false);
+    }
+  };
 
   const resolvedDefaultPromptId = prompts.some((p) => p.id === defaultPromptId)
     ? defaultPromptId
@@ -150,10 +240,9 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
             </div>
             <button
               type="button"
-              onClick={() => {
-                setThemeMode((prev) => prev === 'light' ? 'dark' : 'light');
-                pushToast({ title: '테마 설정은 추후 지원 예정입니다', variant: 'info' });
-              }}
+              onClick={handleThemeToggle}
+              role="switch"
+              aria-checked={themeMode === 'dark'}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                 themeMode === 'dark' ? 'bg-indigo-600' : 'bg-slate-300'
               }`}
@@ -178,10 +267,9 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
             </div>
             <button
               type="button"
-              onClick={() => {
-                setNotificationsEnabled((prev) => !prev);
-                pushToast({ title: '알림 설정은 추후 지원 예정입니다', variant: 'info' });
-              }}
+              onClick={() => void handleNotificationsToggle()}
+              role="switch"
+              aria-checked={notificationsEnabled}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                 notificationsEnabled ? 'bg-indigo-600' : 'bg-slate-300'
               }`}
@@ -206,10 +294,15 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
             </div>
             <button
               type="button"
-              onClick={() => pushToast({ title: '내보내기 기능은 추후 지원 예정입니다', variant: 'info' })}
+              onClick={() => void handleExportData()}
+              disabled={isExportingData}
               className="btn-secondary inline-flex text-sm"
             >
-              <Download className="h-4 w-4" />
+              {isExportingData ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
               내보내기
             </button>
           </div>

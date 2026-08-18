@@ -16,6 +16,7 @@ interface ResultState {
   applyRegenerateEvent: (event: { meetingId: string; phase: string; errorMessage?: string }) => void;
   exportPDF: (meetingId: string) => Promise<boolean>;
   exportDOCX: (meetingId: string) => Promise<boolean>;
+  exportMD: (meetingId: string) => Promise<boolean>;
   clearResult: () => void;
 }
 
@@ -167,18 +168,12 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
     try {
       set({ error: null });
       const blob = await resultApi.exportPDF(meetingId);
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `meeting_${meetingId}_result.pdf`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      window.URL.revokeObjectURL(url);
+      downloadBlob(blob, `meeting_${meetingId}_result.pdf`);
       return true;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to export PDF',
+        error:
+          error instanceof Error ? error.message : 'PDF 내보내기에 실패했습니다',
       });
       return false;
     }
@@ -188,18 +183,31 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
     try {
       set({ error: null });
       const blob = await resultApi.exportDOCX(meetingId);
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `meeting_${meetingId}_result.docx`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      window.URL.revokeObjectURL(url);
+      downloadBlob(blob, `meeting_${meetingId}_result.docx`);
       return true;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to export DOCX',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'DOCX 내보내기에 실패했습니다',
+      });
+      return false;
+    }
+  },
+
+  exportMD: async (meetingId) => {
+    try {
+      set({ error: null });
+      const blob = await resultApi.exportMD(meetingId);
+      downloadBlob(blob, `meeting_${meetingId}_result.md`);
+      return true;
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Markdown 내보내기에 실패했습니다',
       });
       return false;
     }
@@ -209,6 +217,17 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
     set(store.getInitialState());
   },
 }));
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.URL.revokeObjectURL(url);
+}
 
 function resolveRegeneratingState({
   serverReportedRegenerating,

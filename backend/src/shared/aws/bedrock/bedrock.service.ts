@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ConverseCommand,
+  type ConverseCommandOutput,
   type BedrockRuntimeClient,
   type Message,
   type SystemContentBlock,
@@ -20,6 +21,23 @@ import { StructuredLogger } from '../../logging/structured-logger';
 
 const MAX_TRANSCRIPT_CHARS = 200_000;
 const TRANSCRIPT_HEAD_CHARS = 110_000;
+/** Bedrock 호출 타임아웃 — 무한 hang 방지 */
+const BEDROCK_CALL_TIMEOUT_MS = 150_000;
+/** 스로틀링 시 재시도 횟수/기본 대기 */
+const THROTTLE_MAX_RETRIES = 2;
+const THROTTLE_BASE_DELAY_MS = 2_000;
+
+/**
+ * 응답이 max_tokens로 잘린 경우 발생.
+ * 같은 파라미터로 재시도해도 동일하게 잘리므로, 호출부는 이 에러를 받으면
+ * 재시도를 중단하고 폴백 경로로 넘어가야 합니다.
+ */
+export class BedrockMaxTokensError extends Error {
+  constructor(message = 'Bedrock response was truncated by max_tokens') {
+    super(message);
+    this.name = 'BedrockMaxTokensError';
+  }
+}
 
 @Injectable()
 export class BedrockService {
@@ -43,6 +61,46 @@ export class BedrockService {
     this.temperature = this.configService.get('AWS_BEDROCK_TEMPERATURE', {
       infer: true,
     });
+  }
+
+  /**
+   * Bedrock 호출 공통 경로:
+   * - 타임아웃(150초)으로 무한 hang 방지
+   * - ThrottlingException은 지수 백오프로 제한적 재시도
+   */
+  private async sendWithResilience(
+    command: ConverseCommand,
+  ): Promise<ConverseCommandOutput> {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= THROTTLE_MAX_RETRIES; attempt++) {
+      try {
+        return await this.client.send(command, {
+          abortSignal: AbortSignal.timeout(BEDROCK_CALL_TIMEOUT_MS),
+        });
+      } catch (error) {
+        lastError = error;
+        const errorName = error instanceof Error ? error.name : '';
+        const isThrottling =
+          errorName === 'ThrottlingException' ||
+          errorName === 'TooManyRequestsException' ||
+          errorName === 'ServiceUnavailableException';
+
+        if (!isThrottling || attempt === THROTTLE_MAX_RETRIES) {
+          throw error;
+        }
+
+        const delayMs = THROTTLE_BASE_DELAY_MS * Math.pow(2, attempt);
+        this.logger.warn('ai.bedrock.throttled_retrying', {
+          modelId: this.modelId,
+          attempt: attempt + 1,
+          delayMs,
+        });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    throw lastError;
   }
 
   /**
@@ -129,7 +187,7 @@ export class BedrockService {
         },
       });
 
-      const response = await this.client.send(command);
+      const response = await this.sendWithResilience(command);
 
       const outputText = response.output?.message?.content?.[0]?.text ?? '';
 
@@ -146,6 +204,23 @@ export class BedrockService {
         outputLength: outputText.length,
         stopReason: response.stopReason,
       });
+
+      // max_tokens로 잘린 경우: 문서가 중간에 끊긴 상태이므로
+      // 사용자에게 잘림 사실을 명시한다 (조용히 잘린 문서를 정상 결과처럼 반환 금지)
+      if (response.stopReason === 'max_tokens') {
+        this.logger.warn('ai.bedrock.legacy_generation.truncated', {
+          modelId: this.modelId,
+          meetingTitle: meetingTitle ?? 'untitled',
+          maxTokens: this.maxTokens,
+        });
+        return [
+          outputText,
+          '',
+          '---',
+          '',
+          '> ⚠️ 회의 내용이 많아 문서가 여기서 잘렸습니다. 누락된 부분은 전사 기록을 참고하거나, 결과 재생성을 시도해주세요.',
+        ].join('\n');
+      }
 
       return outputText;
     } catch (error) {
@@ -215,8 +290,20 @@ export class BedrockService {
       documentType,
       meetingTitle: meetingTitle ?? 'untitled',
     });
-    const response = await this.client.send(command);
+    const response = await this.sendWithResilience(command);
     const outputText = response.output?.message?.content?.[0]?.text ?? '';
+
+    // max_tokens 잘림: JSON이 중간에 끊겨 파싱이 불가능하며,
+    // 같은 파라미터로 재시도해도 동일하게 실패하므로 전용 에러로 fail-fast.
+    if (response.stopReason === 'max_tokens') {
+      this.logger.warn('ai.bedrock.structured_extraction.truncated', {
+        modelId: this.modelId,
+        documentType,
+        meetingTitle: meetingTitle ?? 'untitled',
+        maxTokens: this.maxTokens,
+      });
+      throw new BedrockMaxTokensError();
+    }
 
     if (!outputText.trim()) {
       this.logger.warn('ai.bedrock.structured_extraction.empty_response', {

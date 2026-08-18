@@ -1,7 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, LessThan, Repository } from 'typeorm';
 import {
   BATCH_TRANSCRIPTION_PROVIDER,
   type BatchTranscriptionProvider,
@@ -11,6 +11,8 @@ import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
+import { TranscriptionUploadStatus } from '../domain/transcription-upload-status.enum';
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { ResultService } from '../../result/application/result.service';
 import { S3AudioService } from '../../../shared/aws/s3/s3.service';
@@ -19,7 +21,16 @@ import { runWithRequestContext } from '../../../shared/logging/request-context.s
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
 const POLL_INTERVAL_MS = 5_000; // 5초
-const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10분
+/**
+ * 인프로세스 폴링 최대 시간.
+ * AWS Transcribe 배치 잡은 오디오 길이에 비례해 오래 걸릴 수 있으므로
+ * (최대 입력 4시간) 짧은 타임아웃으로 강제 실패 처리하면 안 됩니다.
+ * 이 시간을 초과하면 잡을 실패로 마킹하지 않고 폴링만 중단하며,
+ * 이후 StalledMeetingRecoveryService가 폴링을 재개합니다.
+ */
+const MAX_POLL_DURATION_MS = 4 * 60 * 60 * 1000; // 4시간
+/** 이 시간이 지나도 provider가 완료/실패를 반환하지 않으면 잡을 최종 실패 처리 */
+const MAX_JOB_LIFETIME_MS = 6 * 60 * 60 * 1000; // 6시간
 const JOB_COLLECTION_LOCK_PREFIX = 'transcription-job-collection';
 
 interface TranscribeResultItem {
@@ -56,7 +67,7 @@ interface TranscribeResultJson {
 }
 
 @Injectable()
-export class TranscriptionResultCollectorService {
+export class TranscriptionResultCollectorService implements OnModuleInit {
   private readonly logger = new StructuredLogger(
     TranscriptionResultCollectorService.name,
   );
@@ -66,6 +77,8 @@ export class TranscriptionResultCollectorService {
     private readonly jobRepository: Repository<TranscriptionJobEntity>,
     @InjectRepository(TranscriptSegmentEntity)
     private readonly segmentRepository: Repository<TranscriptSegmentEntity>,
+    @InjectRepository(TranscriptionUploadEntity)
+    private readonly uploadRepository: Repository<TranscriptionUploadEntity>,
     @Inject(BATCH_TRANSCRIPTION_PROVIDER)
     private readonly batchProvider: BatchTranscriptionProvider,
     private readonly meetingService: MeetingService,
@@ -73,6 +86,38 @@ export class TranscriptionResultCollectorService {
     private readonly s3AudioService: S3AudioService,
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * 서버 재시작으로 죽은 인프로세스 폴링 루프를 부팅 시 재개합니다.
+   * (이전에는 재배포 후 잡이 QUEUED/PROCESSING인 채 방치되어
+   * stalled recovery의 1시간 임계까지 사용자가 기다려야 했음)
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      const pendingJobs = await this.jobRepository.find({
+        where: {
+          status: In([
+            TranscriptionJobStatus.QUEUED,
+            TranscriptionJobStatus.PROCESSING,
+          ]),
+        },
+      });
+
+      for (const job of pendingJobs) {
+        if (job.collectedAt) continue;
+        this.logger.log('transcription.batch.poll.resumed_on_boot', {
+          meetingId: job.meetingId,
+          jobId: job.id,
+          providerJobId: job.providerJobId,
+        });
+        this.resumePollingInBackground(job.meetingId, job.id);
+      }
+    } catch (error) {
+      this.logger.warn('transcription.batch.poll.boot_resume_failed', {
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
 
   /**
    * 배치 전사 잡 완료를 폴링하고, 결과를 파싱하여 DB에 저장합니다.
@@ -116,6 +161,8 @@ export class TranscriptionResultCollectorService {
             meetingId,
             jobId,
           });
+          // 수집 완료 후 결과 생성 전에 죽은 케이스 복구
+          await this.retriggerGenerationIfStuck(meetingId, meetingOwnerSub);
           return { success: true, segmentCount: 0 };
         }
 
@@ -183,24 +230,15 @@ export class TranscriptionResultCollectorService {
           }
         }
 
-        job.status = TranscriptionJobStatus.FAILED;
-        job.errorMessage = `Polling timed out after ${MAX_POLL_DURATION_MS / 1000}s`;
-        await this.jobRepository.save(job);
-
-        this.logger.error(
-          'transcription.batch.job.timed_out',
-          new Error(job.errorMessage),
-          {
-            meetingId,
-            jobId,
-            providerJobId: job.providerJobId,
-          },
-        );
-        await this.finalizeAfterFailedTranscription(
+        // 폴링 시간 초과: 잡을 실패로 마킹하지 않는다.
+        // AWS 잡이 아직 IN_PROGRESS일 수 있으므로 (긴 오디오),
+        // 오디오/잡을 보존한 채 폴링만 중단하고 StalledMeetingRecoveryService에 위임한다.
+        this.logger.warn('transcription.batch.job.poll_window_exhausted', {
           meetingId,
-          job.mediaUri,
-          meetingOwnerSub,
-        );
+          jobId,
+          providerJobId: job.providerJobId,
+          pollDurationMs: MAX_POLL_DURATION_MS,
+        });
         return { success: false, segmentCount: 0 };
       },
     );
@@ -252,6 +290,8 @@ export class TranscriptionResultCollectorService {
           return { success: false, segmentCount: 0 };
         }
 
+        const jobAgeMs = Date.now() - job.createdAt.getTime();
+
         try {
           const result = await this.batchProvider.getJobStatus(
             job.providerJobId,
@@ -294,6 +334,19 @@ export class TranscriptionResultCollectorService {
             );
             return { success: false, segmentCount: 0 };
           }
+
+          // provider가 아직 QUEUED/PROCESSING을 반환: 잡이 진짜로 진행 중이므로
+          // 강제 실패시키지 않고 폴링을 재개한다 (서버 재시작으로 폴링 루프가 죽은 케이스).
+          if (jobAgeMs < MAX_JOB_LIFETIME_MS) {
+            this.logger.log('transcription.batch.job.recovery_resume_polling', {
+              meetingId,
+              jobId,
+              providerJobId: job.providerJobId,
+              jobAgeMs,
+            });
+            this.resumePollingInBackground(meetingId, jobId);
+            return { success: false, segmentCount: 0 };
+          }
         } catch (error) {
           this.logger.warn('transcription.batch.job.recovery_recheck_failed', {
             meetingId,
@@ -302,10 +355,29 @@ export class TranscriptionResultCollectorService {
             errorMessage:
               error instanceof Error ? error.message : 'Unknown error',
           });
+          // 일시적 API 오류일 수 있으므로 잡 수명 내에서는 폴링을 재개한다.
+          if (jobAgeMs < MAX_JOB_LIFETIME_MS) {
+            this.resumePollingInBackground(meetingId, jobId);
+            return { success: false, segmentCount: 0 };
+          }
+        }
+
+        // 잡 수명(6시간) 초과: 최종 실패 처리 (오디오는 보존 — 재시도 가능성 유지)
+        // 단, 이미 COMPLETED로 알고 있는 잡은 상태 조회 실패만으로 덮어쓰지 않는다.
+        if (
+          job.status === TranscriptionJobStatus.COMPLETED ||
+          job.collectedAt
+        ) {
+          this.logger.warn(
+            'transcription.batch.job.recovery_skip_completed_overwrite',
+            { meetingId, jobId, providerJobId: job.providerJobId },
+          );
+          await this.retriggerGenerationIfStuck(meetingId, ownerSub);
+          return { success: false, segmentCount: 0 };
         }
 
         job.status = TranscriptionJobStatus.FAILED;
-        job.errorMessage = 'Batch transcription stalled for over 1 hour';
+        job.errorMessage = `Batch transcription did not finish within ${MAX_JOB_LIFETIME_MS / 3_600_000}h`;
         await this.jobRepository.save(job);
         this.logger.warn('transcription.batch.job.marked_failed_after_stall', {
           meetingId,
@@ -323,9 +395,10 @@ export class TranscriptionResultCollectorService {
   }
 
   private async parseAndSaveResults(
-    meetingId: string,
+    job: TranscriptionJobEntity,
     transcriptUri?: string,
   ): Promise<number> {
+    const meetingId = job.meetingId;
     if (!transcriptUri) {
       this.logger.warn('transcription.batch.transcript_uri.missing', {
         meetingId,
@@ -348,7 +421,7 @@ export class TranscriptionResultCollectorService {
       const speakerLookup = this.buildSpeakerLookup(parsedUnknown);
       const segments = this.itemsToSegments(meetingId, items, speakerLookup);
 
-      await this.replaceMeetingSegments(meetingId, segments);
+      await this.mergeBatchSegments(job, segments);
 
       return segments.length;
     } catch (error) {
@@ -379,12 +452,15 @@ export class TranscriptionResultCollectorService {
           meetingId: job.meetingId,
           jobId,
         });
+        // 수집은 끝났지만 결과 생성 전에 서버가 죽었을 수 있다.
+        // 회의가 아직 PROCESSING이면 generating 단계를 재발화해 고착을 푼다.
+        await this.retriggerGenerationIfStuck(job.meetingId, ownerSub);
         return 0;
       }
 
       const effectiveTranscriptUri = transcriptUri ?? job.transcriptUri;
       const segmentCount = await this.parseAndSaveResults(
-        job.meetingId,
+        job,
         effectiveTranscriptUri,
       );
 
@@ -397,10 +473,108 @@ export class TranscriptionResultCollectorService {
       await this.jobRepository.save(job);
 
       await this.deleteAudioFile(job.mediaUri);
-      await this.emitGeneratingPhase(job.meetingId, ownerSub);
+      await this.emitGeneratingPhaseIfAllJobsSettled(job.meetingId, ownerSub);
 
       return segmentCount;
     });
+  }
+
+  /**
+   * 세그먼트 수집은 끝났지만(collectedAt 존재) 결과 생성 전에 프로세스가 죽어
+   * 회의가 PROCESSING에 갇힌 케이스를 복구합니다.
+   * 이전에는 collectedAt이 있으면 아무 상태 전환 없이 리턴해 recovery가
+   * 5분마다 무한 no-op을 반복하는 버그가 있었습니다.
+   */
+  async retriggerGenerationIfStuck(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<void> {
+    try {
+      const meeting = await this.meetingService.findById(meetingId, ownerSub);
+      if (meeting.status !== MeetingStatus.PROCESSING) {
+        return;
+      }
+      this.logger.warn('meeting.recovery.retrigger_generation', {
+        meetingId,
+        ownerSub,
+        processingPhase: meeting.processingPhase,
+      });
+      await this.emitGeneratingPhaseIfAllJobsSettled(meetingId, ownerSub);
+    } catch (error) {
+      this.logger.warn('meeting.recovery.retrigger_generation_failed', {
+        meetingId,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * 회의의 모든 배치 잡이 종결(수집 완료 또는 실패)됐을 때만 결과 생성 단계로
+   * 진입합니다. 멀티 세션 녹음에서는 잡이 여러 개이므로, 첫 잡 완료 시점에
+   * 결과를 생성하면 나머지 세션 전사가 회의록에서 누락됩니다.
+   */
+  private async emitGeneratingPhaseIfAllJobsSettled(
+    meetingId: string,
+    ownerSub?: string,
+  ): Promise<void> {
+    // 아직 녹음 중인 회의를 결과 생성으로 밀어내지 않는다
+    try {
+      const meeting = await this.meetingService.findById(meetingId, ownerSub);
+      if (meeting.status === MeetingStatus.RECORDING) {
+        this.logger.log('transcription.batch.generating_deferred_recording', {
+          meetingId,
+        });
+        return;
+      }
+    } catch {
+      // 회의 조회 실패 시 기존 동작 유지
+    }
+
+    const pendingCount = await this.jobRepository.count({
+      where: {
+        meetingId,
+        status: In([
+          TranscriptionJobStatus.QUEUED,
+          TranscriptionJobStatus.PROCESSING,
+        ]),
+      },
+    });
+
+    if (pendingCount > 0) {
+      this.logger.log('transcription.batch.generating_deferred', {
+        meetingId,
+        pendingJobCount: pendingCount,
+      });
+      return;
+    }
+
+    // 멀티 세션 순차 업로드 레이스 방지:
+    // 아직 잡으로 확정되지 않은 최근 업로드(ISSUED/UPLOADED)가 있으면
+    // 그 세션의 전사가 시작되기 전이므로 결과 생성을 유예한다.
+    // 오래 방치된 업로드(탭 강제 종료 등)는 무한 대기하지 않도록 시간 제한.
+    const PENDING_UPLOAD_WINDOW_MS = 15 * 60 * 1000;
+    const pendingUploads = await this.uploadRepository.find({
+      where: {
+        meetingId,
+        status: In([
+          TranscriptionUploadStatus.ISSUED,
+          TranscriptionUploadStatus.UPLOADED,
+        ]),
+      },
+    });
+    const recentPendingUploads = pendingUploads.filter(
+      (upload) =>
+        Date.now() - upload.createdAt.getTime() < PENDING_UPLOAD_WINDOW_MS,
+    );
+    if (recentPendingUploads.length > 0) {
+      this.logger.log('transcription.batch.generating_deferred_uploads', {
+        meetingId,
+        pendingUploadCount: recentPendingUploads.length,
+      });
+      return;
+    }
+
+    await this.emitGeneratingPhase(meetingId, ownerSub);
   }
 
   private async withJobCollectionLock<T>(
@@ -426,20 +600,67 @@ export class TranscriptionResultCollectorService {
     }
   }
 
-  private async replaceMeetingSegments(
-    meetingId: string,
+  /**
+   * 배치 전사 결과를 기존 세그먼트와 병합 저장합니다.
+   *
+   * - 이 잡이 이전에 저장했던 세그먼트(transcription_job_id 일치)만 삭제해
+   *   재수집 멱등성을 보장합니다.
+   * - 실시간 폴백 세그먼트(job id가 null)와 다른 잡의 세그먼트는 보존합니다.
+   * - 잡에 startOffsetSeconds가 있으면 그만큼, 없으면(레거시) 잡 생성 이전에
+   *   저장된 세그먼트의 마지막 endTime만큼 시간 오프셋을 더해 하나의
+   *   타임라인으로 정렬합니다.
+   */
+  private async mergeBatchSegments(
+    job: TranscriptionJobEntity,
     segments: TranscriptSegmentEntity[],
   ): Promise<void> {
+    const meetingId = job.meetingId;
+
     await this.dataSource.transaction(async (manager) => {
-      await manager.delete(TranscriptSegmentEntity, { meetingId });
+      // 이 잡의 이전 부분 수집 잔재만 삭제
+      await manager.delete(TranscriptSegmentEntity, {
+        meetingId,
+        transcriptionJobId: job.id,
+      });
+
+      let offsetSeconds: number;
+      if (
+        job.startOffsetSeconds !== null &&
+        job.startOffsetSeconds !== undefined
+      ) {
+        offsetSeconds = job.startOffsetSeconds;
+      } else {
+        // 레거시 폴백: 잡 생성 이전에 저장된(실시간 폴백) 세그먼트의 마지막 endTime
+        const lastPreserved = await manager.find(TranscriptSegmentEntity, {
+          where: {
+            meetingId,
+            createdAt: LessThan(job.createdAt),
+          },
+          select: ['endTime'],
+          order: { endTime: 'DESC' },
+          take: 1,
+        });
+        offsetSeconds = lastPreserved[0]?.endTime ?? 0;
+      }
+
+      for (const segment of segments) {
+        segment.transcriptionJobId = job.id;
+        if (offsetSeconds > 0) {
+          segment.startTime += offsetSeconds;
+          segment.endTime += offsetSeconds;
+        }
+      }
+
       if (segments.length > 0) {
         await manager.save(TranscriptSegmentEntity, segments);
       }
-    });
 
-    this.logger.log('transcription.segment.replaced', {
-      meetingId,
-      segmentCount: segments.length,
+      this.logger.log('transcription.segment.merged', {
+        meetingId,
+        jobId: job.id,
+        batchSegmentCount: segments.length,
+        appliedOffsetSeconds: offsetSeconds,
+      });
     });
   }
 
@@ -706,9 +927,34 @@ export class TranscriptionResultCollectorService {
     mediaUri: string,
     ownerSub?: string,
   ): Promise<void> {
-    await this.deleteAudioFile(mediaUri);
+    // 원본 오디오는 삭제하지 않고 보존한다.
+    // 일시적 장애로 실패한 경우 재시도(수동 복구·재큐잉)가 가능해야 하며,
+    // 잔여 객체 정리는 S3 lifecycle 정책에 위임한다.
+    this.logger.warn('transcription.audio.preserved_after_failure', {
+      meetingId,
+      mediaUri,
+    });
     await this.meetingService.markNeedsAttention(meetingId, ownerSub);
-    await this.emitGeneratingPhase(meetingId, ownerSub);
+    await this.emitGeneratingPhaseIfAllJobsSettled(meetingId, ownerSub);
+  }
+
+  /** 서버 재시작 등으로 죽은 폴링 루프를 백그라운드에서 재개합니다. */
+  private resumePollingInBackground(meetingId: string, jobId: string): void {
+    this.pollAndCollect(meetingId, jobId)
+      .then((result) => {
+        this.logger.log('transcription.batch.poll.resumed_completed', {
+          meetingId,
+          jobId,
+          success: result.success,
+          segmentCount: result.segmentCount,
+        });
+      })
+      .catch((error: Error) => {
+        this.logger.error('transcription.batch.poll.resume_failed', error, {
+          meetingId,
+          jobId,
+        });
+      });
   }
 
   private sleep(ms: number): Promise<void> {

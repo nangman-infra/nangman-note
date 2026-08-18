@@ -72,11 +72,19 @@ export class TranscriptionService {
   private readonly logger = new StructuredLogger(TranscriptionService.name);
 
   /**
-   * 실시간 전사 세션 재연결 시 타임스탬프 보정을 위한 누적 오프셋.
-   * Transcribe Streaming은 세션 시작 기준 상대 타임스탬프를 반환하므로,
-   * 세션이 재시작되면 이전 세션의 마지막 endTime을 오프셋으로 누적합니다.
+   * 실시간 전사 세션 재연결 시 타임스탬프 보정을 위한 세션 오프셋.
+   * Transcribe Streaming은 "세션 시작 기준 누적 상대 타임스탬프"를 반환하므로,
+   * 오프셋은 세션이 시작될 때 한 번만 확정하고 세션이 살아있는 동안 고정합니다.
+   * (final 이벤트마다 갱신하면 세션 내 두 번째 final부터 오프셋이 복리로 누적되어
+   * 타임스탬프가 이중 계산되는 버그가 발생합니다.)
    */
   private readonly realtimeTimeOffsets = new Map<string, number>();
+
+  /**
+   * 회의별 마지막으로 저장된 보정 endTime.
+   * 다음 세션 시작 시 오프셋 계산에 사용됩니다 (DB 조회보다 우선).
+   */
+  private readonly realtimeLastEndTimes = new Map<string, number>();
 
   constructor(
     @InjectRepository(TranscriptSegmentEntity)
@@ -128,27 +136,32 @@ export class TranscriptionService {
       );
     }
 
-    // 세션 재시작 시: 인메모리 오프셋이 있으면 우선 사용, 없으면 DB에서 복구
-    if (!this.realtimeTimeOffsets.has(meetingId)) {
+    // 세션 시작 시 오프셋 확정: 인메모리 마지막 endTime이 있으면 우선 사용, 없으면 DB에서 복구.
+    // 오프셋은 이 세션이 유지되는 동안 고정됩니다 (final마다 갱신 금지 — 복리 누적 방지).
+    const memoryOffset = this.realtimeLastEndTimes.get(meetingId);
+    let sessionOffset: number;
+    if (memoryOffset !== undefined) {
+      sessionOffset = memoryOffset;
+      this.logger.debug('transcription.realtime.offset.loaded_from_memory', {
+        meetingId,
+        offsetSeconds: memoryOffset,
+      });
+    } else {
       const lastSegment = await this.transcriptRepository.findOne({
         where: { meetingId },
         order: { createdAt: 'DESC' },
         select: ['endTime'],
       });
-      const dbOffset = lastSegment?.endTime ?? 0;
-      this.realtimeTimeOffsets.set(meetingId, dbOffset);
-      if (dbOffset > 0) {
+      sessionOffset = lastSegment?.endTime ?? 0;
+      this.realtimeLastEndTimes.set(meetingId, sessionOffset);
+      if (sessionOffset > 0) {
         this.logger.debug('transcription.realtime.offset.restored_from_db', {
           meetingId,
-          offsetSeconds: dbOffset,
+          offsetSeconds: sessionOffset,
         });
       }
-    } else {
-      this.logger.debug('transcription.realtime.offset.loaded_from_memory', {
-        meetingId,
-        offsetSeconds: this.realtimeTimeOffsets.get(meetingId),
-      });
     }
+    this.realtimeTimeOffsets.set(meetingId, sessionOffset);
 
     const translateTarget = meeting.translateTargetLanguage || null;
 
@@ -156,11 +169,16 @@ export class TranscriptionService {
       meetingId,
       languageCode: meeting.languageCode || null,
       onTranscript: (event: StreamingTranscriptEvent) => {
+        // 오프셋을 콜백 클로저에 고정한다.
+        // 이벤트 시점에 공유 맵을 읽으면 (a) stop 직후 드레인되는 final이
+        // clear된 오프셋(0)으로 저장되거나 (b) 세션 교체 직후 구 세션의
+        // 잔여 final에 신 세션 오프셋이 적용되는 레이스가 발생한다.
         this.handleTranscriptEvent(
           meetingId,
           event,
           translateTarget,
           onPayload,
+          sessionOffset,
         );
       },
       onError,
@@ -201,6 +219,7 @@ export class TranscriptionService {
    */
   clearRealtimeTimeOffset(meetingId: string): void {
     this.realtimeTimeOffsets.delete(meetingId);
+    this.realtimeLastEndTimes.delete(meetingId);
   }
 
   /**
@@ -286,16 +305,20 @@ export class TranscriptionService {
   async issueBatchUpload(
     meetingId: string,
     ownerSub?: string,
+    options?: { startOffsetSeconds?: number; contentType?: string },
   ): Promise<IssuedBatchUpload> {
     const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
-    const upload = await this.s3AudioService.generateUploadUrl(meeting.id);
+    const upload = await this.s3AudioService.generateUploadUrl(meeting.id, {
+      contentType: options?.contentType,
+    });
     const issuedUpload = this.transcriptionUploadRepository.create({
       meetingId: meeting.id,
       bucket: upload.bucket,
       s3Key: upload.s3Key,
       mediaUri: upload.mediaUri,
       status: TranscriptionUploadStatus.ISSUED,
-      contentType: 'audio/webm',
+      contentType: upload.contentType,
+      startOffsetSeconds: options?.startOffsetSeconds ?? null,
     });
     const savedUpload =
       await this.transcriptionUploadRepository.save(issuedUpload);
@@ -426,9 +449,10 @@ export class TranscriptionService {
     event: StreamingTranscriptEvent,
     translateTarget: string | null,
     onPayload: (payload: RealtimeTranscriptPayload) => void,
+    sessionOffset: number,
   ): void {
-    // 세션 재연결 시 누적된 오프셋을 적용하여 절대 타임스탬프로 변환
-    const offset = this.realtimeTimeOffsets.get(meetingId) ?? 0;
+    // 세션 시작 시 클로저에 고정된 오프셋을 적용하여 절대 타임스탬프로 변환
+    const offset = sessionOffset;
     const adjustedStartTime = event.startTime + offset;
     const adjustedEndTime = event.endTime + offset;
 
@@ -473,9 +497,18 @@ export class TranscriptionService {
       adjustedEvent,
     );
 
-    // 인메모리 오프셋을 즉시 갱신 — DB 저장 완료를 기다리지 않으므로
-    // 빠른 재연결에서도 최신 endTime이 반영됨
-    this.realtimeTimeOffsets.set(meetingId, adjustedEndTime);
+    // 마지막 보정 endTime만 기록 — 세션 오프셋 자체는 갱신하지 않음.
+    // (Transcribe 타임스탬프는 세션 기준 누적값이므로, 세션 내에서 오프셋을 갱신하면
+    // 이후 final마다 시간이 이중으로 더해지는 복리 누적이 발생)
+    // Math.max: 세션 교체 직후 늦게 도착한 구 세션 final이 값을 되돌리지 않도록.
+    // 회의 종료(clearRealtimeTimeOffset) 후 도착한 드레인 final은 기록하지 않는다 (맵 부활 방지).
+    if (this.realtimeTimeOffsets.has(meetingId)) {
+      const previousEnd = this.realtimeLastEndTimes.get(meetingId) ?? 0;
+      this.realtimeLastEndTimes.set(
+        meetingId,
+        Math.max(previousEnd, adjustedEndTime),
+      );
+    }
 
     // 번역이 필요한 경우 fire-and-forget으로 후행 처리
     if (needsTranslation && translateTarget) {
@@ -510,7 +543,7 @@ export class TranscriptionService {
         startTime: event.startTime,
         endTime: event.endTime,
         text: event.text,
-        confidence: 0.9,
+        confidence: event.confidence ?? 0.9,
         detectedLanguage: event.detectedLanguage,
         speakerLabel: event.speakerLabel,
       });
@@ -623,8 +656,26 @@ export class TranscriptionService {
     }
 
     if (meeting.transcriptionMode !== MeetingTranscriptionMode.BATCH) {
-      throw new BadRequestException(
-        'Batch transcription is only available for meetings in batch mode',
+      // 실시간 세션이 아직 활성이면 전환하지 않는다.
+      // (전환 시 실시간 세션 재시작이 400으로 실패해 서킷브레이커까지 연쇄될 수 있음)
+      if (this.streamingProvider.hasActiveSession(meetingId)) {
+        throw new BadRequestException(
+          'Realtime transcription session is still active for this meeting',
+        );
+      }
+
+      // 실시간→배치 폴백 시 프론트의 모드 변경 API 호출이 실패했을 수 있다.
+      // 배치 업로드 요청 자체가 배치 처리 의사표시이므로 모드를 자동 전환해
+      // 폴백 이후 녹음분의 업로드가 400으로 거부되는 것을 방지한다.
+      this.logger.warn('transcription.batch.mode_auto_switched', {
+        meetingId,
+        ownerSub,
+        previousMode: meeting.transcriptionMode,
+      });
+      return this.meetingService.updatePrompt(
+        meetingId,
+        { transcriptionMode: MeetingTranscriptionMode.BATCH },
+        ownerSub,
       );
     }
 
@@ -723,6 +774,7 @@ export class TranscriptionService {
           upload.mediaUri,
           meeting.languageCode,
           ownerSub,
+          upload.startOffsetSeconds ?? null,
         );
         upload.status = TranscriptionUploadStatus.JOB_QUEUED;
         upload.transcriptionJobId = job.id;
@@ -783,6 +835,7 @@ export class TranscriptionService {
     mediaUri: string,
     requestedLanguageCode?: string | null,
     ownerSub?: string,
+    startOffsetSeconds?: number | null,
   ): Promise<TranscriptionJobEntity> {
     const languageCode = requestedLanguageCode?.trim() || 'ko-KR';
 
@@ -800,6 +853,7 @@ export class TranscriptionService {
         status: submission.status,
         mediaUri,
         languageCode,
+        startOffsetSeconds: startOffsetSeconds ?? null,
       });
       const savedJob = await this.transcriptionJobRepository.save(queuedJob);
       await this.meetingService.updateProcessingPhase(

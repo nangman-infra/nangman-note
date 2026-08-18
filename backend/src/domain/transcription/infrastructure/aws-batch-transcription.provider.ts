@@ -24,6 +24,7 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
   private readonly outputBucket: string;
   private readonly mediaFormat: string;
   private readonly maxSpeakerLabels: number;
+  private readonly vocabularyName: string | undefined;
 
   constructor(
     private readonly configService: ConfigService<AppEnv, true>,
@@ -49,6 +50,14 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
         infer: true,
       },
     );
+    // 커스텀 어휘 (전문용어 사전) — 설정된 경우에만 전달
+    const vocabulary = this.configService.get(
+      'AWS_TRANSCRIBE_VOCABULARY_NAME',
+      {
+        infer: true,
+      },
+    );
+    this.vocabularyName = vocabulary?.trim() || undefined;
   }
 
   async submitBatchJob(
@@ -56,11 +65,15 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
   ): Promise<SubmitBatchTranscriptionJobResult> {
     const providerJobId = this.buildJobName(input.meetingId);
     const languageCode = input.languageCode || this.defaultLanguageCode;
+    // 파일 업로드 전사는 webm 외 포맷도 지원하므로 URI 확장자에서 추론,
+    // 추론 불가 시 env 기본값 사용
+    const mediaFormat =
+      this.inferMediaFormat(input.mediaUri) ?? this.mediaFormat;
 
     const command = new StartTranscriptionJobCommand({
       TranscriptionJobName: providerJobId,
       LanguageCode: languageCode as LanguageCode,
-      MediaFormat: this.mediaFormat as MediaFormat,
+      MediaFormat: mediaFormat as MediaFormat,
       Media: {
         MediaFileUri: input.mediaUri,
       },
@@ -71,6 +84,7 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
       Settings: {
         ShowSpeakerLabels: true,
         MaxSpeakerLabels: this.maxSpeakerLabels,
+        VocabularyName: this.vocabularyName,
       },
     });
 
@@ -113,6 +127,24 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
   private buildJobName(meetingId: string): string {
     const normalized = meetingId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
     return `${this.jobPrefix}-${normalized}-${Date.now().toString(36)}`;
+  }
+
+  /** 미디어 URI 확장자에서 Transcribe MediaFormat 추론 */
+  private inferMediaFormat(mediaUri: string): string | null {
+    const match = /\.([a-z0-9]+)$/i.exec(mediaUri.trim());
+    if (!match) return null;
+    const extension = match[1].toLowerCase();
+    const supported = [
+      'mp3',
+      'mp4',
+      'wav',
+      'flac',
+      'ogg',
+      'amr',
+      'webm',
+      'm4a',
+    ];
+    return supported.includes(extension) ? extension : null;
   }
 
   private mapAwsStatus(awsStatus: string): TranscriptionJobStatus {

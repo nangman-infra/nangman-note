@@ -92,8 +92,15 @@ apiClient.interceptors.response.use(
       }
 
       const payload = error.response?.data as ErrorPayload | undefined;
+      // production 백엔드는 500을 'Internal server error'로 마스킹하므로
+      // 그대로 노출하지 않고 한국어 안내로 대체한다.
+      const rawServerMessage = payload?.error?.message;
+      const serverMessage =
+        rawServerMessage === 'Internal server error' ? null : rawServerMessage;
       const message =
-        payload?.error?.message || error.message || '오류가 발생했습니다';
+        serverMessage ||
+        translateAxiosErrorMessage(error) ||
+        '오류가 발생했습니다';
 
       return Promise.reject(
         new ApiError({
@@ -110,3 +117,40 @@ apiClient.interceptors.response.use(
     return Promise.reject(new ApiError({ message: fallbackMessage }));
   },
 );
+
+/**
+ * axios가 만든 영문 저수준 에러("timeout of 30000ms exceeded",
+ * "Network Error" 등)를 사용자에게 그대로 노출하지 않도록 한국어로 변환.
+ */
+function translateAxiosErrorMessage(error: AxiosError): string | null {
+  if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+    return '서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.';
+  }
+  if (error.code === 'ERR_NETWORK') {
+    return '네트워크 연결을 확인해주세요. 서버에 연결할 수 없습니다.';
+  }
+  if (error.code === 'ERR_CANCELED') {
+    return '요청이 취소되었습니다.';
+  }
+
+  const status = error.response?.status;
+  if (status !== undefined) {
+    if (status >= 500) {
+      return '서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    }
+    if (status === 404) {
+      return '요청한 데이터를 찾을 수 없습니다.';
+    }
+    if (status === 403) {
+      return '이 작업을 수행할 권한이 없습니다.';
+    }
+    if (status === 401) {
+      return '인증이 만료되었습니다. 다시 로그인해주세요.';
+    }
+    if (status === 400) {
+      return '요청을 처리할 수 없습니다. 입력 내용을 확인해주세요.';
+    }
+  }
+
+  return error.message || null;
+}

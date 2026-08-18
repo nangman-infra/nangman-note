@@ -181,7 +181,8 @@ export function ProcessingProgress({
     {
       key: 'transcribing',
       label: '전사 처리 중',
-      description: '음성을 텍스트로 변환하고 있습니다. 약 2~5분 소요됩니다.',
+      description:
+        '음성을 텍스트로 변환하고 있습니다. 오디오 길이에 따라 수 분 이상 걸릴 수 있습니다.',
       icon: Mic,
     },
     {

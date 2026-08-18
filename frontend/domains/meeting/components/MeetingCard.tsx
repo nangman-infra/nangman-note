@@ -105,6 +105,14 @@ export const MeetingCard = memo(
               <h3 className="line-clamp-1 text-sm font-bold text-slate-900 transition-colors group-hover:text-indigo-700">
                 {meeting.title || '제목 없는 회의'}
               </h3>
+              {meeting.searchSnippet && meeting.searchMatchedIn ? (
+                <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                  <span className="mr-1.5 inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600">
+                    {getSearchMatchLabel(meeting.searchMatchedIn)}
+                  </span>
+                  {meeting.searchSnippet}
+                </p>
+              ) : null}
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--ink-muted)]">
                 <span>{formatDate(meeting.startedAt)}</span>
                 {duration > 0 && (
@@ -192,3 +200,18 @@ export const MeetingCard = memo(
 );
 
 MeetingCard.displayName = 'MeetingCard';
+
+function getSearchMatchLabel(
+  matchedIn: NonNullable<Meeting['searchMatchedIn']>,
+): string {
+  switch (matchedIn) {
+    case 'title':
+      return '제목';
+    case 'note':
+      return '노트';
+    case 'transcript':
+      return '전사';
+    case 'result':
+      return '회의록';
+  }
+}

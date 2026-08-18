@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Socket } from 'socket.io-client';
 import { useTranscriptionStore } from '../stores/transcriptionStore';
+import { transcriptionApi } from '../api/transcriptionApi';
 import { createSocket } from '@/lib/api/websocket';
 import {
   bindTranscriptionSocketHandlers,
@@ -31,6 +32,7 @@ export function useTranscription(
     hasActiveSession,
     error,
     handlePayload,
+    syncSegmentsFromServer,
     clearTranscripts,
     toggleExpanded,
     setConnected,
@@ -103,6 +105,17 @@ export function useTranscription(
       setHasActiveSession,
       setError,
       handlePayload,
+      onReconnected: () => {
+        // 단절 중 놓친 final 세그먼트를 DB에서 재동기화
+        void transcriptionApi
+          .list(meetingId)
+          .then((serverSegments) => {
+            syncSegmentsFromServer(serverSegments);
+          })
+          .catch(() => {
+            // 재동기화 실패는 다음 재연결에서 재시도
+          });
+      },
     });
 
     // Cleanup
@@ -121,6 +134,7 @@ export function useTranscription(
     meetingId,
     clearTranscripts,
     handlePayload,
+    syncSegmentsFromServer,
     setConnected,
     setHasActiveSession,
     setError,

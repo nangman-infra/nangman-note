@@ -10,10 +10,20 @@ const originalMediaDevices = Object.getOwnPropertyDescriptor(
 );
 
 function createMockStream(deviceId = 'device-1'): MediaStream {
+  const listeners = new Map<string, Array<() => void>>();
   const track = {
     stop: vi.fn(),
     getSettings: () => ({ deviceId }),
-  } as unknown as MediaStreamTrack;
+    addEventListener: vi.fn((type: string, listener: () => void) => {
+      const existing = listeners.get(type) ?? [];
+      existing.push(listener);
+      listeners.set(type, existing);
+    }),
+    removeEventListener: vi.fn(),
+    dispatch: (type: string) => {
+      for (const listener of listeners.get(type) ?? []) listener();
+    },
+  } as unknown as MediaStreamTrack & { dispatch: (type: string) => void };
 
   return {
     getTracks: () => [track],
@@ -125,5 +135,36 @@ describe('useAudioCapture', () => {
     expect(response!).toEqual({ granted: false, reason: 'unsupported' });
     expect(result.current.error).toContain('마이크 입력만 지원');
     expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it('attempts automatic recovery when the mic track ends unexpectedly', async () => {
+    const firstStream = createMockStream();
+    const secondStream = createMockStream();
+    const getUserMedia = vi
+      .fn()
+      .mockResolvedValueOnce(firstStream)
+      .mockResolvedValueOnce(secondStream);
+    mockMediaDevices({ getUserMedia });
+
+    const { result } = renderHook(() => useAudioCapture());
+
+    await act(async () => {
+      await result.current.requestPermission();
+    });
+    expect(result.current.stream).toBe(firstStream);
+
+    // 외부 요인으로 트랙이 끊긴 상황 (OS 권한 회수, 기기 분리 등)
+    await act(async () => {
+      const track = firstStream.getAudioTracks()[0] as MediaStreamTrack & {
+        dispatch: (type: string) => void;
+      };
+      track.dispatch('ended');
+      // 자동 복구 getUserMedia가 처리될 시간을 준다
+      await Promise.resolve();
+    });
+
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(result.current.stream).toBe(secondStream);
+    expect(result.current.error).toBeNull();
   });
 });

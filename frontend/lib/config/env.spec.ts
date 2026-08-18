@@ -45,7 +45,6 @@ describe('env config', () => {
     const { env } = await import('./env');
 
     expect(env.APP_NAME).toBe('TransNote');
-    expect(env.ENABLE_OFFLINE).toBe(false);
     expect(env.AUTO_SAVE_DELAY).toBe(3000);
   });
 });

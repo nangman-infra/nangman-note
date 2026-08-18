@@ -14,6 +14,7 @@ describe('useNoteStore', () => {
     vi.clearAllMocks();
     useNoteStore.setState({
       noteContent: '',
+      isDirty: false,
       isSaving: false,
       lastSaved: null,
       error: null,
@@ -45,6 +46,31 @@ describe('useNoteStore', () => {
 
     expect(loaded).toBe('로드된 노트');
     expect(useNoteStore.getState().noteContent).toBe('로드된 노트');
+  });
+
+  it('does not overwrite text entered while a note load is pending', async () => {
+    let resolveGet: (value: Awaited<ReturnType<typeof noteApi.get>>) => void;
+    vi.mocked(noteApi.get).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveGet = resolve;
+        }),
+    );
+
+    const loading = useNoteStore.getState().loadNote('meeting-1');
+    useNoteStore.getState().setContent('작성 중인 노트');
+    resolveGet!({
+      id: 'note-1',
+      meetingId: 'meeting-1',
+      content: '서버 노트',
+      createdAt: '2026-03-01T00:00:00.000Z',
+      updatedAt: '2026-03-01T00:00:00.000Z',
+    });
+
+    await loading;
+
+    expect(useNoteStore.getState().noteContent).toBe('작성 중인 노트');
+    expect(useNoteStore.getState().isDirty).toBe(true);
   });
 
   it('returns false and sets error when save fails', async () => {

@@ -48,6 +48,8 @@ export function InProgressMeetingView({
   onMobilePanelChange,
   onProcessingComplete,
   onProcessingGoHome,
+  onRetryUpload,
+  onContinueWithoutAudio,
   onShowSummaryInfo,
   onSaveNote,
   onEndConfirm,
@@ -98,6 +100,8 @@ export function InProgressMeetingView({
           uploadError={uploadError}
           onComplete={onProcessingComplete}
           onGoHome={onProcessingGoHome}
+          onRetryUpload={onRetryUpload}
+          onContinueWithoutAudio={onContinueWithoutAudio}
         />
       )}
 

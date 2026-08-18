@@ -29,6 +29,10 @@ export interface Meeting {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  /** 검색 결과로 매핑된 경우: 어느 필드에서 매치됐는지 */
+  searchMatchedIn?: 'title' | 'result' | 'transcript' | 'note';
+  /** 검색 결과로 매핑된 경우: 매치 문맥 스니펫 */
+  searchSnippet?: string;
 }
 
 export interface CreateMeetingDto {

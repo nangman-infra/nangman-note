@@ -20,6 +20,8 @@ export function MeetingList(props: MeetingListControllerProps) {
     sortedMeetings,
     visibleMeetings,
     hiddenCount,
+    hasMoreMeetings,
+    isLoadingMore,
     search,
     selection,
     actions,
@@ -63,6 +65,8 @@ export function MeetingList(props: MeetingListControllerProps) {
         inputRef={search.inputRef}
         searchQuery={search.searchQuery}
         setSearchQuery={search.setSearchQuery}
+        searchScope={search.searchScope}
+        onSearchScopeChange={search.changeSearchScope}
         isSearchApplied={search.isSearchApplied}
         isSuggestionOpen={search.isSuggestionOpen}
         activeDescendantIndex={search.activeDescendantIndex}
@@ -119,12 +123,17 @@ export function MeetingList(props: MeetingListControllerProps) {
         onToggleSelect={selection.toggleSelect}
       />
 
-      {!isLoading && hiddenCount > 0 ? (
+      {!isLoading &&
+      (hiddenCount > 0 ||
+        (hasMoreMeetings && !showTrash && !search.isSearchApplied)) ? (
         <MeetingListLoadMoreFooter
           hiddenCount={hiddenCount}
           sortedCount={sortedMeetings.length}
           visibleCount={visibleMeetings.length}
+          hasMoreOnServer={hasMoreMeetings && !showTrash && !search.isSearchApplied}
+          isLoadingMore={isLoadingMore}
           onShowAll={() => handlers.setShowAll(true)}
+          onLoadMoreFromServer={() => void handlers.loadMoreMeetings()}
         />
       ) : null}
 

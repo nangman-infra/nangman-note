@@ -70,12 +70,10 @@ export class TranslateService {
         targetLanguage,
         errorMessage: error instanceof Error ? error.message : String(error),
       });
-      // 번역 실패 시 원본 텍스트 반환 (서비스 중단 방지)
-      return {
-        translatedText: text,
-        sourceLanguageCode: sourceLanguage,
-        targetLanguageCode: targetLanguage,
-      };
+      // 실패를 원문 반환으로 은폐하지 않는다.
+      // (원문이 번역문으로 DB에 저장되고 UI가 '번역 완료'로 표시되는 문제 방지 —
+      // 호출부(translateAndPatchSegment)가 failed 상태를 프론트에 전달한다)
+      throw error;
     }
   }
 

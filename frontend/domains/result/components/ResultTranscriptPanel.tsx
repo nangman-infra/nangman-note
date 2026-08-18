@@ -42,10 +42,40 @@ export function ResultTranscriptPanel({
               [{formatSegmentTime(segment.startTime)} ~{' '}
               {formatSegmentTime(segment.endTime)}]
             </span>
+            {segment.speakerLabel ? (
+              <span
+                className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-semibold ${getResultSpeakerBadgeClass(segment.speakerLabel)}`}
+              >
+                {getResultSpeakerDisplayName(segment.speakerLabel)}
+              </span>
+            ) : null}
             <span>{segment.text}</span>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+const RESULT_SPEAKER_BADGE_CLASSES = [
+  'bg-indigo-100 text-indigo-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-rose-100 text-rose-700',
+  'bg-amber-100 text-amber-700',
+  'bg-sky-100 text-sky-700',
+  'bg-fuchsia-100 text-fuchsia-700',
+] as const;
+
+function getResultSpeakerDisplayName(speakerLabel: string): string {
+  const match = /^spk[_-]?(\d+)$/i.exec(speakerLabel.trim());
+  if (match) {
+    return `화자 ${Number(match[1]) + 1}`;
+  }
+  return speakerLabel;
+}
+
+function getResultSpeakerBadgeClass(speakerLabel: string): string {
+  const match = /(\d+)/.exec(speakerLabel);
+  const index = match ? Number(match[1]) : 0;
+  return RESULT_SPEAKER_BADGE_CLASSES[index % RESULT_SPEAKER_BADGE_CLASSES.length];
 }

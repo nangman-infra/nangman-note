@@ -4,7 +4,8 @@ import { IBM_Plex_Mono, Inter, Manrope } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/auth/AuthSessionProvider';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
 import { NetworkStatusBanner } from '@/components/feedback/NetworkStatusBanner';
-import { getServerRuntimeVar } from '@/lib/config/env';
+import { env, getServerRuntimeVar } from '@/lib/config/env';
+import { THEME_INIT_SCRIPT } from '@/lib/theme/theme';
 import { getSiteUrl } from '@/lib/seo/site-url';
 import '@toast-ui/editor/dist/toastui-editor.css';
 import './globals.css';
@@ -130,16 +131,18 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{ __html: buildRuntimeEnvScript() }}
         />
+        {/* 저장된 테마를 하이드레이션 전에 적용 (다크 모드 FOUC 방지) */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className={`${manrope.variable} ${inter.variable} ${plexMono.variable} antialiased`}>
         <NetworkStatusBanner />
         <AuthSessionProvider>
           <FeedbackProvider>{children}</FeedbackProvider>
         </AuthSessionProvider>
-        {process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL && (
+        {env.ANALYTICS_SCRIPT_URL && (
           <Script
-            src={process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL}
-            data-site-id={process.env.NEXT_PUBLIC_ANALYTICS_SITE_ID}
+            src={env.ANALYTICS_SCRIPT_URL}
+            data-site-id={env.ANALYTICS_SITE_ID}
             strategy="afterInteractive"
           />
         )}

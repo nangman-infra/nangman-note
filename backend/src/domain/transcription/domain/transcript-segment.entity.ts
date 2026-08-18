@@ -50,6 +50,14 @@ export class TranscriptSegmentEntity {
   })
   speakerLabel?: string;
 
+  /**
+   * 이 세그먼트를 생성한 배치 전사 잡 ID (실시간 세그먼트는 null).
+   * 재수집 시 해당 잡의 세그먼트만 교체하여 멱등성을 보장하고,
+   * 실시간→배치 폴백 시 실시간 세그먼트를 보존하기 위해 사용합니다.
+   */
+  @Column({ name: 'transcription_job_id', type: 'uuid', nullable: true })
+  transcriptionJobId?: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -82,6 +82,7 @@ export function bindTranscriptionSocketHandlers({
   setHasActiveSession,
   setError,
   handlePayload,
+  onReconnected,
 }: {
   socket: Socket;
   authRecoveryPendingRef: MutableRefObject<boolean>;
@@ -93,11 +94,22 @@ export function bindTranscriptionSocketHandlers({
   setHasActiveSession: (hasActiveSession: boolean) => void;
   setError: (message: string | null) => void;
   handlePayload: (payload: RealtimeTranscriptPayload) => void;
+  /** 재연결(최초 연결 제외) 시 호출 — 단절 중 놓친 세그먼트 재동기화용 */
+  onReconnected?: () => void;
 }) {
+  let hasConnectedOnce = false;
+
   socket.on('connect', () => {
     authRecoveryPendingRef.current = false;
     setConnected(true);
     setError(null);
+
+    if (hasConnectedOnce) {
+      // 단절 중 emit된 transcript:final은 다시 수신할 수 없으므로
+      // DB에 저장된 세그먼트를 재조회해 화면 공백을 복구한다.
+      onReconnected?.();
+    }
+    hasConnectedOnce = true;
   });
 
   socket.on('disconnect', (reason) => {
@@ -108,6 +120,17 @@ export function bindTranscriptionSocketHandlers({
       authRecoveryPendingRef.current = false;
       recoverSocketAuth(socket);
     }
+  });
+
+  // 자동 재연결 최대 횟수 소진: 이대로 두면 UI가 영구 '연결 중...'에 갇히고
+  // 오디오만 계속 폐기된다. 명시적으로 실패를 알리고 배치 폴백을 트리거한다.
+  socket.io.on('reconnect_failed', () => {
+    setConnected(false);
+    setHasActiveSession(false);
+    setError(
+      '실시간 연결을 복구하지 못했습니다. 남은 구간은 배치 전사로 처리됩니다.',
+    );
+    fallbackCallbackRef.current?.({ reason: 'client-connection-lost' });
   });
 
   socket.on('connected', (data: { meetingId: string; hasActiveSession: boolean }) => {

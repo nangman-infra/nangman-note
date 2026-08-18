@@ -4,6 +4,12 @@ import { useResultStore } from '../stores/resultStore';
 
 /** 재생성 폴링 폴백 최대 대기 시간 (2분) */
 const REGENERATE_POLL_TIMEOUT_MS = 2 * 60 * 1000;
+/**
+ * 결과 대기(isPending) 폴링 최대 시간 (15분).
+ * 백엔드 처리가 고착되면 recovery가 풀어주지만, 그 사이 사용자가
+ * 무한 스피너에 갇히지 않도록 안내 메시지로 전환한다.
+ */
+const PENDING_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 function getInitialVisibility() {
   if (typeof document === 'undefined') {
@@ -26,6 +32,7 @@ export function useResult(meetingId: string) {
     regenerateResult,
     exportPDF,
     exportDOCX,
+    exportMD,
     clearResult,
   } = useResultStore();
 
@@ -76,7 +83,17 @@ export function useResult(meetingId: string) {
   useEffect(() => {
     if (!meetingId || !isPending || !isPageVisible) return;
 
+    const pendingStartedAt = Date.now();
     const timerId = window.setInterval(() => {
+      // 탈출구: 처리 지연이 비정상적으로 길어지면 무한 스피너 대신 안내
+      if (Date.now() - pendingStartedAt > PENDING_POLL_TIMEOUT_MS) {
+        useResultStore.setState({
+          isPending: false,
+          error:
+            '결과 생성이 예상보다 오래 걸리고 있습니다. 서버가 자동으로 복구를 시도하니 잠시 후 다시 확인해주세요. 문제가 계속되면 결과 재생성을 시도할 수 있습니다.',
+        });
+        return;
+      }
       void fetchResult(meetingId, { silent: true });
     }, 5000);
 
@@ -129,5 +146,6 @@ export function useResult(meetingId: string) {
     regenerateResult: (promptId: string) => regenerateResult(meetingId, promptId),
     exportPDF: () => exportPDF(meetingId),
     exportDOCX: () => exportDOCX(meetingId),
+    exportMD: () => exportMD(meetingId),
   };
 }

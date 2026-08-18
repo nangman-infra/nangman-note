@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import {
   cleanupAudioStreamingRuntime,
+  drainPendingChunks,
   handleAudioAckResponse,
   handleAudioChunk,
   markStoppedByGuard,
@@ -61,17 +62,28 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
 
   const handleAck = useCallback(
     (ackId: number, ack?: AudioAckResponse) => {
-      handleAudioAckResponse({
-        ackId,
-        ack,
-        refs,
-        requestSessionStop,
-        notifyFallbackToBatch,
-        cleanup,
-        setState,
-        setError,
-        stopForRealtimeInstability,
-      });
+      // 자기 참조 클로저: ack 처리 후 버퍼된 청크를 이어 전송하고,
+      // 그 청크들의 ack도 동일한 파이프라인으로 처리한다.
+      const processAck = (nextAckId: number, nextAck?: AudioAckResponse) => {
+        handleAudioAckResponse({
+          ackId: nextAckId,
+          ack: nextAck,
+          refs,
+          requestSessionStop,
+          notifyFallbackToBatch,
+          cleanup,
+          setState,
+          setError,
+          stopForRealtimeInstability,
+        });
+        // ack 처리로 in-flight 슬롯이 비었으면 버퍼된 청크를 이어서 전송
+        drainPendingChunks({
+          refs,
+          stopForRealtimeInstability,
+          onAck: processAck,
+        });
+      };
+      processAck(ackId, ack);
     },
     [
       cleanup,

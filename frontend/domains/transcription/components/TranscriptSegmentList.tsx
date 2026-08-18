@@ -1,7 +1,7 @@
-import { Languages, Sparkles } from 'lucide-react';
+import { Languages } from 'lucide-react';
 import type { RefObject } from 'react';
 import type { FinalSegment, PartialSegment } from '../stores/transcriptionStore';
-import { formatSegmentTime, isKeyPointSegment } from './transcriptPanelUtils';
+import { formatSegmentTime, getSpeakerBadgeClass, getSpeakerDisplayName } from './transcriptPanelUtils';
 import { TranscriptPanelEmptyState } from './TranscriptPanelEmptyState';
 
 interface TranscriptSegmentListProps {
@@ -31,29 +31,20 @@ export function TranscriptSegmentList({
 }
 
 function TranscriptSegmentItem({ segment }: { segment: FinalSegment }) {
-  if (isKeyPointSegment(segment)) {
-    return (
-      <div
-        className="ai-card-accent group rounded-r-lg px-3 py-2"
-        data-key-point="true"
-      >
-        <div className="flex items-start gap-2">
-          <span className="mt-0.5 shrink-0 inline-flex items-center gap-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-cyan-300">
-            <Sparkles className="h-3 w-3" aria-hidden="true" />
-            {formatSegmentTime(segment.startTime)}
-          </span>
-          <SegmentText segment={segment} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="group">
       <div className="flex items-start gap-2">
         <span className="mt-0.5 shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-300">
           {formatSegmentTime(segment.startTime)}
         </span>
+        {segment.speakerLabel ? (
+          <span
+            className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${getSpeakerBadgeClass(segment.speakerLabel)}`}
+            title={`화자 ${getSpeakerDisplayName(segment.speakerLabel)}`}
+          >
+            {getSpeakerDisplayName(segment.speakerLabel)}
+          </span>
+        ) : null}
         <SegmentText segment={segment} />
       </div>
     </div>

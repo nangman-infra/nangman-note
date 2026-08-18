@@ -10,9 +10,11 @@ import { MeetingSearchDocumentEntity } from '../domain/meeting-search-document.e
 import { MeetingProcessingPhase } from '../domain/meeting-processing-phase.enum';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
 
-const MAX_TRANSCRIPT_CONTENT_LENGTH = 40_000;
-const MAX_NOTE_CONTENT_LENGTH = 20_000;
-const MAX_RESULT_CONTENT_LENGTH = 20_000;
+// 장시간 회의 후반부도 검색 가능하도록 충분히 크게 설정
+// (3시간 회의 전사 ≈ 10만~15만 자; text 컬럼이라 스키마 제약 없음)
+const MAX_TRANSCRIPT_CONTENT_LENGTH = 200_000;
+const MAX_NOTE_CONTENT_LENGTH = 100_000;
+const MAX_RESULT_CONTENT_LENGTH = 100_000;
 
 export type MeetingSearchScope =
   | 'all'

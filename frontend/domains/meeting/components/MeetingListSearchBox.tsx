@@ -8,12 +8,18 @@ import type {
   RefObject,
   SetStateAction,
 } from 'react';
+import {
+  MEETING_SEARCH_SCOPE_OPTIONS,
+  type MeetingSearchScope,
+} from './useMeetingListSearch';
 
 interface MeetingListSearchBoxProps {
   showTrash: boolean;
   inputRef: RefObject<HTMLInputElement | null>;
   searchQuery: string;
   setSearchQuery: Dispatch<SetStateAction<string>>;
+  searchScope?: MeetingSearchScope;
+  onSearchScopeChange?: (scope: MeetingSearchScope) => void;
   isSuggestionOpen: boolean;
   activeDescendantIndex: number;
   recentSearches: string[];
@@ -32,6 +38,8 @@ export function MeetingListSearchBox({
   inputRef,
   searchQuery,
   setSearchQuery,
+  searchScope = 'all',
+  onSearchScopeChange,
   isSuggestionOpen,
   activeDescendantIndex,
   recentSearches,
@@ -50,7 +58,8 @@ export function MeetingListSearchBox({
         회의 제목과 내용 검색
       </label>
 
-      <div className="relative">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
         <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
           <Search className="h-4 w-4 text-muted" />
         </span>
@@ -145,6 +154,25 @@ export function MeetingListSearchBox({
               })}
             </ul>
           </div>
+        ) : null}
+        </div>
+
+        {onSearchScopeChange ? (
+          <select
+            value={searchScope}
+            onChange={(event) =>
+              onSearchScopeChange(event.target.value as MeetingSearchScope)
+            }
+            disabled={showTrash}
+            aria-label="검색 범위"
+            className="input-shell h-10 shrink-0 rounded-full !px-3 text-xs font-semibold disabled:opacity-60"
+          >
+            {MEETING_SEARCH_SCOPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         ) : null}
       </div>
     </form>

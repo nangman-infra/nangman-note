@@ -40,6 +40,7 @@ export function ResultViewer({
     regenerateResult,
     exportPDF,
     exportDOCX,
+    exportMD,
   } = useResult(meetingId);
 
   const { pushToast } = useFeedback();
@@ -51,7 +52,7 @@ export function ResultViewer({
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [isExporting, setIsExporting] = useState<'pdf' | 'docx' | null>(null);
+  const [isExporting, setIsExporting] = useState<'pdf' | 'docx' | 'md' | null>(null);
   const regenerateDialogRef = useRef<HTMLDialogElement>(null);
 
   const {
@@ -221,6 +222,21 @@ export function ResultViewer({
     }
   };
 
+  const handleExportMD = async () => {
+    setIsExporting('md');
+    try {
+      const success = await exportMD();
+      if (!success) return;
+      pushToast({
+        title: '다운로드 폴더에 저장되었습니다',
+        description: 'Markdown 파일이 다운로드되었습니다.',
+        variant: 'success',
+      });
+    } finally {
+      setIsExporting(null);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <ResultViewerHeader
@@ -244,6 +260,7 @@ export function ResultViewer({
         onCopy={() => void handleCopy()}
         onExportPDF={() => void handleExportPDF()}
         onExportDOCX={() => void handleExportDOCX()}
+        onExportMD={() => void handleExportMD()}
       />
 
       <ResultTabNav activeTab={activeTab} onTabChange={setActiveTab} />

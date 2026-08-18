@@ -32,6 +32,22 @@ export const meetingApi = {
     return response.data.data.meetings;
   },
 
+  // 전체 회의 데이터 내보내기 (노트·결과·전사 포함 JSON)
+  exportAll: async (): Promise<{
+    exportedAt: string;
+    meetingCount: number;
+    meetings: Array<Record<string, unknown>>;
+  }> => {
+    const response = await apiClient.get<{
+      data: {
+        exportedAt: string;
+        meetingCount: number;
+        meetings: Array<Record<string, unknown>>;
+      };
+    }>('/api/v1/meetings/export', { timeout: 120_000 });
+    return response.data.data;
+  },
+
   // 회의 검색
   search: async (query: string, scope: string = 'all'): Promise<SearchResult[]> => {
     const response = await apiClient.get<{ data: { results: SearchResult[] } }>(

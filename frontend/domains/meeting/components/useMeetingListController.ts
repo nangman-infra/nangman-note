@@ -59,9 +59,12 @@ export function useMeetingListController({
   const {
     meetings,
     trashMeetings,
+    hasMoreMeetings,
+    isLoadingMore,
     isLoading,
     error,
     fetchMeetings,
+    loadMoreMeetings,
     fetchTrashMeetings,
     searchMeetings,
     deleteMeeting,
@@ -321,6 +324,8 @@ export function useMeetingListController({
     sortedMeetings,
     visibleMeetings,
     hiddenCount,
+    hasMoreMeetings,
+    isLoadingMore,
     search,
     selection,
     actions,
@@ -331,6 +336,7 @@ export function useMeetingListController({
       setTimeFilter: handleTimeFilterChange,
       setTagFilter: handleTagFilterChange,
       resetArchiveFilters,
+      loadMoreMeetings,
       toggleTrash: () => {
         setShowTrash((prev) => !prev);
         search.resetSearchState();

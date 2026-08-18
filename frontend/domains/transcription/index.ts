@@ -14,10 +14,16 @@ export {
 } from './hooks/useAudioStreaming';
 export {
   useAudioUpload,
+  type UploadOptions,
   type UploadResult,
   type UploadState,
 } from './hooks/useAudioUpload';
-export { useMediaRecorder, type RecorderState } from './hooks/useMediaRecorder';
+export {
+  useMediaRecorder,
+  type RecordedSessionBlob,
+  type RecorderState,
+} from './hooks/useMediaRecorder';
 export { useTranscription } from './hooks/useTranscription';
+export { useWakeLock } from './hooks/useWakeLock';
 export * from './types/audio-input.types';
 export * from './types/transcription.types';

@@ -12,9 +12,21 @@ interface UploadUrlResponse {
 
 export const transcriptionApi = {
   // Presigned URL 생성 (오디오 업로드용)
-  getUploadUrl: async (meetingId: string): Promise<UploadUrlResponse> => {
+  getUploadUrl: async (
+    meetingId: string,
+    startOffsetSeconds?: number,
+    contentType?: string,
+  ): Promise<UploadUrlResponse> => {
+    const body: Record<string, unknown> = {};
+    if (startOffsetSeconds !== undefined) {
+      body.startOffsetSeconds = startOffsetSeconds;
+    }
+    if (contentType) {
+      body.contentType = contentType;
+    }
     const response = await apiClient.post<{ data: UploadUrlResponse }>(
-      `/api/v1/meetings/${meetingId}/transcripts/upload-url`
+      `/api/v1/meetings/${meetingId}/transcripts/upload-url`,
+      body,
     );
     return response.data.data;
   },

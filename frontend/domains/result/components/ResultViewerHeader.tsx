@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { Copy, Edit3, Save, X } from 'lucide-react';
 import { StatusBanner } from '@/components/feedback/StatusBanner';
 import type { MeetingResult } from '../types/result.types';
@@ -13,7 +14,7 @@ interface ResultViewerHeaderProps {
   editTitle: string;
   isRegenerating: boolean;
   error?: string | null;
-  isExporting: 'pdf' | 'docx' | null;
+  isExporting: 'pdf' | 'docx' | 'md' | null;
   uniqueSpeakers: string[];
   visibleSpeakers: string[];
   overflowSpeakerCount: number;
@@ -27,6 +28,7 @@ interface ResultViewerHeaderProps {
   onCopy: () => void;
   onExportPDF: () => void;
   onExportDOCX: () => void;
+  onExportMD: () => void;
 }
 
 export function ResultViewerHeader({
@@ -50,12 +52,30 @@ export function ResultViewerHeader({
   onCopy,
   onExportPDF,
   onExportDOCX,
+  onExportMD,
 }: ResultViewerHeaderProps) {
+  const [showSpeakerPopover, setShowSpeakerPopover] = useState(false);
+  const speakerPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showSpeakerPopover) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        speakerPopoverRef.current &&
+        !speakerPopoverRef.current.contains(event.target as Node)
+      ) {
+        setShowSpeakerPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSpeakerPopover]);
+
   return (
     <header className="px-6 py-6 sm:px-8 lg:px-12">
       <div className="mb-4 flex items-center gap-2">
         <span className="rounded-full bg-[var(--tertiary-fixed)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--tertiary)]">
-          {result.metadata?.totalDuration > 0 ? 'Finished' : 'Draft'}
+          {result.metadata?.totalDuration > 0 ? 'Finished' : 'Note based'}
         </span>
         <span className="text-sm font-medium text-[var(--ink-muted)]">
           {new Date(result.createdAt).toLocaleDateString('ko-KR', {
@@ -118,14 +138,40 @@ export function ResultViewerHeader({
               </span>
             ))}
             {overflowSpeakerCount > 0 ? (
-              <button
-                type="button"
-                title={uniqueSpeakers.slice(3).join(', ')}
-                aria-label={`추가 참가자 ${overflowSpeakerCount}명`}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 ring-2 ring-white hover:bg-slate-300 transition"
-              >
-                +{overflowSpeakerCount}
-              </button>
+              <div ref={speakerPopoverRef} className="relative inline-flex">
+                <button
+                  type="button"
+                  onClick={() => setShowSpeakerPopover((value) => !value)}
+                  aria-label={`추가 참가자 ${overflowSpeakerCount}명 보기`}
+                  aria-expanded={showSpeakerPopover}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 ring-2 ring-white hover:bg-slate-300 transition"
+                >
+                  +{overflowSpeakerCount}
+                </button>
+                {showSpeakerPopover ? (
+                  <div className="absolute left-0 top-full z-20 mt-1 min-w-[160px] rounded-lg bg-white p-2 shadow-lg">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      전체 참가자
+                    </p>
+                    <ul className="space-y-1">
+                      {uniqueSpeakers.map((label, index) => (
+                        <li key={label} className="flex items-center gap-2 text-xs">
+                          <span
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white ${
+                              RESULT_SPEAKER_PALETTE[
+                                index % RESULT_SPEAKER_PALETTE.length
+                              ]
+                            }`}
+                          >
+                            {getSpeakerInitial(label)}
+                          </span>
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <span className="text-xs font-medium text-[var(--ink-muted)]">
@@ -141,6 +187,7 @@ export function ResultViewerHeader({
               isExporting={isExporting}
               onExportPDF={onExportPDF}
               onExportDOCX={onExportDOCX}
+              onExportMD={onExportMD}
             />
             <button type="button" onClick={onStartEdit} className="btn-secondary inline-flex">
               <Edit3 className="h-4 w-4" />

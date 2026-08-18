@@ -13,6 +13,19 @@ import type { Meeting } from '../types/meeting.types';
 
 const MAX_RECENT_SEARCHES = 8;
 
+export type MeetingSearchScope = 'all' | 'title' | 'note' | 'transcript' | 'result';
+
+export const MEETING_SEARCH_SCOPE_OPTIONS: Array<{
+  value: MeetingSearchScope;
+  label: string;
+}> = [
+  { value: 'all', label: '전체' },
+  { value: 'title', label: '제목' },
+  { value: 'note', label: '노트' },
+  { value: 'transcript', label: '전사' },
+  { value: 'result', label: '회의록' },
+];
+
 type PushToast = (options: {
   title: string;
   description?: string;
@@ -39,6 +52,7 @@ export function useMeetingListSearch({
   pushToast,
 }: UseMeetingListSearchParams) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<MeetingSearchScope>('all');
   const [isSearchApplied, setIsSearchApplied] = useState(false);
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
   const [activeDescendantIndex, setActiveDescendantIndex] = useState(-1);
@@ -115,12 +129,13 @@ export function useMeetingListSearch({
     setIsSuggestionOpen(false);
   };
 
-  const runSearch = (keyword: string) => {
+  const runSearch = (keyword: string, scopeOverride?: MeetingSearchScope) => {
     if (showTrash) {
       return;
     }
 
     const normalized = normalizeKeyword(keyword);
+    const effectiveScope = scopeOverride ?? searchScope;
 
     if (!normalized) {
       resetSearchState();
@@ -132,7 +147,15 @@ export function useMeetingListSearch({
     setIsSearchApplied(true);
     storeRecentSearch(normalized);
     setIsSuggestionOpen(false);
-    void searchMeetings(normalized, 'all');
+    void searchMeetings(normalized, effectiveScope);
+  };
+
+  const changeSearchScope = (scope: MeetingSearchScope) => {
+    setSearchScope(scope);
+    // 검색이 적용된 상태에서 범위를 바꾸면 즉시 재검색
+    if (isSearchApplied && searchQuery.trim()) {
+      runSearch(searchQuery, scope);
+    }
   };
 
   const handleSearchSubmit = (event: FormEvent) => {
@@ -210,6 +233,8 @@ export function useMeetingListSearch({
     inputRef,
     searchQuery,
     setSearchQuery,
+    searchScope,
+    changeSearchScope,
     isSearchApplied,
     isSuggestionOpen,
     activeDescendantIndex,

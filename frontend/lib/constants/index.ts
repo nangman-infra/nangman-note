@@ -8,7 +8,6 @@ export const APP_NAME = env.APP_NAME;
 export const APP_VERSION = env.APP_VERSION;
 
 // Feature Flags
-export const ENABLE_OFFLINE = env.ENABLE_OFFLINE;
 export const AUTO_SAVE_DELAY = env.AUTO_SAVE_DELAY;
 
 // UI Constants

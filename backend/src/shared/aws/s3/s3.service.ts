@@ -13,6 +13,32 @@ import { AppEnv } from '../../config/env.validation';
 
 const PRESIGNED_URL_EXPIRY_SECONDS = 600; // 10분
 
+/** AWS Transcribe가 지원하는 업로드 오디오 포맷 (contentType → 확장자) */
+const SUPPORTED_AUDIO_CONTENT_TYPES: Record<string, string> = {
+  'audio/webm': 'webm',
+  'video/webm': 'webm',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/mp4': 'mp4',
+  'video/mp4': 'mp4',
+  'audio/x-m4a': 'm4a',
+  'audio/m4a': 'm4a',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/wave': 'wav',
+  'audio/flac': 'flac',
+  'audio/x-flac': 'flac',
+  'audio/ogg': 'ogg',
+  'application/ogg': 'ogg',
+  'audio/amr': 'amr',
+};
+
+export function resolveSupportedAudioExtension(
+  contentType: string,
+): string | null {
+  return SUPPORTED_AUDIO_CONTENT_TYPES[contentType.toLowerCase()] ?? null;
+}
+
 @Injectable()
 export class S3AudioService {
   private readonly s3Client: S3Client;
@@ -32,11 +58,15 @@ export class S3AudioService {
     });
   }
 
-  async generateUploadUrl(meetingId: string): Promise<{
+  async generateUploadUrl(
+    meetingId: string,
+    options?: { contentType?: string },
+  ): Promise<{
     uploadUrl: string;
     s3Key: string;
     bucket: string;
     mediaUri: string;
+    contentType: string;
     expiresInSeconds: number;
   }> {
     if (!this.bucket) {
@@ -45,13 +75,21 @@ export class S3AudioService {
       );
     }
 
+    const contentType = options?.contentType?.trim() || 'audio/webm';
+    const extension = resolveSupportedAudioExtension(contentType);
+    if (!extension) {
+      throw new BadRequestException(
+        `Unsupported audio content type: ${contentType}. Supported: webm, mp3, mp4, m4a, wav, flac, ogg, amr`,
+      );
+    }
+
     const timestamp = Date.now();
-    const s3Key = `${this.keyPrefix}/${meetingId}/${timestamp}.webm`;
+    const s3Key = `${this.keyPrefix}/${meetingId}/${timestamp}.${extension}`;
 
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: s3Key,
-      ContentType: 'audio/webm',
+      ContentType: contentType,
     });
 
     const uploadUrl = await getSignedUrl(this.s3Client, command, {
@@ -63,6 +101,7 @@ export class S3AudioService {
       s3Key,
       bucket: this.bucket,
       mediaUri: this.buildMediaUri(s3Key),
+      contentType,
       expiresInSeconds: PRESIGNED_URL_EXPIRY_SECONDS,
     };
   }

@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
-import { Bell, BookOpen, Clock, Mic, Settings, Upload, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { BookOpen, Clock, Mic, Settings, Upload, Users } from 'lucide-react';
 import { MeetingList, useMeetings } from '@/domains/meeting';
 import type { SidebarTimeFilter, SidebarView } from '@/components/layout/Sidebar';
+import { NotificationBell } from './NotificationBell';
+import { UploadAudioDialog } from './UploadAudioDialog';
 
 /* ================================================================== */
 /* Dashboard View — Stitch "Workspace Overview" style                 */
@@ -44,6 +47,14 @@ export function DashboardView({
   showOnboarding,
 }: DashboardViewProps) {
   const isMeetingManagement = activeView === 'history';
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const { fetchMeetings } = useMeetings();
+  const { data: session } = useSession();
+
+  const profileInitial = (
+    (session?.user?.name?.trim() || session?.user?.email?.trim() || 'U')
+      .charAt(0) || 'U'
+  ).toUpperCase();
 
   return (
     <div className="flex h-full flex-col">
@@ -53,16 +64,17 @@ export function DashboardView({
           {isMeetingManagement ? 'Meeting' : 'Workspace Overview'}
         </h2>
         <div className="flex items-center gap-3">
-            <button type="button" className="rounded-full p-2 text-slate-500 transition hover:bg-indigo-50">
-              <Bell className="h-5 w-5" />
-            </button>
+            <NotificationBell onSelectMeeting={onSelectMeeting} />
             <Link href="/settings" className="rounded-full p-2 text-slate-500 transition hover:bg-indigo-50">
               <Settings className="h-5 w-5" />
             </Link>
             {/* Profile Avatar */}
-            <div className="h-8 w-8 overflow-hidden rounded-full border-2 border-[var(--outline-variant)]/20 bg-indigo-100">
+            <div
+              className="h-8 w-8 overflow-hidden rounded-full border-2 border-[var(--outline-variant)]/20 bg-indigo-100"
+              title={session?.user?.name || session?.user?.email || undefined}
+            >
               <div className="flex h-full w-full items-center justify-center text-xs font-bold text-indigo-600">
-                U
+                {profileInitial}
               </div>
             </div>
         </div>
@@ -117,6 +129,7 @@ export function DashboardView({
                     </Link>
                     <button
                       type="button"
+                      onClick={() => setShowUploadDialog(true)}
                       className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-transparent px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
                     >
                       <Upload className="h-4 w-4" />
@@ -233,6 +246,12 @@ export function DashboardView({
           </div>
         )}
       </main>
+
+      <UploadAudioDialog
+        open={showUploadDialog}
+        onClose={() => setShowUploadDialog(false)}
+        onUploaded={() => void fetchMeetings({ silent: true })}
+      />
     </div>
   );
 }

@@ -4,15 +4,17 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Download, FileText, Loader2 } from 'lucide-react';
 
 interface ResultExportMenuProps {
-  isExporting: 'pdf' | 'docx' | null;
+  isExporting: 'pdf' | 'docx' | 'md' | null;
   onExportPDF: () => void;
   onExportDOCX: () => void;
+  onExportMD: () => void;
 }
 
 export function ResultExportMenu({
   isExporting,
   onExportPDF,
   onExportDOCX,
+  onExportMD,
 }: ResultExportMenuProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -84,6 +86,23 @@ export function ResultExportMenu({
               <FileText className="h-4 w-4" />
             )}
             DOCX 내보내기
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setShowExportMenu(false);
+              onExportMD();
+            }}
+            disabled={isExporting !== null}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isExporting === 'md' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            Markdown 내보내기
           </button>
         </div>
       )}

@@ -12,6 +12,8 @@ interface InProgressProcessingPanelProps {
   uploadError: string | null;
   onComplete: () => void;
   onGoHome: () => void;
+  onRetryUpload?: () => void;
+  onContinueWithoutAudio?: () => void;
 }
 
 export function InProgressProcessingPanel({
@@ -21,6 +23,8 @@ export function InProgressProcessingPanel({
   uploadError,
   onComplete,
   onGoHome,
+  onRetryUpload,
+  onContinueWithoutAudio,
 }: InProgressProcessingPanelProps) {
   return (
     <div className="mx-auto w-full max-w-lg p-4">
@@ -30,6 +34,8 @@ export function InProgressProcessingPanel({
         uploadProgress={uploadProgress}
         uploadError={uploadError}
         onComplete={onComplete}
+        onRetryUpload={onRetryUpload}
+        onContinueWithoutAudio={onContinueWithoutAudio}
       />
       <div className="mt-3 text-center">
         <button
