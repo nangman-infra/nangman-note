@@ -1,13 +1,13 @@
 # ─── Stage 1: Dependencies ───
 FROM node:22-bookworm-slim AS deps
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.10.0 --activate
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod=false
 
 # ─── Stage 2: Build ───
 FROM node:22-bookworm-slim AS build
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@11.10.0 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -30,8 +30,8 @@ RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs nestjs
 
 # 프로덕션 의존성만 설치
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && corepack prepare pnpm@latest --activate && \
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN corepack enable && corepack prepare pnpm@11.10.0 --activate && \
     pnpm install --frozen-lockfile --prod && \
     pnpm store prune
 
