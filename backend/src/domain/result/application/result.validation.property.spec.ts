@@ -390,7 +390,7 @@ describe('Validation Property Tests - Quality (Property 10)', () => {
   });
 
   /** Validates: Requirements 7.3 */
-  it('Property 10c: >50% empty sub-fields is rejected as quality failure', () => {
+  it('Property 10c: primary items without any details are rejected as quality failure', () => {
     fc.assert(
       fc.property(fc.string({ minLength: 10, maxLength: 200 }), (summary) => {
         // Create an extraction where all sub-array fields are empty

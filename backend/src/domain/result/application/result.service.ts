@@ -612,6 +612,24 @@ export class ResultService {
           meetingAgenda: meeting.agenda?.trim(),
         });
 
+        // 짧은 전사는 결정·액션 아이템 등 일부 세부 필드가 비는 것이 정상이다.
+        // 구조적으로 유효한 응답이면 품질 검증 결과와 무관하게 제목은 저장해
+        // 기본 폴백 결과에서도 "제목 없는 회의"로 남지 않게 한다.
+        const structure = this.validateStructure(
+          extracted,
+          prompt.documentType,
+        );
+        if (structure.valid && !meeting.title?.trim()) {
+          const generatedTitle =
+            await this.meetingService.setGeneratedTitleIfMissing(
+              meeting.id,
+              extracted.suggestedTitle,
+            );
+          if (generatedTitle) {
+            meeting.title = generatedTitle;
+          }
+        }
+
         const validation = this.validateExtraction({
           extracted,
           documentType: prompt.documentType,
@@ -621,18 +639,6 @@ export class ResultService {
         });
 
         if (validation.valid) {
-          if (!meeting.title?.trim()) {
-            const generatedTitle =
-              await this.meetingService.setGeneratedTitleIfMissing(
-                meeting.id,
-                extracted.suggestedTitle,
-              );
-            if (generatedTitle) {
-              // 결과 본문과 metadata에도 같은 제목을 기록한다.
-              meeting.title = generatedTitle;
-            }
-          }
-
           const aiContent = this.renderStructuredMarkdown({
             meeting,
             documentType: prompt.documentType,
@@ -1313,11 +1319,8 @@ export class ResultService {
     }
 
     if (primaryArray.length > 0) {
-      const emptyRatio = this.calculateEmptySubFieldRatio(extracted);
-      if (emptyRatio > 0.5) {
-        return fail(
-          `Too many empty sub-fields: ${(emptyRatio * 100).toFixed(0)}% empty (maximum 50%)`,
-        );
+      if (!this.hasPrimaryDetails(extracted)) {
+        return fail('Primary items contain no extracted details');
       }
     }
 
@@ -1331,30 +1334,26 @@ export class ResultService {
     return [];
   }
 
-  private calculateEmptySubFieldRatio(
-    extracted: StructuredNoteExtraction,
-  ): number {
-    let totalArrayFields = 0;
-    let emptyArrayFields = 0;
-
-    const checkArrayFields = (obj: Record<string, unknown>) => {
-      for (const [key, value] of Object.entries(obj)) {
-        if (key === 'context' || key === 'documentType') continue;
-        if (Array.isArray(value)) {
-          totalArrayFields++;
-          if (value.length === 0) emptyArrayFields++;
-        }
-      }
-    };
-
+  /**
+   * 짧은 대화에서는 결정·액션·미해결 중 일부만 존재하는 것이 정상이다.
+   * 모든 세부 배열이 비어 있는 경우만 품질 미달로 본다.
+   */
+  private hasPrimaryDetails(extracted: StructuredNoteExtraction): boolean {
     const primaryArray = this.getPrimaryArray(extracted);
     for (const item of primaryArray) {
       if (item && typeof item === 'object') {
-        checkArrayFields(item as Record<string, unknown>);
+        const hasDetail = Object.entries(item as Record<string, unknown>).some(
+          ([key, value]) =>
+            key !== 'title' &&
+            key !== 'name' &&
+            key !== 'context' &&
+            Array.isArray(value) &&
+            value.length > 0,
+        );
+        if (hasDetail) return true;
       }
     }
-
-    return totalArrayFields === 0 ? 0 : emptyArrayFields / totalArrayFields;
+    return false;
   }
 
   private validateConsistency(
