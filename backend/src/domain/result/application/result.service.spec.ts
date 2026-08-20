@@ -25,7 +25,13 @@ describe('ResultService', () => {
     Pick<Repository<TranscriptSegmentEntity>, 'find'>
   >;
   let meetingService: jest.Mocked<
-    Pick<MeetingService, 'findById' | 'updatePrompt' | 'updateProcessingPhase'>
+    Pick<
+      MeetingService,
+      | 'findById'
+      | 'updatePrompt'
+      | 'updateProcessingPhase'
+      | 'setGeneratedTitleIfMissing'
+    >
   >;
   let promptService: jest.Mocked<
     Pick<PromptService, 'ensureExists' | 'findById'>
@@ -102,6 +108,7 @@ describe('ResultService', () => {
       findById: jest.fn(),
       updatePrompt: jest.fn(),
       updateProcessingPhase: jest.fn(),
+      setGeneratedTitleIfMissing: jest.fn(),
     };
     promptService = {
       ensureExists: jest.fn(),
@@ -143,7 +150,12 @@ describe('ResultService', () => {
     });
 
     it('generates and saves result when missing', async () => {
-      meetingService.findById.mockResolvedValue(buildMeeting());
+      meetingService.findById.mockResolvedValue(
+        buildMeeting({ title: undefined }),
+      );
+      meetingService.setGeneratedTitleIfMissing.mockResolvedValue(
+        '주간 진행 현황 공유',
+      );
       resultRepository.findOne.mockResolvedValue(null);
       promptService.findById.mockResolvedValue(buildPrompt());
       noteRepository.findOne.mockResolvedValue({
@@ -163,6 +175,7 @@ describe('ResultService', () => {
       ]);
       bedrockService.extractStructuredNotes.mockResolvedValue({
         documentType: PromptDocumentType.MEETING,
+        suggestedTitle: '주간 진행 현황 공유',
         summary: '안건 공유와 후속 작업을 정리했다.',
         participants: ['택준'],
         agendaItems: [
@@ -204,18 +217,23 @@ describe('ResultService', () => {
       }
       expect(createArg.meetingId).toBe('meeting-1');
       expect(createArg.promptId).toBe('prompt_default_meeting');
-      expect(createArg.content).toContain('# 테스트 회의');
+      expect(createArg.content).toContain('# 주간 진행 현황 공유');
       expect(createArg.content).toContain('## 회의 개요');
       expect(createArg.content).toContain('## 안건별 논의');
       expect(createArg.content).toContain(
         '| 진행 현황 정리 | 택준 | 다음 주 | Medium |',
       );
       expect(createArg.metadata?.totalDuration).toBe(600);
+      expect(createArg.metadata?.title).toBe('주간 진행 현황 공유');
       expect(createArg.metadata?.transcriptWordCount).toBe(2);
       expect(createArg.metadata?.noteLength).toBe(5);
       expect(
         meetingSearchDocumentService.refreshByMeetingId,
       ).toHaveBeenCalledWith('meeting-1');
+      expect(meetingService.setGeneratedTitleIfMissing).toHaveBeenCalledWith(
+        'meeting-1',
+        '주간 진행 현황 공유',
+      );
       expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
         'meeting-1',
         null,

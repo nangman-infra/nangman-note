@@ -20,6 +20,7 @@ export interface StructuredMeetingAgendaItem {
 
 export interface StructuredMeetingExtraction {
   documentType: PromptDocumentType.MEETING;
+  suggestedTitle?: string;
   summary: string;
   participants: string[];
   agendaItems: StructuredMeetingAgendaItem[];
@@ -39,6 +40,7 @@ export interface StructuredLectureConcept {
 
 export interface StructuredLectureExtraction {
   documentType: PromptDocumentType.LECTURE;
+  suggestedTitle?: string;
   summary: string;
   concepts: StructuredLectureConcept[];
   practiceItems: string[];
@@ -59,6 +61,7 @@ export interface StructuredMentoringTopic {
 
 export interface StructuredMentoringExtraction {
   documentType: PromptDocumentType.MENTORING;
+  suggestedTitle?: string;
   summary: string;
   topics: StructuredMentoringTopic[];
   keyTakeaways: string[];

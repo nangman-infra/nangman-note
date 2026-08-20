@@ -340,6 +340,32 @@ export class MeetingService {
     return saved;
   }
 
+  /**
+   * AI가 제안한 제목은 사용자가 제목을 직접 입력하지 않은 경우에만 저장합니다.
+   * WHERE 조건으로 제목 편집과 결과 생성의 경합에서도 수동 제목을 덮어쓰지 않습니다.
+   */
+  async setGeneratedTitleIfMissing(
+    id: string,
+    suggestedTitle: string | undefined,
+  ): Promise<string | undefined> {
+    const title = suggestedTitle?.trim().slice(0, 255);
+    if (!title) return undefined;
+
+    const updated = await this.meetingRepository
+      .createQueryBuilder()
+      .update(MeetingEntity)
+      .set({ title })
+      .where('id = :id', { id })
+      .andWhere("(title IS NULL OR TRIM(title) = '')")
+      .execute();
+
+    if (!updated.affected) return undefined;
+
+    await this.meetingSearchDocumentService.refreshByMeetingId(id);
+    this.logger.log('meeting.generated_title.saved', { meetingId: id });
+    return title;
+  }
+
   async complete(
     id: string,
     options?: { skipTranscription?: boolean; markAttentionRequired?: boolean },

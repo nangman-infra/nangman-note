@@ -75,7 +75,7 @@ const extractConverseInput = (
 };
 
 describe('BedrockService', () => {
-  it('builds deterministic inference config from validated env', async () => {
+  it('omits deprecated temperature from inference config', async () => {
     const { service, send } = createService();
 
     await service.generateMeetingResult({
@@ -91,7 +91,7 @@ describe('BedrockService', () => {
 
     expect(input.modelId).toBe('amazon.nova-pro-v1:0');
     expect(inferenceConfig.maxTokens).toBe(4096);
-    expect(inferenceConfig.temperature).toBe(0);
+    expect(inferenceConfig.temperature).toBeUndefined();
     expect(inferenceConfig.topP).toBeUndefined();
   });
 
@@ -195,7 +195,7 @@ describe('BedrockService', () => {
     expect(systemText).toContain('"documentType": "meeting"');
     expect(userText).toContain('## 추가 강조 지시');
     expect(userText).toContain('```prompt-modifier');
-    expect(inferenceConfig.temperature).toBe(0.1);
+    expect(inferenceConfig.temperature).toBeUndefined();
     expect(result.documentType).toBe(PromptDocumentType.MEETING);
     expect(result.summary).toBe('핵심 요약');
     expect(result.keywords).toEqual(['가상화', 'APM']);

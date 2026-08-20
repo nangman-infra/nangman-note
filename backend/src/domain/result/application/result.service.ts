@@ -621,6 +621,18 @@ export class ResultService {
         });
 
         if (validation.valid) {
+          if (!meeting.title?.trim()) {
+            const generatedTitle =
+              await this.meetingService.setGeneratedTitleIfMissing(
+                meeting.id,
+                extracted.suggestedTitle,
+              );
+            if (generatedTitle) {
+              // 결과 본문과 metadata에도 같은 제목을 기록한다.
+              meeting.title = generatedTitle;
+            }
+          }
+
           const aiContent = this.renderStructuredMarkdown({
             meeting,
             documentType: prompt.documentType,
