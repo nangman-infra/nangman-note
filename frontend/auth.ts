@@ -10,6 +10,8 @@ interface AuthRuntimeConfig {
 }
 
 const tokenEndpointCache = new Map<string, string>();
+const refreshInFlight = new Map<string, Promise<JWT>>();
+const ACCESS_TOKEN_REFRESH_BUFFER_MS = 90_000;
 
 function readRequiredAuthRuntimeVar(
   key: 'AUTHENTIK_ISSUER' | 'AUTHENTIK_CLIENT_ID' | 'AUTHENTIK_CLIENT_SECRET',
@@ -61,15 +63,37 @@ async function refreshAccessToken(
   token: JWT,
   config: AuthRuntimeConfig,
 ): Promise<JWT> {
-  try {
-    if (!token.refreshToken) {
-      return { ...token, error: 'RefreshAccessTokenError' };
-    }
+  if (!token.refreshToken) {
+    return { ...token, error: 'RefreshAccessTokenError' };
+  }
 
+  const existingRefresh = refreshInFlight.get(token.refreshToken);
+  if (existingRefresh) {
+    return existingRefresh;
+  }
+
+  const refresh = refreshAccessTokenUncached(token, token.refreshToken, config);
+  refreshInFlight.set(token.refreshToken, refresh);
+
+  try {
+    return await refresh;
+  } finally {
+    if (refreshInFlight.get(token.refreshToken) === refresh) {
+      refreshInFlight.delete(token.refreshToken);
+    }
+  }
+}
+
+async function refreshAccessTokenUncached(
+  token: JWT,
+  refreshToken: string,
+  config: AuthRuntimeConfig,
+): Promise<JWT> {
+  try {
     const tokenEndpoint = await getTokenEndpoint(config.issuer);
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: token.refreshToken,
+      refresh_token: refreshToken,
       client_id: config.clientId,
       client_secret: config.clientSecret,
     });
@@ -143,7 +167,10 @@ export function createAuthOptions(): NextAuthOptions {
         }
 
         const expiresAt = token.accessTokenExpires;
-        if (typeof expiresAt === 'number' && Date.now() < expiresAt - 30_000) {
+        if (
+          typeof expiresAt === 'number' &&
+          Date.now() < expiresAt - ACCESS_TOKEN_REFRESH_BUFFER_MS
+        ) {
           return token;
         }
 
