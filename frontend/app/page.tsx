@@ -1,20 +1,12 @@
-'use client';
-
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { HomePageContent } from './_components/home/HomePageContent';
 
 export default function HomePage() {
+  // HomePageContent derives its state (view/meeting/trash) from
+  // useSearchParams, which Next requires to be wrapped in Suspense.
   return (
-    <Suspense fallback={<HomePageContent initialShowTrash={false} />}>
-      <HomePageWithSearchParams />
+    <Suspense fallback={null}>
+      <HomePageContent />
     </Suspense>
   );
-}
-
-function HomePageWithSearchParams() {
-  const searchParams = useSearchParams();
-  const initialShowTrash = searchParams.get('view') === 'trash';
-
-  return <HomePageContent initialShowTrash={initialShowTrash} />;
 }

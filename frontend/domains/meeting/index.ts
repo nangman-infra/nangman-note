@@ -3,6 +3,7 @@ export { EndMeetingDialog } from './components/EndMeetingDialog';
 export { MeetingList } from './components/MeetingList';
 export { ProcessingProgress } from './components/ProcessingProgress';
 export { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard';
+export { useHistoryBackGuard } from './hooks/useHistoryBackGuard';
 export { useMeeting, useMeetings } from './hooks/useMeeting';
 export { useMeetingStore } from './stores/meetingStore';
 export * from './types/meeting-completion-state.enum';

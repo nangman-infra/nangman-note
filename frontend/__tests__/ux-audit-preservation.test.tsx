@@ -197,10 +197,12 @@ describe('Preservation 3.6 — New meeting start button works correctly', () => 
     const filePath = path.resolve(__dirname, '../app/meeting/new/page.tsx');
     const source = await fs.readFile(filePath, 'utf-8');
 
-    // handleStart should call startMeeting and router.push to in-progress
+    // handleStart should call startMeeting and navigate to in-progress.
+    // replace (not push) is intentional: the completed form flow must not
+    // remain in the history stack (Back would land on a stale form).
     expect(source).toContain('startMeeting');
     expect(source).toContain('handleStart');
-    expect(source).toMatch(/router\.push\s*\(\s*`\/meeting\/in-progress/);
+    expect(source).toMatch(/router\.replace\s*\(\s*`\/meeting\/in-progress/);
   });
 
   it('should have a meeting create API that posts to the server', async () => {

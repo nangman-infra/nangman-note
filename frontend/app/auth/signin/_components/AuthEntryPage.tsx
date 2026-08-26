@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useState, type FormEvent } from 'react';
-import { signIn } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { signIn, useSession } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { SignInCard, type AuthEntryMode, type EmailSignInStatus } from './SignInCard';
 import { SignInHero } from './SignInHero';
@@ -53,6 +53,8 @@ interface AuthEntryPageProps {
 }
 
 function AuthEntryContent({ mode }: AuthEntryPageProps) {
+  const router = useRouter();
+  const { status } = useSession();
   const searchParams = useSearchParams();
   const errorInfo = getErrorInfo(searchParams.get('error'));
   const [email, setEmail] = useState('');
@@ -60,6 +62,15 @@ function AuthEntryContent({ mode }: AuthEntryPageProps) {
   const [emailStatus, setEmailStatus] = useState<EmailSignInStatus>('idle');
 
   const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'));
+
+  // 이미 로그인된 상태에서 signin 페이지에 진입(예: 로그인 후 Back)하면
+  // 로그인 폼을 다시 노출하지 않고 callbackUrl로 replace한다.
+  const isAuthenticated = status === 'authenticated';
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(callbackUrl);
+    }
+  }, [isAuthenticated, callbackUrl, router]);
 
   const handleSsoSignIn = () => {
     void signIn('authentik', { callbackUrl });
@@ -95,6 +106,11 @@ function AuthEntryContent({ mode }: AuthEntryPageProps) {
       setEmailStatus('error');
     }
   };
+
+  if (isAuthenticated) {
+    // 리다이렉트 중에는 폼 대신 스피너만 노출한다.
+    return <AuthEntryFallback />;
+  }
 
   return (
     <div className="relative min-h-dvh bg-gradient-to-br from-slate-50 via-white to-indigo-50">
@@ -151,19 +167,34 @@ function normalizeCallbackUrl(rawValue: string | null): string {
   }
 
   if (rawValue.startsWith('/')) {
-    return rawValue;
+    return sanitizeInternalPath(rawValue);
   }
 
   try {
     const url = new URL(rawValue);
     if (typeof window !== 'undefined' && url.origin === window.location.origin) {
-      return `${url.pathname}${url.search}${url.hash}`;
+      return sanitizeInternalPath(`${url.pathname}${url.search}${url.hash}`);
     }
   } catch {
     // fallback to root
   }
 
   return '/';
+}
+
+/**
+ * 내부 경로만 허용한다.
+ * - `//evil.com`, `/\evil.com` 같은 protocol-relative open redirect 차단
+ * - `/auth/*` 는 인증 후 되돌아갈 곳이 아니므로(스피너 dead-end 방지) 루트로 대체
+ */
+function sanitizeInternalPath(path: string): string {
+  if (path.startsWith('//') || path.startsWith('/\\')) {
+    return '/';
+  }
+  if (path === '/auth' || path.startsWith('/auth/')) {
+    return '/';
+  }
+  return path;
 }
 
 function isValidEmail(value: string): boolean {

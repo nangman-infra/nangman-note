@@ -1,32 +1,101 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, FileText, LayoutDashboard, Sparkles } from 'lucide-react';
 import { TwoColumnLayout } from '@/components/layout/TwoColumnLayout';
 import { Sidebar, type SidebarTimeFilter, type SidebarView } from '@/components/layout/Sidebar';
 import { meetingApi, useMeetingStore } from '@/domains/meeting';
 import { formatPromptLabel, usePrompt } from '@/domains/prompt';
 import { ResultViewer, useResultStore } from '@/domains/result';
+import { goBack } from '@/lib/navigation/goBack';
 import { DashboardView } from './DashboardView';
 import { PromptsInlineView } from './PromptsInlineView';
 import { SettingsInlineView } from './SettingsInlineView';
 
-interface HomePageContentProps {
-  initialShowTrash: boolean;
+/* ------------------------------------------------------------------ */
+/* URL model — the URL is the source of truth for the home workspace: */
+/*   ?view=history|prompts|settings  (absent = dashboard)             */
+/*   ?view=trash                     (history view with trash open)   */
+/*   ?meeting=<id>                   (selected meeting viewer)        */
+/* ------------------------------------------------------------------ */
+
+function parseActiveView(viewParam: string | null): SidebarView {
+  if (viewParam === 'history' || viewParam === 'trash') return 'history';
+  if (viewParam === 'prompts' || viewParam === 'settings') return viewParam;
+  return 'dashboard';
 }
 
-export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
-  const [mobileActiveView, setMobileActiveView] = useState<'dashboard' | 'viewer'>(
-    'dashboard',
+export function buildHomeUrl({
+  view,
+  showTrash = false,
+  meetingId = null,
+}: {
+  view: SidebarView;
+  showTrash?: boolean;
+  meetingId?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  if (view === 'history' && showTrash) {
+    params.set('view', 'trash');
+  } else if (view !== 'dashboard') {
+    params.set('view', view);
+  }
+  if (meetingId) {
+    params.set('meeting', meetingId);
+  }
+  const query = params.toString();
+  return query ? `/?${query}` : '/';
+}
+
+export function HomePageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Derived-from-URL state (no duplicated useState) — back/forward simply
+  // re-renders with the previous searchParams.
+  const viewParam = searchParams.get('view');
+  const showTrash = viewParam === 'trash';
+  const activeView = parseActiveView(viewParam);
+  const selectedMeetingId = searchParams.get('meeting');
+
+  // Mobile pane is derived from the URL as well: the viewer pane is active
+  // whenever a meeting is selected or an inline view (prompts/settings) is
+  // open. The user can still temporarily override it with the mobile toggle;
+  // the override resets on every navigation.
+  const derivedMobileView: 'dashboard' | 'viewer' =
+    selectedMeetingId || activeView === 'prompts' || activeView === 'settings'
+      ? 'viewer'
+      : 'dashboard';
+  const [mobileViewOverride, setMobileViewOverride] = useState<
+    'dashboard' | 'viewer' | null
+  >(null);
+  const searchParamsKey = searchParams.toString();
+  useEffect(() => {
+    setMobileViewOverride(null); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [searchParamsKey]);
+  const mobileActiveView = mobileViewOverride ?? derivedMobileView;
+
+  const currentHomeUrl = searchParamsKey ? `/?${searchParamsKey}` : '/';
+  /**
+   * 동일 URL 재-push 방지: 이미 열린 view/meeting 을 다시 클릭해도
+   * 중복 history 항목을 만들지 않는다(Back 이 한 번 무시되는 문제 방지).
+   * 모바일에서는 override 만 리셋해 pane 이 다시 열리게 한다.
+   */
+  const pushHomeUrl = useCallback(
+    (url: string) => {
+      if (url === currentHomeUrl) {
+        setMobileViewOverride(null);
+        return;
+      }
+      router.push(url);
+    },
+    [currentHomeUrl, router],
   );
+
   const meetingListRefreshToken = 0;
   const [timeFilter, setTimeFilter] = useState<SidebarTimeFilter>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [showTrash, setShowTrash] = useState(initialShowTrash);
-  const [activeView, setActiveView] = useState<SidebarView>(
-    initialShowTrash ? 'history' : 'dashboard',
-  );
   const [meetingsInfo, setMeetingsInfo] = useState<{ total: number; isLoading: boolean; isSearchApplied: boolean; showTrash: boolean }>({
     total: -1,
     isLoading: true,
@@ -69,10 +138,18 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
     [],
   );
 
+  /** User-initiated trash toggle — pushes a history entry so Back undoes it. */
+  const handleShowTrashChange = useCallback(
+    (nextShowTrash: boolean) => {
+      pushHomeUrl(
+        buildHomeUrl({ view: 'history', showTrash: nextShowTrash, meetingId: null }),
+      );
+    },
+    [pushHomeUrl],
+  );
+
   const handleTrashToggle = () => {
-    setShowTrash((prev) => !prev);
-    setSelectedMeetingId(null);
-    setMobileActiveView('dashboard');
+    handleShowTrashChange(!showTrash);
   };
 
   const handleMeetingsLoaded = useCallback(
@@ -82,37 +159,59 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
     [],
   );
 
+  /**
+   * Explicit "back to dashboard" buttons: prefer the real browser history so
+   * the previous view (e.g. the history list) is restored; goBack falls back
+   * to replace('/') when there is nowhere to go back to (deep link in a
+   * fresh tab).
+   */
   const handleBackToDashboard = () => {
-    setSelectedMeetingId(null);
-    setActiveView('dashboard');
-    setMobileActiveView('dashboard');
+    goBack(router, '/');
   };
 
-  const handleSelectMeeting = (meetingId: string | null) => {
-    setSelectedMeetingId(meetingId);
-    setMobileActiveView(meetingId ? 'viewer' : 'dashboard');
-  };
+  /**
+   * Meeting selection. Selecting pushes `?meeting=<id>` (preserving the view
+   * param) so browser Back returns to the list. Clearing (`null`) is only
+   * triggered programmatically — e.g. the meeting was deleted or became
+   * unavailable — so it replaces instead of pushing a history entry.
+   */
+  const handleSelectMeeting = useCallback(
+    (meetingId: string | null) => {
+      if (meetingId) {
+        pushHomeUrl(buildHomeUrl({ view: activeView, showTrash, meetingId }));
+        return;
+      }
+      if (selectedMeetingId) {
+        router.replace(
+          buildHomeUrl({ view: activeView, showTrash, meetingId: null }),
+        );
+      }
+    },
+    [activeView, pushHomeUrl, router, selectedMeetingId, showTrash],
+  );
 
+  /** Sidebar/mobile navigation — pushes so Back restores the previous view. */
   const handleViewChange = (view: SidebarView) => {
-    setActiveView(view);
-    setMobileActiveView(
-      view === 'prompts' || view === 'settings' ? 'viewer' : 'dashboard',
+    // Preserve original semantics: switching to dashboard/history clears the
+    // selected meeting; prompts/settings keep it (the inline view takes over).
+    const keepMeeting = view === 'prompts' || view === 'settings';
+    pushHomeUrl(
+      buildHomeUrl({
+        view,
+        showTrash: view === 'history' && showTrash,
+        meetingId: keepMeeting ? selectedMeetingId : null,
+      }),
     );
-    if (view !== 'history') {
-      setShowTrash(false);
-    }
-    // dashboard/history 뷰로 전환 시 선택된 회의 해제
-    if (view === 'dashboard' || view === 'history') {
-      setSelectedMeetingId(null);
-    }
   };
 
   // onboarding: show guided steps when user has zero meetings
   const showOnboarding =
     meetingsInfo.total === 0 && !meetingsInfo.isLoading && !meetingsInfo.isSearchApplied && !meetingsInfo.showTrash;
 
-  // For history/prompts/settings views, we don't show the viewer panel
-  const showViewer = Boolean(selectedMeetingId) && activeView !== 'history' && activeView !== 'prompts' && activeView !== 'settings';
+  // Prompts/settings render their own inline view; otherwise a selected
+  // meeting (?meeting=<id> — including deep links) opens the result viewer.
+  const showViewer =
+    Boolean(selectedMeetingId) && activeView !== 'prompts' && activeView !== 'settings';
   const renderViewer = () => {
     if (activeView === 'settings') {
       return (
@@ -195,7 +294,7 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
     <TwoColumnLayout
       showViewer={showViewer || activeView === 'settings' || activeView === 'prompts'}
       mobileView={mobileActiveView}
-      onMobileViewChange={setMobileActiveView}
+      onMobileViewChange={setMobileViewOverride}
       mobileNavigation={
         <nav aria-label="모바일 주요 메뉴" className="grid grid-cols-3 gap-1">
           {([
@@ -232,7 +331,7 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
         <DashboardView
           activeView={activeView}
           showTrash={showTrash}
-          onShowTrashChange={setShowTrash}
+          onShowTrashChange={handleShowTrashChange}
           refreshToken={meetingListRefreshToken}
           onSelectMeeting={handleSelectMeeting}
           selectedMeetingId={selectedMeetingId || undefined}

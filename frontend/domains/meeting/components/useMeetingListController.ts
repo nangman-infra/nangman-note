@@ -62,6 +62,8 @@ export function useMeetingListController({
     hasMoreMeetings,
     isLoadingMore,
     isLoading,
+    hasLoadedMeetings,
+    hasLoadedTrashMeetings,
     error,
     fetchMeetings,
     loadMoreMeetings,
@@ -179,12 +181,30 @@ export function useMeetingListController({
 
   useEffect(() => {
     if (!selectedMeetingId) return;
+    // Don't judge while the list is still loading (e.g. a deep link like
+    // /?meeting=<id> arrives before the first fetch resolves).
+    if (isLoading) return;
+    // Cold mount(새 탭/새로고침 deep-link)에서는 최초 fetch 가 시작되기 전에
+    // 빈 목록으로 판정해 deselect 하면 안 된다 — 최초 로드 성공 이후에만 판정.
+    if (showTrash ? !hasLoadedTrashMeetings : !hasLoadedMeetings) return;
+    // A paginated list may simply not contain an older meeting yet.
+    if (!showTrash && hasMoreMeetings) return;
     const source = showTrash ? trashMeetings : meetings;
     const exists = source.some((meeting) => meeting.id === selectedMeetingId);
     if (!exists) {
       onSelectMeeting?.(null);
     }
-  }, [meetings, onSelectMeeting, selectedMeetingId, showTrash, trashMeetings]);
+  }, [
+    hasLoadedMeetings,
+    hasLoadedTrashMeetings,
+    hasMoreMeetings,
+    isLoading,
+    meetings,
+    onSelectMeeting,
+    selectedMeetingId,
+    showTrash,
+    trashMeetings,
+  ]);
 
   useEffect(() => {
     setShowAll(false); // eslint-disable-line react-hooks/set-state-in-effect
@@ -340,7 +360,12 @@ export function useMeetingListController({
       toggleTrash: () => {
         setShowTrash((prev) => !prev);
         search.resetSearchState();
-        onSelectMeeting?.(null);
+        // In controlled mode the parent owns showTrash (URL-driven) and its
+        // onShowTrashChange navigation already clears the selected meeting;
+        // deselecting here would race with that navigation.
+        if (!isControlled) {
+          onSelectMeeting?.(null);
+        }
       },
     },
   };

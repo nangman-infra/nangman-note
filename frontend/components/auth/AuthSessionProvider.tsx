@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { SessionProvider, useSession, signIn } from 'next-auth/react';
 import { setAccessToken } from '@/lib/auth/access-token-store';
 
@@ -11,11 +11,17 @@ import { setAccessToken } from '@/lib/auth/access-token-store';
  */
 function SessionTokenSync() {
   const { data: session } = useSession();
+  // signIn() 은 full-page 이동이다. 세션 refetch(포커스/4분 주기)마다
+  // 반복 실행되면 뒤로가기로 복원된 페이지가 계속 IdP 로 납치되므로
+  // 탭 수명 동안 1회만 실행한다.
+  const redirectStartedRef = useRef(false);
 
   useEffect(() => {
     if (session?.error === 'RefreshAccessTokenError') {
       // refresh token 마저 만료 → 재로그인
       setAccessToken(undefined);
+      if (redirectStartedRef.current) return;
+      redirectStartedRef.current = true;
       const callbackUrl =
         typeof window !== 'undefined'
           ? `${window.location.pathname}${window.location.search}${window.location.hash}`

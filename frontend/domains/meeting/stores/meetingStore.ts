@@ -29,6 +29,10 @@ interface MeetingState {
   meetingsPage: number;
   isLoadingMore: boolean;
   isLoading: boolean;
+  /** 최초 회의 목록 로드가 성공한 적 있는지 (deep-link deselect 판정용) */
+  hasLoadedMeetings: boolean;
+  /** 최초 휴지통 목록 로드가 성공한 적 있는지 */
+  hasLoadedTrashMeetings: boolean;
   error: string | null;
   startMeeting: (dto: CreateMeetingDto) => Promise<Meeting | null>;
   endMeeting: (options?: {
@@ -103,6 +107,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   meetingsPage: 1,
   isLoadingMore: false,
   isLoading: false,
+  hasLoadedMeetings: false,
+  hasLoadedTrashMeetings: false,
   error: null,
 
   startMeeting: async (dto) => {
@@ -197,6 +203,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
           meetingsPage: options?.silent ? loadedPageCount : 1,
           error: null,
           isLoading: shouldShowLoading ? false : state.isLoading,
+          hasLoadedMeetings: true,
         };
       });
     } catch (error) {
@@ -263,6 +270,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         trashMeetings,
         error: null,
         isLoading: shouldShowLoading ? false : state.isLoading,
+        hasLoadedTrashMeetings: true,
       }));
     } catch (error) {
       if (requestSeq !== latestCollectionRequestSeq) return;

@@ -11,6 +11,7 @@ import {
 } from '@/domains/prompt';
 import { useUserSettingsStore } from '@/domains/settings';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
+import { goBack } from '@/lib/navigation/goBack';
 
 export function useSettingsPageController() {
   const router = useRouter();
@@ -249,7 +250,7 @@ export function useSettingsPageController() {
       handleDefaultTranslateLanguageChange,
       handleSave,
       handleCancel: () => setEditorOpen(false),
-      handleBack: () => router.push('/'),
+      handleBack: () => goBack(router),
     },
   };
 }

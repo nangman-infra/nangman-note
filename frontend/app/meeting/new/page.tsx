@@ -7,6 +7,7 @@ import { MeetingTranscriptionMode, useMeeting } from '@/domains/meeting';
 import { formatPromptLabel, usePrompt } from '@/domains/prompt';
 import { useUserSettingsStore } from '@/domains/settings';
 import { DEFAULT_PROMPT_ID } from '@/lib/constants';
+import { goBack } from '@/lib/navigation/goBack';
 import { NewMeetingForm } from './_components/NewMeetingForm';
 import { NewMeetingHero } from './_components/NewMeetingHero';
 import {
@@ -80,7 +81,9 @@ export default function NewMeetingPage() {
       description: '실시간 노트 화면으로 이동합니다.',
       variant: 'success',
     });
-    router.push(`/meeting/in-progress?meetingId=${meeting.id}`);
+    // replace: the new-meeting form flow is complete — Back from in-progress
+    // should not land on the stale form (stack would be [/, /meeting/new, /]).
+    router.replace(`/meeting/in-progress?meetingId=${meeting.id}`);
   };
 
   return (
@@ -96,7 +99,7 @@ export default function NewMeetingPage() {
 
       <div className="relative mx-auto flex min-h-dvh max-w-6xl items-center px-6 py-12 sm:px-8 lg:px-10">
         <div className="grid w-full grid-cols-1 items-start gap-10 lg:grid-cols-12 lg:gap-16">
-          <NewMeetingHero onBack={() => router.push('/')} />
+          <NewMeetingHero onBack={() => goBack(router)} />
           <NewMeetingForm
             title={title}
             agenda={agenda}
@@ -108,7 +111,7 @@ export default function NewMeetingPage() {
             error={error}
             onTitleChange={setTitle}
             onAgendaChange={setAgenda}
-            onBack={() => router.push('/')}
+            onBack={() => goBack(router)}
             onOpenSettings={() => router.push('/settings')}
             onStart={handleStart}
           />

@@ -9,6 +9,7 @@ import {
   MeetingTranscriptionMode,
   meetingApi,
   useBeforeUnloadGuard,
+  useHistoryBackGuard,
   useMeeting,
 } from '@/domains/meeting';
 import { useNoteStore } from '@/domains/note';
@@ -250,6 +251,38 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
       isUploadingAudio ||
       uploadFailed,
   );
+  // 브라우저 뒤로가기(SPA popstate)는 beforeunload 로 막을 수 없으므로
+  // sentinel history 항목으로 차단하고 종료 절차를 안내한다.
+  const handleBackBlocked = useCallback(() => {
+    if (isEnding || isUploadingAudio || uploadFailed) {
+      pushToast({
+        title: '회의 저장이 진행 중입니다',
+        description: '저장이 끝날 때까지 잠시만 기다려주세요.',
+        variant: 'info',
+      });
+      return;
+    }
+    // 다이얼로그가 이미 떠 있으면 연속 뒤로가기에 toast 를 중복 표시하지 않는다.
+    if (showEndDialog) return;
+    pushToast({
+      title: '회의가 아직 진행 중입니다',
+      description: '회의를 종료한 뒤 목록으로 이동해주세요.',
+      variant: 'info',
+    });
+    setShowEndDialog(true);
+  }, [
+    isEnding,
+    isUploadingAudio,
+    uploadFailed,
+    pushToast,
+    setShowEndDialog,
+    showEndDialog,
+  ]);
+  useHistoryBackGuard(
+    (isActiveRecording || isEnding || isUploadingAudio || uploadFailed) &&
+      !isLeavingPage,
+    handleBackBlocked,
+  );
   // 녹음/스트리밍 중 화면 잠금으로 캡처가 끊기지 않도록 wake lock 유지
   useWakeLock(isActiveRecording || isEnding || isUploadingAudio);
 
@@ -283,6 +316,8 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
             description: '회의 결과 화면에서 회의록을 확인해주세요.',
             variant: 'info',
           });
+          // 재귀 방지: query id를 비워 복구 이펙트가 재실행되지 않게 한다.
+          setMeetingIdFromQuery('');
           navigateHome();
           return;
         }
@@ -294,6 +329,8 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
           description: '회의가 이미 종료되었거나 접근할 수 없습니다.',
           variant: 'info',
         });
+        // 재귀 방지: query id를 비워 복구 이펙트가 재실행되지 않게 한다.
+        setMeetingIdFromQuery('');
         navigateHome();
       } finally {
         if (!disposed) {
