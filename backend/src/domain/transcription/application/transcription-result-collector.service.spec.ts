@@ -8,13 +8,21 @@ import type { BatchTranscriptionProvider } from './ports/batch-transcription-pro
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import {
+  TRANSCRIPTION_COLLECTION_FAILURE_PREFIX,
+  TRANSCRIPTION_SUBMISSION_PENDING_ERROR,
+  unsettledTranscriptionJobWhere,
+} from '../domain/transcription-job.constants';
 import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 
 describe('TranscriptionResultCollectorService', () => {
   let service: TranscriptionResultCollectorService;
   let jobRepository: jest.Mocked<
-    Pick<Repository<TranscriptionJobEntity>, 'findOne' | 'save' | 'count'>
+    Pick<
+      Repository<TranscriptionJobEntity>,
+      'find' | 'findOne' | 'save' | 'count'
+    >
   >;
   let segmentRepository: jest.Mocked<
     Pick<Repository<TranscriptSegmentEntity>, 'create'>
@@ -61,6 +69,7 @@ describe('TranscriptionResultCollectorService', () => {
 
   beforeEach(() => {
     jobRepository = {
+      find: jest.fn(),
       findOne: jest.fn(),
       save: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
@@ -130,6 +139,17 @@ describe('TranscriptionResultCollectorService', () => {
 
     expect(result).toEqual({ success: false, segmentCount: 0 });
     expect(batchProvider.getJobStatus.mock.calls).toHaveLength(0);
+  });
+
+  it('does not poll submission-pending jobs during collector startup', async () => {
+    jobRepository.find.mockResolvedValue([
+      buildJob({ errorMessage: TRANSCRIPTION_SUBMISSION_PENDING_ERROR }),
+    ]);
+    const pollSpy = jest.spyOn(service, 'pollAndCollect');
+
+    await service.onModuleInit();
+
+    expect(pollSpy).not.toHaveBeenCalled();
   });
 
   it('skips collection when a job was already collected', async () => {
@@ -219,6 +239,118 @@ describe('TranscriptionResultCollectorService', () => {
         status: MeetingStatus.PROCESSING,
       }),
     );
+  });
+
+  it.each([
+    ['missing URI', undefined, undefined],
+    [
+      'download failure',
+      's3://transcript-bucket/result.json',
+      new Error('download failed'),
+    ],
+    ['parse failure', 's3://transcript-bucket/result.json', '{invalid'],
+    [
+      'invalid shape',
+      's3://transcript-bucket/result.json',
+      JSON.stringify({ results: {} }),
+    ],
+  ])(
+    'keeps completed jobs retryable after %s',
+    async (_caseName, transcriptUri, transcriptResult) => {
+      const job = buildJob();
+      jobRepository.findOne.mockResolvedValue(job);
+      jobRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as TranscriptionJobEntity),
+      );
+      batchProvider.getJobStatus.mockResolvedValue({
+        status: TranscriptionJobStatus.COMPLETED,
+        transcriptUri,
+      });
+      if (transcriptResult instanceof Error) {
+        s3AudioService.getObjectAsStringFromBucket.mockRejectedValue(
+          transcriptResult,
+        );
+      } else if (typeof transcriptResult === 'string') {
+        s3AudioService.getObjectAsStringFromBucket.mockResolvedValue(
+          transcriptResult,
+        );
+      }
+
+      const result = await service.pollAndCollect('meeting-1', 'job-1');
+
+      expect(result).toEqual({ success: false, segmentCount: 0 });
+      expect(job.status).toBe(TranscriptionJobStatus.FAILED);
+      expect(job.collectedAt).toBeUndefined();
+      expect(job.errorMessage).toBeTruthy();
+      expect(transactionManager.delete).not.toHaveBeenCalled();
+      expect(s3AudioService.deleteAudioFile).not.toHaveBeenCalled();
+      expect(meetingService.updateProcessingPhase).not.toHaveBeenCalled();
+    },
+  );
+
+  it('successfully retries a job after a collection failure', async () => {
+    const job = buildJob();
+    jobRepository.findOne.mockResolvedValue(job);
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
+    batchProvider.getJobStatus.mockResolvedValue({
+      status: TranscriptionJobStatus.COMPLETED,
+      transcriptUri: 's3://transcript-bucket/result.json',
+    });
+    s3AudioService.getObjectAsStringFromBucket
+      .mockResolvedValueOnce('{invalid')
+      .mockResolvedValueOnce(JSON.stringify({ results: { items: [] } }));
+
+    await expect(service.pollAndCollect('meeting-1', 'job-1')).resolves.toEqual(
+      { success: false, segmentCount: 0 },
+    );
+    await expect(service.pollAndCollect('meeting-1', 'job-1')).resolves.toEqual(
+      { success: true, segmentCount: 0 },
+    );
+
+    expect(job.status).toBe(TranscriptionJobStatus.COMPLETED);
+    expect(job.collectedAt).toBeInstanceOf(Date);
+    expect(job.errorMessage).toBeNull();
+    expect(s3AudioService.deleteAudioFile).toHaveBeenCalledWith(
+      'meeting-1/audio.webm',
+    );
+  });
+
+  it('does not generate after a successful job while another job has a retryable collection failure', async () => {
+    const job = buildJob({ id: 'job-successful' });
+    const failedCollectionJob = buildJob({
+      id: 'job-failed-collection',
+      status: TranscriptionJobStatus.FAILED,
+      errorMessage: `${TRANSCRIPTION_COLLECTION_FAILURE_PREFIX}invalid JSON`,
+    });
+    jobRepository.findOne.mockResolvedValue(job);
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
+    jobRepository.count.mockResolvedValue(1);
+    batchProvider.getJobStatus.mockResolvedValue({
+      status: TranscriptionJobStatus.COMPLETED,
+      transcriptUri: 's3://transcript-bucket/result.json',
+    });
+    s3AudioService.getObjectAsStringFromBucket.mockResolvedValue(
+      JSON.stringify({ results: { items: [] } }),
+    );
+    meetingService.findById.mockResolvedValue({
+      id: 'meeting-1',
+      ownerSub: 'user-1',
+      status: MeetingStatus.PROCESSING,
+      transcriptionJobs: [job, failedCollectionJob],
+    } as never);
+
+    await expect(
+      service.pollAndCollect('meeting-1', 'job-successful'),
+    ).resolves.toEqual({ success: true, segmentCount: 0 });
+
+    expect(jobRepository.count).toHaveBeenCalledWith({
+      where: unsettledTranscriptionJobWhere('meeting-1'),
+    });
+    expect(meetingService.updateProcessingPhase).not.toHaveBeenCalled();
   });
 
   it('handles failed transcription by finalizing meeting safely', async () => {

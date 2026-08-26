@@ -22,7 +22,7 @@ describe('ResultController', () => {
 
   it('includes regeneration state in result responses', async () => {
     resultService.findByMeetingId.mockResolvedValue(buildResult());
-    resultService.isRegenerating.mockReturnValue(true);
+    resultService.isRegenerating.mockResolvedValue(true);
 
     const response = await controller.getByMeetingId('meeting-1');
 

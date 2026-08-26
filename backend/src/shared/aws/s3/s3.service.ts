@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { S3Client } from '@aws-sdk/client-s3';
+import { randomUUID } from 'crypto';
 import { AwsClientFactory } from '../aws-client.factory';
 import { AppEnv } from '../../config/env.validation';
 
@@ -84,7 +85,7 @@ export class S3AudioService {
     }
 
     const timestamp = Date.now();
-    const s3Key = `${this.keyPrefix}/${meetingId}/${timestamp}.${extension}`;
+    const s3Key = `${this.keyPrefix}/${meetingId}/${timestamp}-${randomUUID()}.${extension}`;
 
     const command = new PutObjectCommand({
       Bucket: this.bucket,

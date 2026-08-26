@@ -6,6 +6,7 @@ import {
   type TranscribeClient,
   type LanguageCode,
   type MediaFormat,
+  type StartTranscriptionJobCommandOutput,
 } from '@aws-sdk/client-transcribe';
 import { AppEnv } from '../../../shared/config/env.validation';
 import { AwsClientFactory } from '../../../shared/aws/aws-client.factory';
@@ -63,7 +64,8 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
   async submitBatchJob(
     input: SubmitBatchTranscriptionJobInput,
   ): Promise<SubmitBatchTranscriptionJobResult> {
-    const providerJobId = this.buildJobName(input.meetingId);
+    const providerJobId =
+      input.providerJobId ?? this.buildJobName(input.meetingId);
     const languageCode = input.languageCode || this.defaultLanguageCode;
     // 파일 업로드 전사는 webm 외 포맷도 지원하므로 URI 확장자에서 추론,
     // 추론 불가 시 env 기본값 사용
@@ -88,7 +90,20 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
       },
     });
 
-    const response = await this.transcribeClient.send(command);
+    let response: StartTranscriptionJobCommandOutput;
+    try {
+      response = await this.transcribeClient.send(command);
+    } catch (error) {
+      if (!this.isConflictException(error)) {
+        throw error;
+      }
+
+      const existing = await this.getJobStatus(providerJobId);
+      return {
+        providerJobId,
+        status: existing.status,
+      };
+    }
     const awsStatus =
       response.TranscriptionJob?.TranscriptionJobStatus ?? 'QUEUED';
 
@@ -127,6 +142,15 @@ export class AwsBatchTranscriptionProvider implements BatchTranscriptionProvider
   private buildJobName(meetingId: string): string {
     const normalized = meetingId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
     return `${this.jobPrefix}-${normalized}-${Date.now().toString(36)}`;
+  }
+
+  private isConflictException(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      error.name === 'ConflictException'
+    );
   }
 
   /** 미디어 URI 확장자에서 Transcribe MediaFormat 추론 */

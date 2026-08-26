@@ -88,6 +88,10 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
   };
 
   const handleDelete = async (promptId: string) => {
+    const prompt = prompts.find((item) => item.id === promptId);
+    if (!window.confirm(`“${prompt?.name || '이 프롬프트'}”을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
     const ok = await deletePrompt(promptId);
     if (!ok) {
       pushToast({ title: '프롬프트 삭제 실패', variant: 'error' });
@@ -111,7 +115,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
       {/* ── System Library ── */}
       <ErrorBoundary>
         <section>
-          <p className="label-sm mb-2 text-[var(--ink-muted)]">SYSTEM LIBRARY</p>
+          <p className="label-sm mb-2 text-[var(--ink-muted)]">시스템 라이브러리</p>
           <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">시스템 기본 프롬프트</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {systemPrompts.map((prompt) => (
@@ -134,7 +138,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
         <section>
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="label-sm text-[var(--ink-muted)]">TEMPLATE EDITOR</p>
+              <p className="label-sm text-[var(--ink-muted)]">템플릿 편집기</p>
               <h2 className="font-headline text-xl font-bold tracking-tight">
                 {inlineEditingId ? '프롬프트 편집' : '새 프롬프트 만들기'}
               </h2>
@@ -283,7 +287,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
         <section>
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="label-sm text-[var(--ink-muted)]">MY PROMPTS</p>
+              <p className="label-sm text-[var(--ink-muted)]">내 프롬프트</p>
               <h2 className="font-headline text-xl font-bold tracking-tight">개인 등록 프롬프트</h2>
             </div>
             <span className="text-xs text-[var(--ink-muted)]">{userPrompts.length}개</span>
@@ -320,6 +324,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
                             onClick={() => openEdit(prompt)}
                             className="rounded-lg p-1.5 text-indigo-600 transition hover:bg-indigo-50"
                             title="편집"
+                            aria-label={`${prompt.name} 편집`}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -328,6 +333,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
                             onClick={() => void handleDelete(prompt.id)}
                             className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-50"
                             title="삭제"
+                            aria-label={`${prompt.name} 삭제`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

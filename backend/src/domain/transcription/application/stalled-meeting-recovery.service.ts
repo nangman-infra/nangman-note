@@ -9,6 +9,7 @@ import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { TRANSCRIPTION_SUBMISSION_PENDING_ERROR } from '../domain/transcription-job.constants';
 import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { TranscriptionService } from './transcription.service';
@@ -264,12 +265,12 @@ export class StalledMeetingRecoveryService
           return;
         }
 
-        const latestJob = await this.transcriptionJobRepository.findOne({
+        const jobs = await this.transcriptionJobRepository.find({
           where: { meetingId: meeting.id },
-          order: { createdAt: 'DESC' },
+          order: { createdAt: 'ASC' },
         });
 
-        if (!latestJob) {
+        if (jobs.length === 0) {
           const latestUpload = await this.transcriptionUploadRepository.findOne(
             {
               where: { meetingId: meeting.id },
@@ -326,40 +327,54 @@ export class StalledMeetingRecoveryService
           return;
         }
 
-        if (!this.shouldRecoverJob(latestJob, threshold)) {
-          return;
-        }
+        for (const job of jobs) {
+          if (!this.shouldRecoverJob(job, threshold)) {
+            continue;
+          }
 
-        this.logger.warn('meeting.recovery.stalled_transcription_job', {
-          meetingId: meeting.id,
-          jobId: latestJob.id,
-          transcriptionJobStatus: latestJob.status,
-          providerJobId: latestJob.providerJobId,
-        });
-        await this.transcriptionResultCollectorService.recoverStalledBatchJob(
-          meeting.id,
-          latestJob.id,
-          meeting.ownerSub,
-        );
+          if (job.errorMessage === TRANSCRIPTION_SUBMISSION_PENDING_ERROR) {
+            await this.transcriptionService.recoverPendingBatchSubmission(
+              job.id,
+              meeting.ownerSub,
+            );
+            continue;
+          }
+
+          this.logger.warn('meeting.recovery.stalled_transcription_job', {
+            meetingId: meeting.id,
+            jobId: job.id,
+            transcriptionJobStatus: job.status,
+            providerJobId: job.providerJobId,
+          });
+          await this.transcriptionResultCollectorService.recoverStalledBatchJob(
+            meeting.id,
+            job.id,
+            meeting.ownerSub,
+          );
+        }
       },
     );
   }
 
   private shouldRecoverJob(
-    latestJob: TranscriptionJobEntity,
+    job: TranscriptionJobEntity,
     threshold: Date,
   ): boolean {
+    if (job.collectedAt) {
+      return false;
+    }
+
     if (
-      latestJob.status === TranscriptionJobStatus.COMPLETED ||
-      latestJob.status === TranscriptionJobStatus.FAILED
+      job.status === TranscriptionJobStatus.COMPLETED ||
+      job.status === TranscriptionJobStatus.FAILED
     ) {
       return true;
     }
 
     if (
-      (latestJob.status === TranscriptionJobStatus.QUEUED ||
-        latestJob.status === TranscriptionJobStatus.PROCESSING) &&
-      latestJob.updatedAt.getTime() <= threshold.getTime()
+      (job.status === TranscriptionJobStatus.QUEUED ||
+        job.status === TranscriptionJobStatus.PROCESSING) &&
+      job.updatedAt.getTime() <= threshold.getTime()
     ) {
       return true;
     }
@@ -374,24 +389,33 @@ export class StalledMeetingRecoveryService
       return;
     }
 
-    const rows = await this.dataSource.query(
-      'SELECT pg_try_advisory_lock($1) AS locked',
-      [POSTGRES_LOCK_KEY],
-    );
-
-    if (!rows[0]?.locked) {
-      this.logger.debug('meeting.recovery.lock_skipped', {
-        lockKey: POSTGRES_LOCK_KEY,
-      });
-      return;
-    }
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    let locked = false;
 
     try {
+      const rows = await queryRunner.query(
+        'SELECT pg_try_advisory_lock($1) AS locked',
+        [POSTGRES_LOCK_KEY],
+      );
+      locked = Boolean(rows[0]?.locked);
+      if (!locked) {
+        this.logger.debug('meeting.recovery.lock_skipped', {
+          lockKey: POSTGRES_LOCK_KEY,
+        });
+        return;
+      }
       await task();
     } finally {
-      await this.dataSource.query('SELECT pg_advisory_unlock($1)', [
-        POSTGRES_LOCK_KEY,
-      ]);
+      try {
+        if (locked) {
+          await queryRunner.query('SELECT pg_advisory_unlock($1)', [
+            POSTGRES_LOCK_KEY,
+          ]);
+        }
+      } finally {
+        await queryRunner.release();
+      }
     }
   }
 }

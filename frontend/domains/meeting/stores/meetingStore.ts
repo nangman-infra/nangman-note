@@ -9,6 +9,9 @@ import {
   type SearchResult,
 } from '../types/meeting.types';
 
+let latestCollectionRequestSeq = 0;
+let latestLoadMoreRequestSeq = 0;
+
 interface BulkResult {
   succeeded: string[];
   failed: string[];
@@ -158,10 +161,12 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   },
 
   fetchMeetings: async (options) => {
+    const requestSeq = ++latestCollectionRequestSeq;
     const shouldShowLoading = !options?.silent;
     try {
       if (shouldShowLoading) {
-        set({ isLoading: true, error: null });
+        latestLoadMoreRequestSeq += 1;
+        set({ isLoading: true, isLoadingMore: false, error: null });
       }
       // silent 갱신은 사용자가 이미 펼친 페이지 범위를 모두 다시 읽는다.
       // 첫 페이지만 새 응답에 섞으면 삭제된 tail 회의를 구분할 수 없어
@@ -175,6 +180,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
           }),
         ),
       );
+      if (requestSeq !== latestCollectionRequestSeq) return;
       const meetings = pages.flat();
       const lastPage = pages[pages.length - 1] ?? [];
       set((state) => {
@@ -194,6 +200,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         };
       });
     } catch (error) {
+      if (requestSeq !== latestCollectionRequestSeq) return;
       if (shouldShowLoading) {
         set({
           error: error instanceof Error ? error.message : 'Failed to fetch meetings',
@@ -207,6 +214,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     const { meetingsPage, isLoadingMore, hasMoreMeetings } = get();
     if (isLoadingMore || !hasMoreMeetings) return;
 
+    const requestSeq = ++latestCollectionRequestSeq;
+    const loadMoreRequestSeq = ++latestLoadMoreRequestSeq;
     try {
       set({ isLoadingMore: true });
       const nextPage = meetingsPage + 1;
@@ -214,6 +223,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         page: nextPage,
         limit: MEETINGS_PAGE_SIZE,
       });
+      if (requestSeq !== latestCollectionRequestSeq) return;
       set((state) => {
         const existingIds = new Set(state.meetings.map((meeting) => meeting.id));
         const appended = older.filter((meeting) => !existingIds.has(meeting.id));
@@ -225,29 +235,37 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         };
       });
     } catch (error) {
+      if (requestSeq !== latestCollectionRequestSeq) return;
       set({
         error:
           error instanceof Error
             ? error.message
             : 'Failed to load more meetings',
-        isLoadingMore: false,
       });
+    } finally {
+      if (loadMoreRequestSeq === latestLoadMoreRequestSeq) {
+        set({ isLoadingMore: false });
+      }
     }
   },
 
   fetchTrashMeetings: async (options) => {
+    const requestSeq = ++latestCollectionRequestSeq;
     const shouldShowLoading = !options?.silent;
     try {
       if (shouldShowLoading) {
-        set({ isLoading: true, error: null });
+        latestLoadMoreRequestSeq += 1;
+        set({ isLoading: true, isLoadingMore: false, error: null });
       }
       const trashMeetings = await meetingApi.listTrash();
+      if (requestSeq !== latestCollectionRequestSeq) return;
       set((state) => ({
         trashMeetings,
         error: null,
         isLoading: shouldShowLoading ? false : state.isLoading,
       }));
     } catch (error) {
+      if (requestSeq !== latestCollectionRequestSeq) return;
       if (shouldShowLoading) {
         set({
           error: error instanceof Error ? error.message : 'Failed to fetch trash meetings',
@@ -258,11 +276,15 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   },
 
   searchMeetings: async (query, scope = 'all') => {
+    const requestSeq = ++latestCollectionRequestSeq;
+    latestLoadMoreRequestSeq += 1;
     try {
-      set({ isLoading: true, error: null });
+      set({ isLoading: true, isLoadingMore: false, error: null });
       const results = await meetingApi.search(query, scope);
+      if (requestSeq !== latestCollectionRequestSeq) return;
       set({ meetings: results.map(mapSearchResultToMeeting), isLoading: false });
     } catch (error) {
+      if (requestSeq !== latestCollectionRequestSeq) return;
       set({
         error: error instanceof Error ? error.message : 'Failed to search meetings',
         isLoading: false,

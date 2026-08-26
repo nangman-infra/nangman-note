@@ -4,6 +4,8 @@ import { NoteEntity } from '../note/domain/note.entity';
 import { PromptModule } from '../prompt/prompt.module';
 import { ResultEntity } from '../result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../transcription/domain/transcript-segment.entity';
+import { TranscriptionJobEntity } from '../transcription/domain/transcription-job.entity';
+import { TranscriptionUploadEntity } from '../transcription/domain/transcription-upload.entity';
 import { MeetingSearchDocumentService } from './application/meeting-search-document.service';
 import { MeetingService } from './application/meeting.service';
 import { MeetingEntity } from './domain/meeting.entity';
@@ -19,6 +21,8 @@ import { MeetingStatusGateway } from './infrastructure/meeting-status.gateway';
       NoteEntity,
       ResultEntity,
       TranscriptSegmentEntity,
+      TranscriptionJobEntity,
+      TranscriptionUploadEntity,
     ]),
     PromptModule,
   ],

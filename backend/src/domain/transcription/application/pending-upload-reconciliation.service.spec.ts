@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
@@ -16,7 +16,12 @@ describe('PendingUploadReconciliationService', () => {
   let transcriptionService: jest.Mocked<
     Pick<TranscriptionService, 'reconcilePendingBatchUpload'>
   >;
-  let dataSource: jest.Mocked<Pick<DataSource, 'options' | 'query'>>;
+  let dataSource: jest.Mocked<
+    Pick<DataSource, 'options' | 'createQueryRunner'>
+  >;
+  let queryRunner: jest.Mocked<
+    Pick<QueryRunner, 'connect' | 'query' | 'release'>
+  >;
 
   beforeEach(() => {
     transcriptionUploadRepository = {
@@ -29,9 +34,14 @@ describe('PendingUploadReconciliationService', () => {
         jobId: 'job-1',
       }),
     };
+    queryRunner = {
+      connect: jest.fn(),
+      query: jest.fn(),
+      release: jest.fn(),
+    };
     dataSource = {
       options: { type: 'sqlite' } as DataSource['options'],
-      query: jest.fn(),
+      createQueryRunner: jest.fn().mockReturnValue(queryRunner),
     };
 
     service = new PendingUploadReconciliationService(
@@ -89,5 +99,30 @@ describe('PendingUploadReconciliationService', () => {
     expect(
       transcriptionService.reconcilePendingBatchUpload,
     ).not.toHaveBeenCalled();
+  });
+
+  it('unlocks and releases the same QueryRunner when reconciliation fails', async () => {
+    (dataSource.options as { type: string }).type = 'postgres';
+    queryRunner.query.mockResolvedValueOnce([{ locked: true }]);
+    transcriptionUploadRepository.find.mockRejectedValue(
+      new Error('db failed'),
+    );
+
+    await expect((service as any).reconcilePendingUploads()).rejects.toThrow(
+      'db failed',
+    );
+
+    expect(queryRunner.connect).toHaveBeenCalledTimes(1);
+    expect(queryRunner.query).toHaveBeenNthCalledWith(
+      1,
+      'SELECT pg_try_advisory_lock($1) AS locked',
+      [74274002],
+    );
+    expect(queryRunner.query).toHaveBeenNthCalledWith(
+      2,
+      'SELECT pg_advisory_unlock($1)',
+      [74274002],
+    );
+    expect(queryRunner.release).toHaveBeenCalledTimes(1);
   });
 });

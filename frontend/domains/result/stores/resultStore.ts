@@ -3,6 +3,8 @@ import { resultApi } from '../api/resultApi';
 import type { MeetingResult } from '../types/result.types';
 import { ApiError } from '@/lib/api/client';
 
+let latestFetchRequestSeq = 0;
+
 interface ResultState {
   result: MeetingResult | null;
   isLoading: boolean;
@@ -34,6 +36,7 @@ function createInitialResultState() {
 export const useResultStore = create<ResultState>()((set, _get, store) => ({
   ...createInitialResultState(),
   fetchResult: async (meetingId, options) => {
+    const requestSeq = ++latestFetchRequestSeq;
     const silent = options?.silent ?? false;
     try {
       if (!silent) {
@@ -45,6 +48,7 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
         });
       }
       const result = await resultApi.get(meetingId);
+      if (requestSeq !== latestFetchRequestSeq) return;
       const prev = useResultStore.getState();
       // 폴링 폴백: 재생성 중 결과가 바뀌면 (generatedAt 변경) → isRegenerating 해제
       const wasRegenerating = prev.isRegenerating;
@@ -70,6 +74,7 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
         }),
       });
     } catch (error) {
+      if (requestSeq !== latestFetchRequestSeq) return;
       const message =
         error instanceof Error ? error.message : 'Failed to fetch result';
       const lowered = message.toLowerCase();
@@ -214,6 +219,7 @@ export const useResultStore = create<ResultState>()((set, _get, store) => ({
   },
 
   clearResult: () => {
+    latestFetchRequestSeq += 1;
     set(store.getInitialState());
   },
 }));

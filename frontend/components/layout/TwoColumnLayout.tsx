@@ -37,6 +37,7 @@ interface TwoColumnLayoutProps {
    * mobile header is only visible under `lg:hidden`.
    */
   breadcrumb?: React.ReactNode;
+  mobileNavigation?: React.ReactNode;
 }
 
 export function TwoColumnLayout({
@@ -47,6 +48,7 @@ export function TwoColumnLayout({
   mobileView,
   onMobileViewChange,
   breadcrumb,
+  mobileNavigation,
 }: TwoColumnLayoutProps) {
   const [internalActiveView, setInternalActiveView] = useState<ActiveView>(
     showViewer ? 'viewer' : 'dashboard',
@@ -59,41 +61,44 @@ export function TwoColumnLayout({
   return (
     <LayoutContext.Provider value={{ activeView: mobileResolvedView, setActiveView }}>
       {/* ── Mobile (< lg) ── */}
-      <div className="h-dvh bg-[var(--bg-root)] lg:hidden">
+      <div className="flex h-dvh flex-col bg-[var(--bg-root)] lg:hidden">
         {/* Mobile top bar */}
-        <header className="flex items-center justify-between gap-3 bg-slate-50/80 px-4 py-2.5 shadow-sm backdrop-blur-xl">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="font-headline text-sm font-extrabold tracking-tighter text-indigo-700">TransNote</span>
-            {breadcrumb ? (
-              <div className="min-w-0 flex-1 truncate text-xs text-[var(--ink-muted)]">{breadcrumb}</div>
-            ) : null}
+        <header className="bg-slate-50/80 px-4 py-2 shadow-sm backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="font-headline text-sm font-extrabold tracking-tighter text-indigo-700">TransNote</span>
+              {breadcrumb ? (
+                <div className="min-w-0 flex-1 truncate text-xs text-[var(--ink-muted)]">{breadcrumb}</div>
+              ) : null}
+            </div>
+            <div className="inline-flex flex-shrink-0 rounded-lg bg-[var(--surface-container-low)] p-1">
+              <button
+                type="button"
+                onClick={() => setActiveView('dashboard')}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  mobileResolvedView === 'dashboard' ? 'bg-brand-gradient text-white shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                <Columns3 className="h-3.5 w-3.5" />
+                대시보드
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveView('viewer')}
+                disabled={!showViewer}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  mobileResolvedView === 'viewer' ? 'bg-brand-gradient text-white shadow-sm' : 'text-slate-500'
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                문서
+              </button>
+            </div>
           </div>
-          <div className="inline-flex flex-shrink-0 rounded-lg bg-[var(--surface-container-low)] p-1">
-            <button
-              type="button"
-              onClick={() => setActiveView('dashboard')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                mobileResolvedView === 'dashboard' ? 'bg-brand-gradient text-white shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              <Columns3 className="h-3.5 w-3.5" />
-              대시보드
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView('viewer')}
-              disabled={!showViewer}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                mobileResolvedView === 'viewer' ? 'bg-brand-gradient text-white shadow-sm' : 'text-slate-500'
-              } disabled:cursor-not-allowed disabled:opacity-40`}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              문서
-            </button>
-          </div>
+          {mobileNavigation ? <div className="mt-2">{mobileNavigation}</div> : null}
         </header>
 
-        <div className="h-[calc(100dvh-3rem)] overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-hidden">
           {mobileResolvedView === 'dashboard' ? (
             <div className="h-full overflow-y-auto">
               <ErrorBoundary>{dashboard}</ErrorBoundary>

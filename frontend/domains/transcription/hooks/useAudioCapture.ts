@@ -46,6 +46,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
+  const requestGenerationRef = useRef(0);
   /** 트랙이 외부 요인으로 끊겼을 때 자동 복구를 1회만 시도하기 위한 가드 */
   const autoRecoveryAttemptedRef = useRef(false);
   const requestPermissionRef = useRef<
@@ -53,6 +54,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
   >(null);
 
   const stopCapture = useCallback(() => {
+    requestGenerationRef.current += 1;
     const currentStream = streamRef.current;
     if (currentStream) {
       currentStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
@@ -116,8 +118,13 @@ export function useAudioCapture(): UseAudioCaptureReturn {
         return { granted: false, reason: 'unsupported' };
       }
 
-      // 이전 스트림이 남아있으면 정리
-      stopCapture();
+      const requestGeneration = ++requestGenerationRef.current;
+      const currentStream = streamRef.current;
+      if (currentStream) {
+        currentStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+        streamRef.current = null;
+        setStream(null);
+      }
       const normalizedRequest =
         typeof request === 'string' ? { deviceId: request } : request;
       const effectiveDeviceId =
@@ -140,6 +147,11 @@ export function useAudioCapture(): UseAudioCaptureReturn {
           audio: audioConstraints,
         });
 
+        if (requestGeneration !== requestGenerationRef.current) {
+          mediaStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+          return { granted: false, reason: 'unknown' };
+        }
+
         streamRef.current = mediaStream;
         setStream(mediaStream);
         setPermission('granted');
@@ -149,6 +161,9 @@ export function useAudioCapture(): UseAudioCaptureReturn {
 
         // 권한 획득 후 디바이스 목록 갱신 (label이 채워짐)
         const audioDevices = await enumerateAudioDevices();
+        if (requestGeneration !== requestGenerationRef.current) {
+          return { granted: false, reason: 'unknown' };
+        }
         setDevices(audioDevices);
 
         // 선택된 디바이스가 없으면 현재 스트림의 디바이스를 기본 선택
@@ -164,6 +179,9 @@ export function useAudioCapture(): UseAudioCaptureReturn {
 
         return { granted: true };
       } catch (error) {
+        if (requestGeneration !== requestGenerationRef.current) {
+          return { granted: false, reason: 'unknown' };
+        }
         if (error instanceof DOMException) {
           if (
             error.name === 'NotAllowedError' ||
@@ -201,7 +219,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
         return { granted: false, reason: 'unknown' };
       }
     },
-    [selectedDeviceId, stopCapture, attachTrackMonitors],
+    [selectedDeviceId, attachTrackMonitors],
   );
 
   // requestPermission을 track ended 핸들러에서 참조할 수 있도록 ref에 연결
@@ -226,6 +244,7 @@ export function useAudioCapture(): UseAudioCaptureReturn {
   // 컴포넌트 언마운트 시 스트림 정리
   useEffect(() => {
     return () => {
+      requestGenerationRef.current += 1;
       const currentStream = streamRef.current;
       if (currentStream) {
         currentStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());

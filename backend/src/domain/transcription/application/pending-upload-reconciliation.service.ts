@@ -142,24 +142,33 @@ export class PendingUploadReconciliationService
       return;
     }
 
-    const rows = await this.dataSource.query(
-      'SELECT pg_try_advisory_lock($1) AS locked',
-      [RECONCILIATION_LOCK_KEY],
-    );
-
-    if (!rows[0]?.locked) {
-      this.logger.debug('transcription.batch.upload.reconcile_lock_skipped', {
-        lockKey: RECONCILIATION_LOCK_KEY,
-      });
-      return;
-    }
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    let locked = false;
 
     try {
+      const rows = await queryRunner.query(
+        'SELECT pg_try_advisory_lock($1) AS locked',
+        [RECONCILIATION_LOCK_KEY],
+      );
+      locked = Boolean(rows[0]?.locked);
+      if (!locked) {
+        this.logger.debug('transcription.batch.upload.reconcile_lock_skipped', {
+          lockKey: RECONCILIATION_LOCK_KEY,
+        });
+        return;
+      }
       await task();
     } finally {
-      await this.dataSource.query('SELECT pg_advisory_unlock($1)', [
-        RECONCILIATION_LOCK_KEY,
-      ]);
+      try {
+        if (locked) {
+          await queryRunner.query('SELECT pg_advisory_unlock($1)', [
+            RECONCILIATION_LOCK_KEY,
+          ]);
+        }
+      } finally {
+        await queryRunner.release();
+      }
     }
   }
 }

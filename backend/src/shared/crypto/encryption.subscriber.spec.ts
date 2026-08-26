@@ -2,10 +2,15 @@ import { DataSource, InsertEvent, UpdateEvent } from 'typeorm';
 import { NoteEntity } from '../../domain/note/domain/note.entity';
 import { ResultEntity } from '../../domain/result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../../domain/transcription/domain/transcript-segment.entity';
+import { MeetingSearchDocumentEntity } from '../../domain/meeting/domain/meeting-search-document.entity';
 import { EncryptionSubscriber } from './encryption.subscriber';
 import type { EncryptionService } from './encryption.service';
 
-type EncryptableEntity = NoteEntity | ResultEntity | TranscriptSegmentEntity;
+type EncryptableEntity =
+  | NoteEntity
+  | ResultEntity
+  | TranscriptSegmentEntity
+  | MeetingSearchDocumentEntity;
 
 describe('EncryptionSubscriber', () => {
   let subscriber: EncryptionSubscriber;
@@ -67,6 +72,32 @@ describe('EncryptionSubscriber', () => {
 
     expect(entity.text).toBe('원문');
     expect(entity.translatedText).toBe('번역본');
+  });
+
+  it('encrypts sensitive search projection fields before persistence', () => {
+    const entity = new MeetingSearchDocumentEntity();
+    entity.title = '공개 제목';
+    entity.noteContent = '민감한 노트';
+    entity.resultContent = '민감한 결과';
+    entity.transcriptContent = '민감한 전사';
+
+    subscriber.beforeInsert({ entity } as InsertEvent<EncryptableEntity>);
+
+    expect(entity).toEqual(
+      expect.objectContaining({
+        title: '공개 제목',
+        noteContent: 'enc:민감한 노트',
+        resultContent: 'enc:민감한 결과',
+        transcriptContent: 'enc:민감한 전사',
+      }),
+    );
+    expect(JSON.stringify(entity)).not.toContain('"noteContent":"민감한 노트"');
+    expect(JSON.stringify(entity)).not.toContain(
+      '"resultContent":"민감한 결과"',
+    );
+    expect(JSON.stringify(entity)).not.toContain(
+      '"transcriptContent":"민감한 전사"',
+    );
   });
 });
 

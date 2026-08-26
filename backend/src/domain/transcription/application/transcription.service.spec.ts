@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { BadGatewayException, BadRequestException } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
+import { TRANSCRIPTION_SUBMISSION_PENDING_ERROR } from '../domain/transcription-job.constants';
 import { TranscriptionJobProvider } from '../domain/transcription-job-provider.enum';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
 import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
@@ -56,7 +57,12 @@ describe('TranscriptionService', () => {
   let transcriptionResultCollectorService: jest.Mocked<
     Pick<TranscriptionResultCollectorService, 'pollAndCollect'>
   >;
-  let dataSource: jest.Mocked<Pick<DataSource, 'options' | 'query'>>;
+  let dataSource: jest.Mocked<
+    Pick<DataSource, 'options' | 'createQueryRunner'>
+  >;
+  let queryRunner: jest.Mocked<
+    Pick<QueryRunner, 'connect' | 'query' | 'release'>
+  >;
   let s3AudioService: jest.Mocked<
     Pick<
       S3AudioService,
@@ -159,9 +165,14 @@ describe('TranscriptionService', () => {
         segmentCount: 0,
       }),
     };
+    queryRunner = {
+      connect: jest.fn(),
+      query: jest.fn(),
+      release: jest.fn(),
+    };
     dataSource = {
       options: { type: 'sqlite' } as DataSource['options'],
-      query: jest.fn(),
+      createQueryRunner: jest.fn().mockReturnValue(queryRunner),
     };
     s3AudioService = {
       generateUploadUrl: jest.fn(),
@@ -697,6 +708,7 @@ describe('TranscriptionService', () => {
         s3Key: 'audio/meeting-1/file.webm',
         bucket: 'bucket',
         mediaUri: 's3://bucket/audio/meeting-1/file.webm',
+        contentType: 'audio/webm',
         expiresInSeconds: 600,
       });
       transcriptionUploadRepository.create.mockImplementation(
@@ -750,14 +762,14 @@ describe('TranscriptionService', () => {
 
       const job = await service.confirmBatchUpload('meeting-1', 'upload-1');
 
-      expect(job.id).toBe('job-1');
+      expect(job.id).toBeDefined();
       expect(s3AudioService.objectExists).toHaveBeenCalledWith(
         'bucket',
         'audio/meeting-1/file.webm',
       );
       expect(
         transcriptionResultCollectorService.pollAndCollect,
-      ).toHaveBeenCalledWith('meeting-1', 'job-1');
+      ).toHaveBeenCalledWith('meeting-1', job.id);
     });
 
     it('returns an existing job idempotently when already queued', async () => {
@@ -817,11 +829,9 @@ describe('TranscriptionService', () => {
         'upload-1',
       );
 
-      expect(result).toEqual({
-        queued: true,
-        objectPresent: true,
-        jobId: 'job-1',
-      });
+      expect(result.queued).toBe(true);
+      expect(result.objectPresent).toBe(true);
+      expect(typeof result.jobId).toBe('string');
     });
 
     it('does not fail early when the object is not present yet', async () => {
@@ -850,6 +860,34 @@ describe('TranscriptionService', () => {
     });
   });
 
+  describe('upload advisory lock', () => {
+    it('uses one QueryRunner and unlocks and releases it when work fails', async () => {
+      (dataSource.options as { type: string }).type = 'postgres';
+      const failure = new Error('task failed');
+      const withUploadLock = Reflect.get(service, 'withUploadLock') as (
+        uploadId: string,
+        task: () => Promise<never>,
+      ) => Promise<never>;
+
+      await expect(
+        withUploadLock.call(service, 'upload-1', () => Promise.reject(failure)),
+      ).rejects.toBe(failure);
+
+      expect(queryRunner.connect).toHaveBeenCalledTimes(1);
+      expect(queryRunner.query).toHaveBeenNthCalledWith(
+        1,
+        'SELECT pg_advisory_lock(hashtext($1))',
+        ['transcription-upload:upload-1'],
+      );
+      expect(queryRunner.query).toHaveBeenNthCalledWith(
+        2,
+        'SELECT pg_advisory_unlock(hashtext($1))',
+        ['transcription-upload:upload-1'],
+      );
+      expect(queryRunner.release).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('queueBatchJob', () => {
     it('queues batch job with trimmed language code', async () => {
       meetingService.findById.mockResolvedValue(
@@ -874,18 +912,17 @@ describe('TranscriptionService', () => {
         languageCode: '  en-US  ',
       });
 
-      expect(
-        batchTranscriptionProvider.submitBatchJob.mock.calls[0]?.[0],
-      ).toEqual({
-        meetingId: 'meeting-1',
-        mediaUri: 's3://bucket/audio.wav',
-        languageCode: 'en-US',
-      });
+      const submissionInput =
+        batchTranscriptionProvider.submitBatchJob.mock.calls[0]?.[0];
+      expect(submissionInput?.meetingId).toBe('meeting-1');
+      expect(submissionInput?.mediaUri).toBe('s3://bucket/audio.wav');
+      expect(submissionInput?.languageCode).toBe('en-US');
+      expect(typeof submissionInput?.providerJobId).toBe('string');
       expect(result.provider).toBe(TranscriptionJobProvider.AWS_TRANSCRIBE);
       expect(result.status).toBe(TranscriptionJobStatus.QUEUED);
       expect(
         transcriptionResultCollectorService.pollAndCollect,
-      ).toHaveBeenCalledWith('meeting-1', 'job-1');
+      ).toHaveBeenCalledWith('meeting-1', result.id);
     });
 
     it('defaults language code to ko-KR when omitted', async () => {
@@ -908,13 +945,12 @@ describe('TranscriptionService', () => {
         mediaUri: 's3://bucket/audio.wav',
       });
 
-      expect(
-        batchTranscriptionProvider.submitBatchJob.mock.calls[0]?.[0],
-      ).toEqual({
-        meetingId: 'meeting-1',
-        mediaUri: 's3://bucket/audio.wav',
-        languageCode: 'ko-KR',
-      });
+      const submissionInput =
+        batchTranscriptionProvider.submitBatchJob.mock.calls[0]?.[0];
+      expect(submissionInput?.meetingId).toBe('meeting-1');
+      expect(submissionInput?.mediaUri).toBe('s3://bucket/audio.wav');
+      expect(submissionInput?.languageCode).toBe('ko-KR');
+      expect(typeof submissionInput?.providerJobId).toBe('string');
     });
 
     it('auto-switches non-batch meetings to batch mode instead of rejecting', async () => {
@@ -952,8 +988,7 @@ describe('TranscriptionService', () => {
       expect(result.status).toBe(TranscriptionJobStatus.QUEUED);
     });
 
-    it('stores failed job and throws BadGatewayException when provider fails', async () => {
-      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_772_200_000_000);
+    it('keeps the durable job pending when provider submission fails', async () => {
       meetingService.findById.mockResolvedValue(buildMeeting());
       batchTranscriptionProvider.submitBatchJob.mockRejectedValue(
         new Error('provider unavailable'),
@@ -974,23 +1009,144 @@ describe('TranscriptionService', () => {
         }),
       ).rejects.toBeInstanceOf(BadGatewayException);
 
-      const savedFailedJob = transcriptionJobRepository.save.mock
+      const savedPendingJob = transcriptionJobRepository.save.mock
         .calls[0]?.[0] as TranscriptionJobEntity | undefined;
-      expect(savedFailedJob).toBeDefined();
-      if (!savedFailedJob) {
-        throw new Error('Expected failed job to be saved');
+      expect(savedPendingJob).toBeDefined();
+      if (!savedPendingJob) {
+        throw new Error('Expected pending job to be saved');
       }
-      expect(savedFailedJob.meetingId).toBe('meeting-1');
-      expect(savedFailedJob.provider).toBe(
+      expect(savedPendingJob.meetingId).toBe('meeting-1');
+      expect(savedPendingJob.provider).toBe(
         TranscriptionJobProvider.AWS_TRANSCRIBE,
       );
-      expect(savedFailedJob.status).toBe(TranscriptionJobStatus.FAILED);
-      expect(savedFailedJob.errorMessage).toBe('provider unavailable');
+      expect(savedPendingJob.status).toBe(TranscriptionJobStatus.QUEUED);
+      expect(savedPendingJob.errorMessage).toBe(
+        TRANSCRIPTION_SUBMISSION_PENDING_ERROR,
+      );
       expect(
-        savedFailedJob.providerJobId.startsWith('aws-transcribe-meeting1-'),
+        savedPendingJob.providerJobId.startsWith('aws-transcribe-meeting1-'),
       ).toBe(true);
+      expect(transcriptionJobRepository.save).toHaveBeenCalledTimes(1);
+    });
 
-      nowSpy.mockRestore();
+    it('returns the existing job for duplicate mediaUri submissions', async () => {
+      const existingJob = buildJob();
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      transcriptionJobRepository.findOne.mockResolvedValue(existingJob);
+
+      const result = await service.queueBatchJob('meeting-1', {
+        mediaUri: existingJob.mediaUri,
+      });
+
+      expect(result).toBe(existingJob);
+      expect(batchTranscriptionProvider.submitBatchJob).not.toHaveBeenCalled();
+      expect(transcriptionJobRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('persists a durable provider id before AWS submission', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      batchTranscriptionProvider.submitBatchJob.mockResolvedValue({
+        providerJobId: 'aws-job-queued',
+        status: TranscriptionJobStatus.QUEUED,
+      });
+      transcriptionJobRepository.create.mockImplementation(
+        (entity) => entity as TranscriptionJobEntity,
+      );
+      transcriptionJobRepository.save
+        .mockImplementationOnce((entity) =>
+          Promise.resolve(entity as TranscriptionJobEntity),
+        )
+        .mockRejectedValueOnce(new Error('database unavailable'));
+
+      await expect(
+        service.queueBatchJob('meeting-1', {
+          mediaUri: 's3://bucket/audio.wav',
+        }),
+      ).rejects.toBeInstanceOf(BadGatewayException);
+
+      const durableJob = transcriptionJobRepository.save.mock.calls[0]?.[0];
+      const submission =
+        batchTranscriptionProvider.submitBatchJob.mock.calls[0]?.[0];
+      expect(durableJob).toBeDefined();
+      if (!durableJob) {
+        throw new Error('Expected durable job to be saved before submission');
+      }
+      const durableJobId = durableJob.id;
+      if (!durableJobId) {
+        throw new Error('Expected durable job id before submission');
+      }
+      expect(typeof durableJobId).toBe('string');
+      expect(typeof durableJob.providerJobId).toBe('string');
+      expect(durableJob.idempotencyKey).toBe('s3://bucket/audio.wav');
+      expect(submission?.providerJobId).toBe(
+        `aws-transcribe-meeting1-${durableJobId.replaceAll('-', '')}`,
+      );
+      expect(
+        transcriptionJobRepository.save.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        batchTranscriptionProvider.submitBatchJob.mock.invocationCallOrder[0],
+      );
+
+      const persistedPendingJob = buildJob({
+        id: durableJobId,
+        providerJobId: submission?.providerJobId,
+        mediaUri: durableJob.mediaUri,
+        languageCode: durableJob.languageCode,
+        errorMessage: TRANSCRIPTION_SUBMISSION_PENDING_ERROR,
+      });
+      transcriptionJobRepository.findOne.mockResolvedValue(persistedPendingJob);
+      transcriptionJobRepository.save.mockResolvedValue(persistedPendingJob);
+      batchTranscriptionProvider.submitBatchJob.mockResolvedValue({
+        providerJobId: persistedPendingJob.providerJobId,
+        status: TranscriptionJobStatus.PROCESSING,
+      });
+
+      await expect(
+        service.recoverPendingBatchSubmission(durableJobId),
+      ).resolves.toBe(persistedPendingJob);
+
+      expect(
+        batchTranscriptionProvider.submitBatchJob,
+      ).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          providerJobId: submission?.providerJobId,
+        }),
+      );
+      expect(persistedPendingJob.errorMessage).toBeNull();
+      expect(persistedPendingJob.status).toBe(
+        TranscriptionJobStatus.PROCESSING,
+      );
+      expect(
+        transcriptionResultCollectorService.pollAndCollect,
+      ).toHaveBeenCalledWith('meeting-1', durableJobId);
+    });
+
+    it('submits persisted pending jobs on module startup', async () => {
+      const pendingJob = buildJob({
+        providerJobId: 'durable-provider-job-id',
+        errorMessage: TRANSCRIPTION_SUBMISSION_PENDING_ERROR,
+      });
+      transcriptionJobRepository.find.mockResolvedValue([pendingJob]);
+      transcriptionJobRepository.findOne.mockResolvedValue(pendingJob);
+      transcriptionJobRepository.save.mockResolvedValue(pendingJob);
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      batchTranscriptionProvider.submitBatchJob.mockResolvedValue({
+        providerJobId: pendingJob.providerJobId,
+        status: TranscriptionJobStatus.QUEUED,
+      });
+
+      await service.onModuleInit();
+
+      expect(batchTranscriptionProvider.submitBatchJob).toHaveBeenCalledWith({
+        meetingId: 'meeting-1',
+        mediaUri: pendingJob.mediaUri,
+        languageCode: pendingJob.languageCode,
+        providerJobId: 'durable-provider-job-id',
+      });
+      expect(pendingJob.errorMessage).toBeNull();
+      expect(
+        transcriptionResultCollectorService.pollAndCollect,
+      ).toHaveBeenCalledWith('meeting-1', pendingJob.id);
     });
 
     it('rejects unmanaged mediaUri values before queueing', async () => {

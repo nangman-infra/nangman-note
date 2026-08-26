@@ -203,9 +203,24 @@ export function ProcessingProgress({
   const currentIndex = stepOrder.indexOf(currentStep);
 
   return (
-    <div className="surface-card p-5">
-      <p className="text-xs font-semibold tracking-wide text-muted">PROCESSING</p>
+    <div className="surface-card p-5" aria-busy={currentStep !== 'failed' && currentStep !== 'completed'}>
+      <p className="text-xs font-semibold tracking-wide text-muted">처리 중</p>
       <h3 className="mt-1 text-lg font-semibold">회의 결과 생성 중</h3>
+      <span className="sr-only" role="status" aria-live="polite">
+        현재 단계: {currentStep === 'failed' ? '처리 실패' : steps.find((step) => step.key === currentStep)?.label}
+      </span>
+      {uploadState === 'uploading' ? (
+        <span
+          className="sr-only"
+          role="progressbar"
+          aria-label="오디오 업로드 진행률"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={uploadProgress}
+        >
+          {uploadProgress}%
+        </span>
+      ) : null}
 
       {currentStep !== 'failed' && (
         <p className="mt-1 text-xs text-muted">
@@ -218,7 +233,7 @@ export function ProcessingProgress({
       )}
 
       {error && currentStep === 'failed' ? (
-        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+        <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           {error}
           <div className="mt-3 flex flex-wrap gap-2">
             {onRetryUpload && (

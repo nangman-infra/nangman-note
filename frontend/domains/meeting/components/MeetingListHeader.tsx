@@ -95,7 +95,7 @@ export function MeetingListHeader({
     <header className="space-y-3 border-b border-[var(--line-soft)] bg-white/95 px-5 py-4">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="label-sm text-[var(--ink-muted)]">MEETINGS</p>
+          <p className="label-sm text-[var(--ink-muted)]">회의</p>
           <h2 className="truncate font-headline text-xl font-bold tracking-tight text-slate-900">
             {showTrash ? '회의 휴지통' : '회의 아카이브'}
           </h2>

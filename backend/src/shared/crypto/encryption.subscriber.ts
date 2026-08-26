@@ -11,8 +11,13 @@ import { EncryptionService } from './encryption.service';
 import { TranscriptSegmentEntity } from '../../domain/transcription/domain/transcript-segment.entity';
 import { NoteEntity } from '../../domain/note/domain/note.entity';
 import { ResultEntity } from '../../domain/result/domain/result.entity';
+import { MeetingSearchDocumentEntity } from '../../domain/meeting/domain/meeting-search-document.entity';
 
-type EncryptableEntity = TranscriptSegmentEntity | NoteEntity | ResultEntity;
+type EncryptableEntity =
+  | TranscriptSegmentEntity
+  | NoteEntity
+  | ResultEntity
+  | MeetingSearchDocumentEntity;
 
 interface EncryptionFieldMap {
   entityClass: new (...args: unknown[]) => EncryptableEntity;
@@ -23,6 +28,10 @@ const ENCRYPTION_TARGETS: EncryptionFieldMap[] = [
   { entityClass: TranscriptSegmentEntity, fields: ['text', 'translatedText'] },
   { entityClass: NoteEntity, fields: ['content'] },
   { entityClass: ResultEntity, fields: ['content'] },
+  {
+    entityClass: MeetingSearchDocumentEntity,
+    fields: ['noteContent', 'resultContent', 'transcriptContent'],
+  },
 ];
 
 @Injectable()

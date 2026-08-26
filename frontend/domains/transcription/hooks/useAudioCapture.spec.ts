@@ -54,6 +54,14 @@ function mockMediaDevices(options: {
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 afterEach(() => {
   if (originalMediaDevices) {
     Object.defineProperty(navigator, 'mediaDevices', originalMediaDevices);
@@ -166,5 +174,38 @@ describe('useAudioCapture', () => {
     expect(getUserMedia).toHaveBeenCalledTimes(2);
     expect(result.current.stream).toBe(secondStream);
     expect(result.current.error).toBeNull();
+  });
+
+  it('keeps the newest concurrent capture and stops a stale stream', async () => {
+    const first = deferred<MediaStream>();
+    const second = deferred<MediaStream>();
+    const firstStream = createMockStream('device-1');
+    const secondStream = createMockStream('device-2');
+    mockMediaDevices({
+      getUserMedia: vi
+        .fn()
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => second.promise),
+    });
+    const { result } = renderHook(() => useAudioCapture());
+
+    let firstRequest!: ReturnType<typeof result.current.requestPermission>;
+    let secondRequest!: ReturnType<typeof result.current.requestPermission>;
+    act(() => {
+      firstRequest = result.current.requestPermission('device-1');
+      secondRequest = result.current.requestPermission('device-2');
+    });
+    await act(async () => {
+      second.resolve(secondStream);
+      await secondRequest;
+    });
+    await act(async () => {
+      first.resolve(firstStream);
+      await firstRequest;
+    });
+
+    expect(result.current.stream).toBe(secondStream);
+    expect(firstStream.getTracks()[0].stop).toHaveBeenCalledOnce();
+    expect(secondStream.getTracks()[0].stop).not.toHaveBeenCalled();
   });
 });

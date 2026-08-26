@@ -153,7 +153,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
       {/* Transcription Defaults */}
       <ErrorBoundary>
         <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <p className="label-sm text-[var(--ink-muted)]">TRANSCRIPTION</p>
+          <p className="label-sm text-[var(--ink-muted)]">전사</p>
           <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">기본 전사 설정</h2>
           <div className="space-y-4">
             <div>
@@ -185,8 +185,8 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
                 className="input-shell w-full text-sm"
                 disabled={isSettingsLoading || isSettingsSaving}
               >
-                <option value={MeetingTranscriptionMode.REALTIME}>Realtime (실시간 전사)</option>
-                <option value={MeetingTranscriptionMode.BATCH}>Batch (종료 후 전사)</option>
+                <option value={MeetingTranscriptionMode.REALTIME}>실시간 전사</option>
+                <option value={MeetingTranscriptionMode.BATCH}>종료 후 전사</option>
               </select>
             </div>
             <div>
@@ -202,8 +202,8 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
                 disabled={isSettingsLoading || isSettingsSaving}
               >
                 <option value="ko-KR">한국어</option>
-                <option value="en-US">English</option>
-                <option value="ja-JP">日本語</option>
+                <option value="en-US">영어</option>
+                <option value="ja-JP">일본어</option>
               </select>
             </div>
             <div>
@@ -220,8 +220,8 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
               >
                 <option value="">번역 안 함</option>
                 <option value="ko">한국어</option>
-                <option value="en">English</option>
-                <option value="ja">日本語</option>
+                <option value="en">영어</option>
+                <option value="ja">일본어</option>
               </select>
             </div>
           </div>
@@ -231,7 +231,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
       {/* Theme */}
       <ErrorBoundary>
         <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <p className="label-sm text-[var(--ink-muted)]">APPEARANCE</p>
+          <p className="label-sm text-[var(--ink-muted)]">화면</p>
           <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">테마</h2>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -243,6 +243,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
               onClick={handleThemeToggle}
               role="switch"
               aria-checked={themeMode === 'dark'}
+              aria-label="다크 모드"
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                 themeMode === 'dark' ? 'bg-indigo-600' : 'bg-slate-300'
               }`}
@@ -258,7 +259,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
       {/* Notifications */}
       <ErrorBoundary>
         <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <p className="label-sm text-[var(--ink-muted)]">NOTIFICATIONS</p>
+          <p className="label-sm text-[var(--ink-muted)]">알림</p>
           <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">알림</h2>
           <div className="flex items-center justify-between">
             <div>
@@ -270,6 +271,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
               onClick={() => void handleNotificationsToggle()}
               role="switch"
               aria-checked={notificationsEnabled}
+              aria-label="회의 완료 알림"
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                 notificationsEnabled ? 'bg-indigo-600' : 'bg-slate-300'
               }`}
@@ -285,7 +287,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
       {/* Data */}
       <ErrorBoundary>
         <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <p className="label-sm text-[var(--ink-muted)]">DATA</p>
+          <p className="label-sm text-[var(--ink-muted)]">데이터</p>
           <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">데이터</h2>
           <div className="flex items-center justify-between">
             <div>
@@ -312,7 +314,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
       {/* Account */}
       <ErrorBoundary>
         <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <p className="label-sm text-[var(--ink-muted)]">ACCOUNT</p>
+          <p className="label-sm text-[var(--ink-muted)]">계정</p>
           <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">계정</h2>
           <div className="space-y-4">
             <div className="flex items-center gap-3">

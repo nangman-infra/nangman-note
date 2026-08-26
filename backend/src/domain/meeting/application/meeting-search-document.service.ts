@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { NoteEntity } from '../../note/domain/note.entity';
 import { ResultEntity } from '../../result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-segment.entity';
@@ -57,7 +57,7 @@ export class MeetingSearchDocumentService {
     private readonly transcriptRepository: Repository<TranscriptSegmentEntity>,
   ) {}
 
-  async refreshByMeetingId(meetingId: string): Promise<void> {
+  async refreshByMeetingId(meetingId: string): Promise<boolean> {
     try {
       const meeting = await this.meetingRepository.findOne({
         where: { id: meetingId },
@@ -66,7 +66,7 @@ export class MeetingSearchDocumentService {
 
       if (!meeting || meeting.deletedAt) {
         await this.searchDocumentRepository.delete({ meetingId });
-        return;
+        return true;
       }
 
       const [note, result, transcripts, existing] = await Promise.all([
@@ -113,47 +113,77 @@ export class MeetingSearchDocumentService {
         existing.resultContent = nextPayload.resultContent;
         existing.transcriptContent = nextPayload.transcriptContent;
         await this.searchDocumentRepository.save(existing);
-        return;
+        return true;
       }
 
       await this.searchDocumentRepository.save(
         this.searchDocumentRepository.create(nextPayload),
       );
+      return true;
     } catch (error) {
       this.logger.warn('meeting.search_document.refresh_failed', {
         meetingId,
         errorMessage: error instanceof Error ? error.message : String(error),
       });
+      try {
+        await this.searchDocumentRepository.delete({ meetingId });
+      } catch (cleanupError) {
+        this.logger.warn('meeting.search_document.invalidate_failed', {
+          meetingId,
+          errorMessage:
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError),
+        });
+      }
+      return false;
     }
   }
 
-  async ensureCoverage(limit = 200): Promise<number> {
-    const missingRows = await this.meetingRepository
+  async ensureCoverage(ownerSub?: string, limit = 200): Promise<boolean> {
+    const batchSize = Math.max(1, limit);
+    const missingRows = await this.findMissingMeetingIds(
+      ownerSub,
+      batchSize + 1,
+    );
+    let refreshSucceeded = true;
+
+    for (const row of missingRows.slice(0, batchSize)) {
+      const refreshed = await this.refreshByMeetingId(row.id);
+      refreshSucceeded = refreshed && refreshSucceeded;
+    }
+
+    if (!refreshSucceeded || missingRows.length > batchSize) {
+      return false;
+    }
+
+    return (await this.findMissingMeetingIds(ownerSub, 1)).length === 0;
+  }
+
+  private async findMissingMeetingIds(
+    ownerSub: string | undefined,
+    limit: number,
+  ): Promise<Array<{ id: string }>> {
+    const query = this.meetingRepository
       .createQueryBuilder('meeting')
       .leftJoin(
         MeetingSearchDocumentEntity,
         'doc',
-        'doc.meeting_id = meeting.id',
+        `doc.meeting_id = meeting.id
+          AND COALESCE(doc.owner_sub, '') = COALESCE(meeting.owner_sub, '')`,
       )
       .select('meeting.id', 'id')
       .where('meeting.deleted_at IS NULL')
-      .andWhere('doc.meeting_id IS NULL')
-      .orderBy('meeting.started_at', 'DESC')
-      .limit(Math.max(1, limit))
-      .getRawMany<{ id: string }>();
+      .andWhere('doc.meeting_id IS NULL');
 
-    for (const row of missingRows) {
-      try {
-        await this.refreshByMeetingId(row.id);
-      } catch (error) {
-        this.logger.warn('meeting.search_document.backfill_failed', {
-          meetingId: row.id,
-          errorMessage: error instanceof Error ? error.message : String(error),
-        });
-      }
+    if (ownerSub) {
+      query.andWhere('meeting.owner_sub = :ownerSub', { ownerSub });
     }
 
-    return missingRows.length;
+    return query
+      .orderBy('meeting.started_at', 'DESC')
+      .limit(limit)
+      .getRawMany<{ id: string }>();
   }
 
   async search(params: {
@@ -165,75 +195,78 @@ export class MeetingSearchDocumentService {
   }): Promise<{ rows: MeetingSearchDocumentRow[]; total: number }> {
     const { loweredKeyword, scope, page, limit, ownerSub } = params;
     const skip = (page - 1) * limit;
-    const keyword = `%${loweredKeyword}%`;
-
-    const query = this.searchDocumentRepository
-      .createQueryBuilder('doc')
-      .innerJoin(MeetingEntity, 'meeting', 'meeting.id = doc.meeting_id')
-      .where('meeting.deleted_at IS NULL');
-
-    if (ownerSub) {
-      query.andWhere('doc.owner_sub = :ownerSub', { ownerSub });
-    }
-
-    if (scope === 'title') {
-      query.andWhere("LOWER(COALESCE(doc.title, '')) LIKE :keyword", {
-        keyword,
-      });
-    } else if (scope === 'result') {
-      query.andWhere("LOWER(COALESCE(doc.result_content, '')) LIKE :keyword", {
-        keyword,
-      });
-    } else if (scope === 'note') {
-      query.andWhere("LOWER(COALESCE(doc.note_content, '')) LIKE :keyword", {
-        keyword,
-      });
-    } else if (scope === 'transcript') {
-      query.andWhere(
-        "LOWER(COALESCE(doc.transcript_content, '')) LIKE :keyword",
-        {
-          keyword,
+    // AES-GCM ciphertext is intentionally non-searchable. Load the encrypted
+    // projection through TypeORM so the subscriber decrypts it before matching.
+    const documents = await this.searchDocumentRepository.find({
+      where: {
+        ...(ownerSub ? { ownerSub } : {}),
+        meeting: { deletedAt: IsNull() },
+      },
+      relations: { meeting: true },
+      select: {
+        meetingId: true,
+        ownerSub: true,
+        title: true,
+        noteContent: scope === 'all' || scope === 'note',
+        resultContent: scope === 'all' || scope === 'result',
+        transcriptContent: scope === 'all' || scope === 'transcript',
+        meeting: {
+          id: true,
+          status: true,
+          processingPhase: true,
+          needsAttention: true,
+          completionState: true,
+          transcriptionMode: true,
+          startedAt: true,
         },
-      );
-    } else {
-      query.andWhere(
-        `
-          LOWER(COALESCE(doc.title, '')) LIKE :keyword
-          OR LOWER(COALESCE(doc.result_content, '')) LIKE :keyword
-          OR LOWER(COALESCE(doc.note_content, '')) LIKE :keyword
-          OR LOWER(COALESCE(doc.transcript_content, '')) LIKE :keyword
-        `,
-        { keyword },
-      );
-    }
-
-    const total = await query.clone().getCount();
+      },
+      order: { meeting: { startedAt: 'DESC' } },
+    });
+    const matchedDocuments = documents.filter((document) =>
+      this.matchesKeyword(document, loweredKeyword, scope),
+    );
+    const total = matchedDocuments.length;
     if (total === 0) {
       return { rows: [], total: 0 };
     }
 
-    const rows = await query
-      .clone()
-      .select([
-        'doc.meeting_id AS "meetingId"',
-        'doc.owner_sub AS "ownerSub"',
-        'doc.title AS "title"',
-        'doc.note_content AS "noteContent"',
-        'doc.result_content AS "resultContent"',
-        'doc.transcript_content AS "transcriptContent"',
-        'meeting.status AS "status"',
-        'meeting.processing_phase AS "processingPhase"',
-        'meeting.needs_attention AS "needsAttention"',
-        'meeting.completion_state AS "completionState"',
-        'meeting.transcription_mode AS "transcriptionMode"',
-        'meeting.started_at AS "startedAt"',
-      ])
-      .orderBy('meeting.started_at', 'DESC')
-      .offset(skip)
-      .limit(limit)
-      .getRawMany<MeetingSearchDocumentRow>();
+    const rows = matchedDocuments.slice(skip, skip + limit).map((document) => ({
+      meetingId: document.meetingId,
+      ownerSub: document.ownerSub,
+      title: document.title,
+      noteContent: document.noteContent ?? '',
+      resultContent: document.resultContent ?? '',
+      transcriptContent: document.transcriptContent ?? '',
+      status: document.meeting.status,
+      processingPhase: document.meeting.processingPhase,
+      needsAttention: document.meeting.needsAttention,
+      completionState: document.meeting.completionState,
+      transcriptionMode: document.meeting.transcriptionMode,
+      startedAt: document.meeting.startedAt,
+    }));
 
     return { rows, total };
+  }
+
+  private matchesKeyword(
+    document: MeetingSearchDocumentEntity,
+    loweredKeyword: string,
+    scope: MeetingSearchScope,
+  ): boolean {
+    const fields: Record<Exclude<MeetingSearchScope, 'all'>, string> = {
+      title: document.title ?? '',
+      result: document.resultContent ?? '',
+      transcript: document.transcriptContent ?? '',
+      note: document.noteContent ?? '',
+    };
+
+    if (scope !== 'all') {
+      return fields[scope].toLowerCase().includes(loweredKeyword);
+    }
+
+    return Object.values(fields).some((value) =>
+      value.toLowerCase().includes(loweredKeyword),
+    );
   }
 
   private limitText(text: string, maxLength: number): string {

@@ -29,10 +29,10 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: Array<{ key: SidebarView; icon: typeof LayoutDashboard; label: string }> = [
-  { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { key: 'history', icon: FileText, label: 'Meeting' },
-  { key: 'prompts', icon: Sparkles, label: 'Prompts' },
-  { key: 'settings', icon: Settings, label: 'Settings' },
+  { key: 'dashboard', icon: LayoutDashboard, label: '대시보드' },
+  { key: 'history', icon: FileText, label: '회의 기록' },
+  { key: 'prompts', icon: Sparkles, label: '프롬프트' },
+  { key: 'settings', icon: Settings, label: '설정' },
 ];
 
 export function Sidebar({
@@ -53,14 +53,14 @@ export function Sidebar({
             <h1 className="font-headline text-lg font-extrabold leading-none text-indigo-700">
               TransNote
             </h1>
-            <p className="label-sm mt-1 text-slate-500">Cognitive Workspace</p>
+            <p className="label-sm mt-1 text-slate-500">AI 회의 워크스페이스</p>
           </div>
         </div>
       </header>
 
       {/* Main Navigation — Stitch style: 버튼 기반, 새 페이지 이동 없음 */}
       <nav className="space-y-1">
-        <p className="label-sm mb-2 px-4 text-[var(--ink-muted)]">MENU</p>
+        <p className="label-sm mb-2 px-4 text-[var(--ink-muted)]">메뉴</p>
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.key;
           return (
@@ -91,7 +91,7 @@ export function Sidebar({
           aria-current={pathname === '/meeting/new' ? 'page' : undefined}
         >
           <Plus className="h-5 w-5 text-white" />
-          <span className="text-white">New Meeting</span>
+          <span className="text-white">새 회의</span>
         </Link>
       </div>
     </div>
@@ -119,6 +119,7 @@ function UserInfo() {
         onClick={() => void signOut({ callbackUrl: '/auth/signin' })}
         className="flex-shrink-0 rounded-md p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
         title="로그아웃"
+        aria-label="로그아웃"
       >
         <LogOut className="h-3.5 w-3.5" />
       </button>

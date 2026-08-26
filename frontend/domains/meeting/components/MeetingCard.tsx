@@ -57,30 +57,37 @@ export const MeetingCard = memo(
       onClick?.();
     };
 
-	    return (
-	      <article
-	        className={`group relative w-full rounded-xl px-4 py-3 transition-all ${
-	          isRecording
-	            ? 'border-l-4 border-l-[var(--tertiary)] bg-[var(--surface-container-low)]'
-	            : 'bg-[var(--surface-container-low)]'
-	        } ${cardSelectionClassName} ${selectionMode ? 'cursor-pointer' : ''}`}
+    return (
+      <article
+        className={`group relative w-full rounded-xl px-4 py-3 transition-all ${
+          isRecording
+            ? 'border-l-4 border-l-[var(--tertiary)] bg-[var(--surface-container-low)]'
+            : 'bg-[var(--surface-container-low)]'
+        } ${cardSelectionClassName} ${selectionMode ? 'cursor-pointer' : ''}`}
         onClick={selectionMode ? handleCardClick : undefined}
+        onKeyDown={selectionMode ? (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          onToggleSelect?.();
+        } : undefined}
+        role={selectionMode ? 'checkbox' : undefined}
+        aria-checked={selectionMode ? isSelected : undefined}
+        aria-label={selectionMode ? `${meeting.title || '제목 없는 회의'} ${isSelected ? '선택됨' : '선택 안 됨'}` : undefined}
+        tabIndex={selectionMode ? 0 : undefined}
       >
         <div className="flex items-center gap-3">
           {/* Selection checkbox */}
           {selectionMode ? (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
+            <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${
                 isSelected
                   ? 'border-brand bg-brand text-white'
                   : 'border-[var(--outline-variant)] bg-white hover:border-brand'
               }`}
-              aria-label={isSelected ? '선택 해제' : '선택'}
+              aria-hidden="true"
             >
               {isSelected ? <Check className="h-3 w-3" /> : null}
-            </button>
+            </span>
           ) : null}
 
           <div
@@ -101,6 +108,7 @@ export const MeetingCard = memo(
               onClick={selectionMode ? undefined : onClick}
               className={`block w-full text-left ${selectionMode ? 'pointer-events-none' : ''}`}
               disabled={mode === 'trash' || selectionMode}
+              aria-current={isActive ? 'true' : undefined}
             >
               <h3 className="line-clamp-1 text-sm font-bold text-slate-900 transition-colors group-hover:text-indigo-700">
                 {meeting.title || '제목 없는 회의'}
@@ -128,7 +136,7 @@ export const MeetingCard = memo(
           {/* Right side: status text + actions */}
           <div className="flex shrink-0 items-center gap-2">
             {isRecording ? (
-              <span className="status-pill status-pill--live">
+              <span className="status-pill status-pill--live" role="status">
                 {config.label}
               </span>
             ) : (
@@ -160,6 +168,8 @@ export const MeetingCard = memo(
 
         {(meeting.status === 'processing' || meeting.needsAttention) && (
           <div
+            role={meeting.needsAttention ? 'alert' : 'status'}
+            aria-live={meeting.needsAttention ? 'assertive' : 'polite'}
             className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
               getProcessingBannerClassName(meeting.needsAttention)
             }`}
@@ -169,9 +179,9 @@ export const MeetingCard = memo(
             ) : (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             )}
-	            {getProcessingBannerMessage(meeting)}
-	          </div>
-	        )}
+            {getProcessingBannerMessage(meeting)}
+          </div>
+        )}
 
         {/* Trash mode actions */}
         {mode === 'trash' && !selectionMode ? (

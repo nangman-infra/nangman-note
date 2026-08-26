@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -18,6 +19,11 @@ const nullableDateColumnType: ColumnType =
     : 'datetime';
 
 @Entity('transcription_job')
+@Index(
+  'UQ_transcription_job_meeting_media_idempotency',
+  ['meetingId', 'idempotencyKey'],
+  { unique: true },
+)
 export class TranscriptionJobEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -44,6 +50,14 @@ export class TranscriptionJobEntity {
 
   @Column({ name: 'media_uri', type: 'varchar', length: 2048 })
   mediaUri: string;
+
+  @Column({
+    name: 'idempotency_key',
+    type: 'varchar',
+    length: 2048,
+    nullable: true,
+  })
+  idempotencyKey?: string | null;
 
   @Column({
     name: 'language_code',

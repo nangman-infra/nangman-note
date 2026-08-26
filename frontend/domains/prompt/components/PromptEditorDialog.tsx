@@ -43,6 +43,15 @@ export function PromptEditorDialog({
     useState<PromptDocumentType>(initialDocumentType);
 
   useEffect(() => {
+    if (!open) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setName(initialName);
+    setContent(initialContent);
+    setDocumentType(initialDocumentType);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, mode, initialName, initialContent, initialDocumentType]);
+
+  useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 

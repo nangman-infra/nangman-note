@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText, LayoutDashboard, Sparkles } from 'lucide-react';
 import { TwoColumnLayout } from '@/components/layout/TwoColumnLayout';
 import { Sidebar, type SidebarTimeFilter, type SidebarView } from '@/components/layout/Sidebar';
 import { meetingApi, useMeetingStore } from '@/domains/meeting';
@@ -48,7 +48,7 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
       try {
         await meetingApi.update(meetingId, { title });
         useResultStore.setState((state) => {
-          if (!state.result) return state;
+          if (state.result?.meetingId !== meetingId) return state;
           return {
             result: {
               ...state.result,
@@ -124,9 +124,9 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
               className="btn-secondary inline-flex text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
-              Dashboard
+              대시보드
             </button>
-            <span className="text-sm font-semibold text-slate-900">Settings</span>
+            <span className="text-sm font-semibold text-slate-900">설정</span>
           </div>
           <div className="flex-1 overflow-y-auto">
             <SettingsInlineView prompts={prompts} />
@@ -145,9 +145,9 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
               className="btn-secondary inline-flex text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
-              Dashboard
+              대시보드
             </button>
-            <span className="text-sm font-semibold text-slate-900">Prompts</span>
+            <span className="text-sm font-semibold text-slate-900">프롬프트</span>
           </div>
           <div className="flex-1 overflow-y-auto">
             <PromptsInlineView prompts={prompts} />
@@ -166,7 +166,7 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
               className="btn-secondary inline-flex text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
-              Dashboard
+              대시보드
             </button>
           </div>
           <div className="flex-1 overflow-hidden">
@@ -196,6 +196,30 @@ export function HomePageContent({ initialShowTrash }: HomePageContentProps) {
       showViewer={showViewer || activeView === 'settings' || activeView === 'prompts'}
       mobileView={mobileActiveView}
       onMobileViewChange={setMobileActiveView}
+      mobileNavigation={
+        <nav aria-label="모바일 주요 메뉴" className="grid grid-cols-3 gap-1">
+          {([
+            ['dashboard', '대시보드', LayoutDashboard],
+            ['history', '회의 기록', FileText],
+            ['prompts', '프롬프트', Sparkles],
+          ] as const).map(([view, label, Icon]) => (
+            <button
+              key={view}
+              type="button"
+              onClick={() => handleViewChange(view)}
+              aria-current={activeView === view ? 'page' : undefined}
+              className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-md px-2 text-xs font-semibold transition ${
+                activeView === view
+                  ? 'bg-white text-indigo-700 shadow-sm'
+                  : 'text-[var(--ink-muted)] hover:bg-white/70'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </nav>
+      }
       sidebar={
         <Sidebar
           activeView={activeView}

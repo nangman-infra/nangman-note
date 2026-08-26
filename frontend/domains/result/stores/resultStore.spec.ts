@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resultApi } from '../api/resultApi';
 import { useResultStore } from './resultStore';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 vi.mock('../api/resultApi', () => ({
   resultApi: {
     get: vi.fn(),
@@ -117,4 +125,40 @@ describe('useResultStore', () => {
       error: null,
     });
   });
+
+  it('ignores a stale fetch after switching meetings', async () => {
+    const first = deferred<Awaited<ReturnType<typeof resultApi.get>>>();
+    const second = deferred<Awaited<ReturnType<typeof resultApi.get>>>();
+    vi.mocked(resultApi.get)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
+    const firstFetch = useResultStore.getState().fetchResult('m1');
+    useResultStore.getState().clearResult();
+    const secondFetch = useResultStore.getState().fetchResult('m2');
+    second.resolve(buildResult('m2'));
+    await secondFetch;
+    first.resolve(buildResult('m1'));
+    await firstFetch;
+
+    expect(useResultStore.getState().result?.meetingId).toBe('m2');
+  });
 });
+
+function buildResult(meetingId: string) {
+  return {
+    id: `result-${meetingId}`,
+    meetingId,
+    promptId: 'prompt_default_meeting',
+    content: '# 회의록',
+    metadata: {
+      title: meetingId,
+      generatedAt: '2026-03-07T00:00:00.000Z',
+      totalDuration: 300,
+      transcriptWordCount: 10,
+      noteLength: 20,
+    },
+    createdAt: '2026-03-07T00:00:00.000Z',
+    updatedAt: '2026-03-07T00:00:00.000Z',
+  };
+}

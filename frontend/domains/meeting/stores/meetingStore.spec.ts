@@ -31,6 +31,14 @@ function buildMeeting(overrides: Partial<Meeting> = {}): Meeting {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('useMeetingStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -169,6 +177,74 @@ describe('useMeetingStore', () => {
         transcriptionMode: MeetingTranscriptionMode.BATCH,
       }),
     ]);
+  });
+
+  it('does not let an old list response replace a newer search', async () => {
+    const list = deferred<Meeting[]>();
+    vi.mocked(meetingApi.list).mockReturnValue(list.promise);
+    vi.mocked(meetingApi.search).mockResolvedValue([
+      {
+        meetingId: 'search-result',
+        title: 'current query',
+        status: MeetingStatus.COMPLETED,
+        transcriptionMode: MeetingTranscriptionMode.BATCH,
+        matchedIn: 'title',
+        snippet: 'current query',
+        startedAt: '2026-03-01T00:00:00.000Z',
+      },
+    ]);
+
+    const listing = useMeetingStore.getState().fetchMeetings();
+    await useMeetingStore.getState().searchMeetings('current query');
+    list.resolve([buildMeeting({ id: 'stale-list' })]);
+    await listing;
+
+    expect(useMeetingStore.getState().meetings[0]?.id).toBe('search-result');
+  });
+
+  it('does not let an old query replace newer search results', async () => {
+    const oldSearch = deferred<Awaited<ReturnType<typeof meetingApi.search>>>();
+    vi.mocked(meetingApi.search)
+      .mockReturnValueOnce(oldSearch.promise)
+      .mockResolvedValueOnce([
+        {
+          meetingId: 'new-query-result',
+          title: 'new query',
+          status: MeetingStatus.COMPLETED,
+          transcriptionMode: MeetingTranscriptionMode.BATCH,
+          matchedIn: 'title',
+          snippet: 'new query',
+          startedAt: '2026-03-01T00:00:00.000Z',
+        },
+      ]);
+
+    const oldRequest = useMeetingStore.getState().searchMeetings('old query');
+    await useMeetingStore.getState().searchMeetings('new query');
+    oldSearch.resolve([]);
+    await oldRequest;
+
+    expect(useMeetingStore.getState().meetings[0]?.id).toBe('new-query-result');
+  });
+
+  it('clears load-more state when a silent refresh makes its response stale', async () => {
+    const loadMore = deferred<Meeting[]>();
+    useMeetingStore.setState({
+      meetings: [buildMeeting({ id: 'meeting-1' })],
+      meetingsPage: 1,
+      hasMoreMeetings: true,
+      isLoadingMore: false,
+    });
+    vi.mocked(meetingApi.list)
+      .mockReturnValueOnce(loadMore.promise)
+      .mockResolvedValueOnce([buildMeeting({ id: 'meeting-refreshed' })]);
+
+    const loadingMore = useMeetingStore.getState().loadMoreMeetings();
+    await useMeetingStore.getState().fetchMeetings({ silent: true });
+    loadMore.resolve([buildMeeting({ id: 'meeting-older' })]);
+    await loadingMore;
+
+    expect(useMeetingStore.getState().isLoadingMore).toBe(false);
+    expect(useMeetingStore.getState().meetings[0]?.id).toBe('meeting-refreshed');
   });
 
   it('removes deleted meeting from state list', async () => {

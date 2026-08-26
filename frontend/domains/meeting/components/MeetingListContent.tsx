@@ -53,7 +53,7 @@ export function MeetingListContent({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-2" role="status" aria-label="회의 목록을 불러오는 중" aria-live="polite">
           {Array.from({ length: 4 }, (_, index) => (
             <MeetingCardSkeleton key={index} />
           ))}
@@ -105,7 +105,7 @@ export function MeetingListContent({
   };
 
   return (
-    <div className="scroll-muted flex-1 space-y-2 overflow-y-auto bg-white px-4 py-3">
+    <div aria-busy={isLoading} className="scroll-muted flex-1 space-y-2 overflow-y-auto bg-white px-4 py-3">
       {renderContent()}
     </div>
   );

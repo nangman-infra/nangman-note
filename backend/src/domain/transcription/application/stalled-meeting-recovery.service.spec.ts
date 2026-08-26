@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { ResultEntity } from '../../result/domain/result.entity';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
@@ -7,6 +7,7 @@ import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
+import { TRANSCRIPTION_SUBMISSION_PENDING_ERROR } from '../domain/transcription-job.constants';
 import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
 import { TranscriptionUploadStatus } from '../domain/transcription-upload-status.enum';
 import { StalledMeetingRecoveryService } from './stalled-meeting-recovery.service';
@@ -18,14 +19,17 @@ describe('StalledMeetingRecoveryService', () => {
   let meetingRepository: jest.Mocked<Pick<Repository<MeetingEntity>, 'find'>>;
   let resultRepository: jest.Mocked<Pick<Repository<ResultEntity>, 'findOne'>>;
   let transcriptionJobRepository: jest.Mocked<
-    Pick<Repository<TranscriptionJobEntity>, 'findOne'>
+    Pick<Repository<TranscriptionJobEntity>, 'find'>
   >;
   let transcriptionUploadRepository: jest.Mocked<
     Pick<Repository<TranscriptionUploadEntity>, 'findOne'>
   >;
   let meetingService: jest.Mocked<Pick<MeetingService, 'updateStatus'>>;
   let transcriptionService: jest.Mocked<
-    Pick<TranscriptionService, 'recoverPendingBatchUpload'>
+    Pick<
+      TranscriptionService,
+      'recoverPendingBatchUpload' | 'recoverPendingBatchSubmission'
+    >
   >;
   let transcriptionResultCollectorService: jest.Mocked<
     Pick<
@@ -33,7 +37,12 @@ describe('StalledMeetingRecoveryService', () => {
       'recoverMissingBatchJob' | 'recoverStalledBatchJob'
     >
   >;
-  let dataSource: jest.Mocked<Pick<DataSource, 'options' | 'query'>>;
+  let dataSource: jest.Mocked<
+    Pick<DataSource, 'options' | 'createQueryRunner'>
+  >;
+  let queryRunner: jest.Mocked<
+    Pick<QueryRunner, 'connect' | 'query' | 'release'>
+  >;
 
   const now = new Date('2026-03-13T12:00:00.000Z');
 
@@ -93,7 +102,7 @@ describe('StalledMeetingRecoveryService', () => {
       findOne: jest.fn(),
     };
     transcriptionJobRepository = {
-      findOne: jest.fn(),
+      find: jest.fn(),
     };
     transcriptionUploadRepository = {
       findOne: jest.fn(),
@@ -103,14 +112,20 @@ describe('StalledMeetingRecoveryService', () => {
     };
     transcriptionService = {
       recoverPendingBatchUpload: jest.fn(),
+      recoverPendingBatchSubmission: jest.fn(),
     };
     transcriptionResultCollectorService = {
       recoverMissingBatchJob: jest.fn(),
       recoverStalledBatchJob: jest.fn(),
     };
+    queryRunner = {
+      connect: jest.fn(),
+      query: jest.fn(),
+      release: jest.fn(),
+    };
     dataSource = {
       options: { type: 'sqlite' } as DataSource['options'],
-      query: jest.fn(),
+      createQueryRunner: jest.fn().mockReturnValue(queryRunner),
     };
 
     service = new StalledMeetingRecoveryService(
@@ -133,7 +148,7 @@ describe('StalledMeetingRecoveryService', () => {
   it('recovers stale meetings without transcription jobs via missing-job path', async () => {
     meetingRepository.find.mockResolvedValue([buildMeeting()]);
     resultRepository.findOne.mockResolvedValue(null);
-    transcriptionJobRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.find.mockResolvedValue([]);
     transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
     await (service as any).recoverStalledMeetings();
@@ -146,7 +161,7 @@ describe('StalledMeetingRecoveryService', () => {
   it('recovers stale meetings through the latest upload session when no job exists', async () => {
     meetingRepository.find.mockResolvedValue([buildMeeting()]);
     resultRepository.findOne.mockResolvedValue(null);
-    transcriptionJobRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.find.mockResolvedValue([]);
     transcriptionUploadRepository.findOne.mockResolvedValue(buildUpload());
     transcriptionService.recoverPendingBatchUpload.mockResolvedValue({
       queued: true,
@@ -169,7 +184,7 @@ describe('StalledMeetingRecoveryService', () => {
   it('falls back to missing-job recovery when uploaded object is still missing', async () => {
     meetingRepository.find.mockResolvedValue([buildMeeting()]);
     resultRepository.findOne.mockResolvedValue(null);
-    transcriptionJobRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.find.mockResolvedValue([]);
     transcriptionUploadRepository.findOne.mockResolvedValue(buildUpload());
     transcriptionService.recoverPendingBatchUpload.mockResolvedValue({
       queued: false,
@@ -211,11 +226,11 @@ describe('StalledMeetingRecoveryService', () => {
       }),
     ]);
     resultRepository.findOne.mockResolvedValue(null);
-    transcriptionJobRepository.findOne.mockResolvedValue(
+    transcriptionJobRepository.find.mockResolvedValue([
       buildJob({
         updatedAt: new Date('2026-03-13T11:25:00.000Z'),
       }),
-    );
+    ]);
     transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
     await (service as any).recoverStalledMeetings();
@@ -228,12 +243,12 @@ describe('StalledMeetingRecoveryService', () => {
   it('recovers stale queued or processing jobs through the collector', async () => {
     meetingRepository.find.mockResolvedValue([buildMeeting()]);
     resultRepository.findOne.mockResolvedValue(null);
-    transcriptionJobRepository.findOne.mockResolvedValue(
+    transcriptionJobRepository.find.mockResolvedValue([
       buildJob({
         status: TranscriptionJobStatus.PROCESSING,
         updatedAt: new Date('2026-03-13T10:40:00.000Z'),
       }),
-    );
+    ]);
     transcriptionUploadRepository.findOne.mockResolvedValue(null);
 
     await (service as any).recoverStalledMeetings();
@@ -243,24 +258,84 @@ describe('StalledMeetingRecoveryService', () => {
     ).toHaveBeenCalledWith('meeting-1', 'job-1', 'user-1');
   });
 
+  it('retries stale pending submissions instead of polling a missing AWS job', async () => {
+    meetingRepository.find.mockResolvedValue([buildMeeting()]);
+    resultRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.find.mockResolvedValue([
+      buildJob({ errorMessage: TRANSCRIPTION_SUBMISSION_PENDING_ERROR }),
+    ]);
+
+    await (service as any).recoverStalledMeetings();
+
+    expect(
+      transcriptionService.recoverPendingBatchSubmission,
+    ).toHaveBeenCalledWith('job-1', 'user-1');
+    expect(
+      transcriptionResultCollectorService.recoverStalledBatchJob,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('recovers every unsettled job instead of only the newest one', async () => {
+    meetingRepository.find.mockResolvedValue([buildMeeting()]);
+    resultRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.find.mockResolvedValue([
+      buildJob({ id: 'job-older' }),
+      buildJob({
+        id: 'job-newer',
+        status: TranscriptionJobStatus.COMPLETED,
+        createdAt: new Date('2026-03-13T10:45:00.000Z'),
+      }),
+      buildJob({
+        id: 'job-collected',
+        status: TranscriptionJobStatus.COMPLETED,
+        collectedAt: new Date('2026-03-13T11:00:00.000Z'),
+      }),
+    ]);
+
+    await (service as any).recoverStalledMeetings();
+
+    expect(
+      transcriptionResultCollectorService.recoverStalledBatchJob,
+    ).toHaveBeenCalledTimes(2);
+    expect(
+      transcriptionResultCollectorService.recoverStalledBatchJob,
+    ).toHaveBeenNthCalledWith(1, 'meeting-1', 'job-older', 'user-1');
+    expect(
+      transcriptionResultCollectorService.recoverStalledBatchJob,
+    ).toHaveBeenNthCalledWith(2, 'meeting-1', 'job-newer', 'user-1');
+  });
+
   it('uses a Postgres advisory lock when available', async () => {
     (dataSource.options as any).type = 'postgres';
-    dataSource.query
+    queryRunner.query
       .mockResolvedValueOnce([{ locked: true }])
       .mockResolvedValueOnce([]);
     meetingRepository.find.mockResolvedValue([]);
 
     await (service as any).recoverStalledMeetings();
 
-    expect(dataSource.query).toHaveBeenNthCalledWith(
+    expect(queryRunner.connect).toHaveBeenCalledTimes(1);
+    expect(queryRunner.query).toHaveBeenNthCalledWith(
       1,
       'SELECT pg_try_advisory_lock($1) AS locked',
       [74274001],
     );
-    expect(dataSource.query).toHaveBeenNthCalledWith(
+    expect(queryRunner.query).toHaveBeenNthCalledWith(
       2,
       'SELECT pg_advisory_unlock($1)',
       [74274001],
     );
+    expect(queryRunner.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the QueryRunner without unlocking when the lock is unavailable', async () => {
+    (dataSource.options as any).type = 'postgres';
+    queryRunner.query.mockResolvedValueOnce([{ locked: false }]);
+
+    await (service as any).recoverStalledMeetings();
+
+    expect(queryRunner.query).toHaveBeenCalledTimes(1);
+    expect(queryRunner.release).toHaveBeenCalledTimes(1);
+    expect(meetingRepository.find).not.toHaveBeenCalled();
   });
 });

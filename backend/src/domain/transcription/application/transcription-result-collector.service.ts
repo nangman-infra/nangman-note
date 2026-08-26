@@ -10,6 +10,11 @@ import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { TranscriptionJobEntity } from '../domain/transcription-job.entity';
+import {
+  TRANSCRIPTION_COLLECTION_FAILURE_PREFIX,
+  TRANSCRIPTION_SUBMISSION_PENDING_ERROR,
+  unsettledTranscriptionJobWhere,
+} from '../domain/transcription-job.constants';
 import { TranscriptionJobStatus } from '../domain/transcription-job-status.enum';
 import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
 import { TranscriptionUploadStatus } from '../domain/transcription-upload-status.enum';
@@ -51,8 +56,8 @@ interface TranscribeSpeakerSegmentItem {
 }
 
 interface TranscribeResultJson {
-  results?: {
-    items?: TranscribeResultItem[];
+  results: {
+    items: TranscribeResultItem[];
     transcripts?: Array<{ transcript?: string }>;
     speaker_labels?: {
       speakers?: number;
@@ -104,7 +109,12 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
       });
 
       for (const job of pendingJobs) {
-        if (job.collectedAt) continue;
+        if (
+          job.collectedAt ||
+          job.errorMessage === TRANSCRIPTION_SUBMISSION_PENDING_ERROR
+        ) {
+          continue;
+        }
         this.logger.log('transcription.batch.poll.resumed_on_boot', {
           meetingId: job.meetingId,
           jobId: job.id,
@@ -196,7 +206,10 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
                 meetingOwnerSub,
               );
 
-              return { success: true, segmentCount };
+              return {
+                success: segmentCount !== null,
+                segmentCount: segmentCount ?? 0,
+              };
             }
 
             if (result.status === TranscriptionJobStatus.FAILED) {
@@ -317,7 +330,10 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
               result.transcriptUri,
               ownerSub,
             );
-            return { success: true, segmentCount };
+            return {
+              success: segmentCount !== null,
+              segmentCount: segmentCount ?? 0,
+            };
           }
 
           if (result.status === TranscriptionJobStatus.FAILED) {
@@ -400,44 +416,30 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
   ): Promise<number> {
     const meetingId = job.meetingId;
     if (!transcriptUri) {
-      this.logger.warn('transcription.batch.transcript_uri.missing', {
-        meetingId,
-      });
-      return 0;
+      throw new Error('Completed transcription job has no transcript URI');
     }
 
-    try {
-      // transcriptUri는 S3 URI (s3://bucket/key) 또는 HTTPS URL
-      const jsonContent = await this.fetchTranscriptJson(transcriptUri);
-      const parsedUnknown: unknown = JSON.parse(jsonContent);
-      if (!this.isTranscribeResultJson(parsedUnknown)) {
-        this.logger.warn('transcription.batch.transcript_shape.invalid', {
-          meetingId,
-        });
-        return 0;
-      }
-
-      const items = parsedUnknown.results?.items ?? [];
-      const speakerLookup = this.buildSpeakerLookup(parsedUnknown);
-      const segments = this.itemsToSegments(meetingId, items, speakerLookup);
-
-      await this.mergeBatchSegments(job, segments);
-
-      return segments.length;
-    } catch (error) {
-      this.logger.error('transcription.batch.transcript_parse_failed', error, {
-        meetingId,
-        transcriptUri,
-      });
-      return 0;
+    // transcriptUri는 S3 URI (s3://bucket/key) 또는 HTTPS URL
+    const jsonContent = await this.fetchTranscriptJson(transcriptUri);
+    const parsedUnknown: unknown = JSON.parse(jsonContent);
+    if (!this.isTranscribeResultJson(parsedUnknown)) {
+      throw new Error('Transcription result has an invalid shape');
     }
+
+    const items = parsedUnknown.results.items;
+    const speakerLookup = this.buildSpeakerLookup(parsedUnknown);
+    const segments = this.itemsToSegments(meetingId, items, speakerLookup);
+
+    await this.mergeBatchSegments(job, segments);
+
+    return segments.length;
   }
 
   private async collectCompletedJob(
     jobId: string,
     transcriptUri: string | undefined,
     ownerSub?: string,
-  ): Promise<number> {
+  ): Promise<number | null> {
     return this.withJobCollectionLock(jobId, async () => {
       const job = await this.jobRepository.findOne({ where: { id: jobId } });
       if (!job) {
@@ -459,10 +461,39 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
       }
 
       const effectiveTranscriptUri = transcriptUri ?? job.transcriptUri;
-      const segmentCount = await this.parseAndSaveResults(
-        job,
-        effectiveTranscriptUri,
-      );
+      let segmentCount: number;
+      try {
+        segmentCount = await this.parseAndSaveResults(
+          job,
+          effectiveTranscriptUri,
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Failed to collect transcription result';
+        this.logger.error(
+          'transcription.batch.transcript_collection_failed',
+          error,
+          {
+            meetingId: job.meetingId,
+            jobId,
+            transcriptUri: effectiveTranscriptUri,
+          },
+        );
+        job.status = TranscriptionJobStatus.FAILED;
+        job.errorMessage = `${TRANSCRIPTION_COLLECTION_FAILURE_PREFIX}${errorMessage}`;
+        try {
+          await this.jobRepository.save(job);
+        } catch (saveError) {
+          this.logger.error(
+            'transcription.batch.transcript_collection_error_save_failed',
+            saveError,
+            { meetingId: job.meetingId, jobId },
+          );
+        }
+        return null;
+      }
 
       job.status = TranscriptionJobStatus.COMPLETED;
       if (effectiveTranscriptUri) {
@@ -531,13 +562,7 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
     }
 
     const pendingCount = await this.jobRepository.count({
-      where: {
-        meetingId,
-        status: In([
-          TranscriptionJobStatus.QUEUED,
-          TranscriptionJobStatus.PROCESSING,
-        ]),
-      },
+      where: unsettledTranscriptionJobWhere(meetingId),
     });
 
     if (pendingCount > 0) {
@@ -812,7 +837,14 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
   private isTranscribeResultJson(
     value: unknown,
   ): value is TranscribeResultJson {
-    return typeof value === 'object' && value !== null;
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+    const results = (value as { results?: unknown }).results;
+    if (typeof results !== 'object' || results === null) {
+      return false;
+    }
+    return Array.isArray((results as { items?: unknown }).items);
   }
 
   private parseS3HttpsUrl(url: string): { bucket: string; key: string } | null {

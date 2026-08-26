@@ -265,7 +265,13 @@ export function ResultViewer({
 
       <ResultTabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <section className="scroll-muted flex-1 overflow-y-auto px-6 py-5">
+      <section
+        id="result-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`result-tab-${activeTab}`}
+        tabIndex={0}
+        className="scroll-muted flex-1 overflow-y-auto px-6 py-5"
+      >
         <ResultViewerTabContent
           activeTab={activeTab}
           isEditing={isEditing}

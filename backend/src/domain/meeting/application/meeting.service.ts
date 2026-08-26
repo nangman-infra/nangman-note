@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { PromptService } from '../../prompt/application/prompt.service';
 import {
   MeetingSearchDocumentService,
@@ -20,6 +20,10 @@ import { MeetingProcessingPhase } from '../domain/meeting-processing-phase.enum'
 import { MeetingStatus } from '../domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../domain/meeting-transcription-mode.enum';
 import { ResultEntity } from '../../result/domain/result.entity';
+import { TranscriptionJobEntity } from '../../transcription/domain/transcription-job.entity';
+import { unsettledTranscriptionJobWhere } from '../../transcription/domain/transcription-job.constants';
+import { TranscriptionUploadEntity } from '../../transcription/domain/transcription-upload.entity';
+import { TranscriptionUploadStatus } from '../../transcription/domain/transcription-upload-status.enum';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { ListMeetingsQueryDto } from './dto/list-meetings-query.dto';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
@@ -54,6 +58,10 @@ export class MeetingService {
     private readonly meetingRepository: Repository<MeetingEntity>,
     @InjectRepository(ResultEntity)
     private readonly resultRepository: Repository<ResultEntity>,
+    @InjectRepository(TranscriptionJobEntity)
+    private readonly transcriptionJobRepository: Repository<TranscriptionJobEntity>,
+    @InjectRepository(TranscriptionUploadEntity)
+    private readonly transcriptionUploadRepository: Repository<TranscriptionUploadEntity>,
     private readonly promptService: PromptService,
     private readonly eventEmitter: EventEmitter2,
     private readonly meetingSearchDocumentService: MeetingSearchDocumentService,
@@ -234,7 +242,22 @@ export class MeetingService {
 
     const loweredKeyword = keyword.toLowerCase();
     try {
-      await this.meetingSearchDocumentService.ensureCoverage();
+      const coverageComplete =
+        await this.meetingSearchDocumentService.ensureCoverage(ownerSub);
+      if (!coverageComplete) {
+        this.logger.warn('meeting.search.projection_incomplete', {
+          ownerSub,
+          scope,
+        });
+        return this.searchLegacy({
+          scope,
+          keyword,
+          loweredKeyword,
+          page,
+          limit,
+          ownerSub,
+        });
+      }
 
       const { rows, total } = await this.meetingSearchDocumentService.search({
         loweredKeyword,
@@ -395,11 +418,15 @@ export class MeetingService {
     // 실시간 모드: PROCESSING (AI 결과 생성 대기)
     // skipTranscription(전사 없음): COMPLETED
     if (isBatchWithTranscription) {
+      const shouldGenerate = await this.isBatchTranscriptionSettled(meeting.id);
+      const processingPhase = shouldGenerate
+        ? MeetingProcessingPhase.GENERATING
+        : MeetingProcessingPhase.UPLOADING;
       const updated = await this.updateLifecycle(
         meeting,
         {
           status: MeetingStatus.PROCESSING,
-          processingPhase: MeetingProcessingPhase.UPLOADING,
+          processingPhase,
           needsAttention: false,
           completionState: null,
           endedAt: new Date(),
@@ -414,7 +441,7 @@ export class MeetingService {
       this.emitStatusChanged(
         updated.id,
         updated.status,
-        MeetingProcessingPhase.UPLOADING,
+        processingPhase,
         updated.ownerSub,
         updated.needsAttention,
         updated.completionState,
@@ -450,6 +477,30 @@ export class MeetingService {
       updated.completionState,
     );
     return updated;
+  }
+
+  private async isBatchTranscriptionSettled(
+    meetingId: string,
+  ): Promise<boolean> {
+    const [jobCount, unsettledJobCount, pendingUploadCount] = await Promise.all(
+      [
+        this.transcriptionJobRepository.count({ where: { meetingId } }),
+        this.transcriptionJobRepository.count({
+          where: unsettledTranscriptionJobWhere(meetingId),
+        }),
+        this.transcriptionUploadRepository.count({
+          where: {
+            meetingId,
+            status: In([
+              TranscriptionUploadStatus.ISSUED,
+              TranscriptionUploadStatus.UPLOADED,
+            ]),
+          },
+        }),
+      ],
+    );
+
+    return jobCount > 0 && unsettledJobCount === 0 && pendingUploadCount === 0;
   }
 
   async updateStatus(

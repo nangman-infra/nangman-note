@@ -61,11 +61,11 @@ export function DashboardView({
       {/* ── Stitch TopAppBar ── */}
       <header className="sticky top-0 z-40 flex items-center justify-between bg-slate-50/80 px-6 py-3 shadow-sm backdrop-blur-xl">
         <h2 className="font-headline text-xl font-bold tracking-tight text-slate-900">
-          {isMeetingManagement ? 'Meeting' : 'Workspace Overview'}
+          {isMeetingManagement ? '회의 기록' : '워크스페이스 개요'}
         </h2>
         <div className="flex items-center gap-3">
             <NotificationBell onSelectMeeting={onSelectMeeting} />
-            <Link href="/settings" className="rounded-full p-2 text-slate-500 transition hover:bg-indigo-50">
+            <Link href="/settings" aria-label="설정" className="rounded-full p-2 text-slate-500 transition hover:bg-indigo-50">
               <Settings className="h-5 w-5" />
             </Link>
             {/* Profile Avatar */}
@@ -110,13 +110,13 @@ export function DashboardView({
                 <div className="relative overflow-hidden rounded-xl bg-brand-gradient p-8 text-white shadow-xl md:col-span-8 min-h-[260px] flex flex-col justify-between">
                   <div className="relative z-10">
                     <span className="label-sm mb-4 inline-block rounded-full bg-white/20 px-3 py-1">
-                      Focus Mode
+                      집중 모드
                     </span>
                     <h1 className="font-headline text-3xl font-extrabold leading-tight tracking-tighter lg:text-4xl">
-                      Capture every thought,<br />automatically.
+                      모든 생각을 놓치지 않고<br />자동으로 기록하세요.
                     </h1>
                     <p className="mt-3 max-w-md text-sm text-white/70 lg:text-base">
-                      Your AI partner is ready to transcribe, summarize, and distill your next big meeting into actionable insights.
+                      AI가 다음 회의를 전사하고 요약해, 바로 실행할 수 있는 핵심 내용으로 정리합니다.
                     </p>
                   </div>
                   <div className="relative z-10 mt-6 flex gap-4">
@@ -125,7 +125,7 @@ export function DashboardView({
                       className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-bold !text-indigo-700 transition hover:bg-slate-50 active:scale-95"
                     >
                       <Mic className="h-4 w-4" />
-                      Start Recording
+                      녹음 시작
                     </Link>
                     <button
                       type="button"
@@ -133,7 +133,7 @@ export function DashboardView({
                       className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-transparent px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
                     >
                       <Upload className="h-4 w-4" />
-                      Upload Audio
+                      오디오 업로드
                     </button>
                   </div>
                   {/* Decorative blur blob */}
@@ -296,7 +296,7 @@ function KpiCards({ meetingsTotal, isLoading }: KpiCardsProps) {
   }, [meetings]);
 
   const hoursLabel =
-    totalTranscribedHours > 0 ? `${totalTranscribedHours.toFixed(1)} hrs` : '—';
+    totalTranscribedHours > 0 ? `${totalTranscribedHours.toFixed(1)}시간` : '—';
 
   const meetingsLabel = getMeetingsLabel({ isLoading, meetingsTotal });
 
@@ -309,7 +309,7 @@ function KpiCards({ meetingsTotal, isLoading }: KpiCardsProps) {
           </div>
         </div>
         <div>
-          <p className="text-sm font-medium text-[var(--ink-muted)]">Total Transcribed</p>
+          <p className="text-sm font-medium text-[var(--ink-muted)]">총 전사 시간</p>
           <p className="font-headline text-3xl font-bold text-slate-900">{hoursLabel}</p>
         </div>
       </div>
@@ -320,7 +320,7 @@ function KpiCards({ meetingsTotal, isLoading }: KpiCardsProps) {
           </div>
         </div>
         <div>
-          <p className="text-sm font-medium text-[var(--ink-muted)]">Meetings Held</p>
+          <p className="text-sm font-medium text-[var(--ink-muted)]">전체 회의</p>
           <p className="font-headline text-3xl font-bold text-slate-900">{meetingsLabel}</p>
         </div>
       </div>

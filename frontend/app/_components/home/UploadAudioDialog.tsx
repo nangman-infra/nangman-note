@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileAudio, Loader2, Upload, X } from 'lucide-react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { meetingApi, MeetingTranscriptionMode } from '@/domains/meeting';
@@ -56,6 +56,8 @@ function getDefaultTitle(fileName: string): string {
 
 export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDialogProps) {
   const { pushToast } = useFeedback();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const initialFocusRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   /** 재시도 시 회의를 재사용하기 위한 참조 (실패마다 고아 회의가 쌓이는 것 방지) */
   const createdMeetingIdRef = useRef<string | null>(null);
@@ -66,6 +68,47 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isBusy = phase !== 'idle';
+
+  useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const frameId = window.requestAnimationFrame(() => initialFocusRef.current?.focus());
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [open]);
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      if (!isBusy) {
+        event.preventDefault();
+        resetAndClose();
+      }
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const focusable = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]):not([type="file"]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((element) => !element.hidden);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const discardCreatedMeeting = async () => {
     const meetingId = createdMeetingIdRef.current;
@@ -223,16 +266,20 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="오디오 파일 업로드"
+      aria-labelledby="upload-audio-dialog-title"
+      aria-describedby="upload-audio-dialog-description"
+      aria-busy={isBusy}
+      onKeyDown={handleDialogKeyDown}
     >
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h3 className="font-headline text-lg font-bold text-slate-900">
+          <h2 id="upload-audio-dialog-title" className="font-headline text-lg font-bold text-slate-900">
             오디오 파일 업로드
-          </h3>
+          </h2>
           <button
             type="button"
             onClick={resetAndClose}
@@ -243,13 +290,14 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-1 text-xs text-slate-500">
+        <p id="upload-audio-dialog-description" className="mt-1 text-xs text-slate-500">
           기존 녹음 파일을 업로드하면 전사와 AI 회의록이 자동으로 생성됩니다.
         </p>
 
         <div className="mt-5 space-y-4">
           {/* 파일 선택 */}
           <button
+            ref={initialFocusRef}
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isBusy}
@@ -297,13 +345,20 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
           </div>
 
           {errorMessage ? (
-            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+            <p id="upload-audio-error" role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
               {errorMessage}
             </p>
           ) : null}
 
           {phase === 'uploading' ? (
-            <div>
+            <div
+              role="progressbar"
+              aria-label="오디오 업로드 진행률"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-valuetext={`${progress}% 업로드됨`}
+            >
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-indigo-600 transition-[width]"
@@ -319,6 +374,7 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
             onClick={() => void handleSubmit()}
             disabled={!file || isBusy}
             className="btn-primary inline-flex w-full justify-center"
+            aria-describedby={errorMessage ? 'upload-audio-error' : undefined}
           >
             {isBusy ? (
               <>

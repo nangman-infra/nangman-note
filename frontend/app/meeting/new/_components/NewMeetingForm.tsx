@@ -45,9 +45,16 @@ export function NewMeetingForm({
         돌아가기
       </button>
 
-      <div className="rounded-2xl bg-white p-8 shadow-xl sm:p-10">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!isLoading) onStart();
+        }}
+        aria-busy={isLoading}
+        className="rounded-2xl bg-white p-8 shadow-xl sm:p-10"
+      >
         <div className="mb-7">
-          <p className="label-sm text-[var(--ink-muted)]">NEW MEETING</p>
+          <p className="label-sm text-[var(--ink-muted)]">새 회의</p>
           <h2 className="mt-1 font-headline text-2xl font-extrabold tracking-tight text-[var(--ink-strong)]">
             회의 시작
           </h2>
@@ -77,10 +84,6 @@ export function NewMeetingForm({
               onChange={(event) => onTitleChange(event.target.value)}
               placeholder="예: 1분기 마케팅 전략 회의"
               className="input-shell"
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter') return;
-                event.preventDefault();
-              }}
             />
             <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-muted)]">
               미입력 시 AI가 회의 내용을 기반으로 자동 생성합니다. 완료 후 결과
@@ -144,8 +147,7 @@ export function NewMeetingForm({
 
         <div className="mt-8">
           <button
-            type="button"
-            onClick={onStart}
+            type="submit"
             disabled={isLoading}
             className="btn-primary inline-flex w-full py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -153,7 +155,7 @@ export function NewMeetingForm({
             {isLoading ? '회의를 준비하는 중...' : '회의 시작'}
           </button>
         </div>
-      </div>
+      </form>
 
       <p className="mt-5 text-center text-[11px] text-[var(--ink-muted)]">
         © 낭만 인프라 · TransNote v1.0

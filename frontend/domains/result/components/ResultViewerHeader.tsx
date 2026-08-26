@@ -56,6 +56,16 @@ export function ResultViewerHeader({
 }: ResultViewerHeaderProps) {
   const [showSpeakerPopover, setShowSpeakerPopover] = useState(false);
   const speakerPopoverRef = useRef<HTMLDivElement>(null);
+  const titleButtonRef = useRef<HTMLButtonElement>(null);
+  const wasEditingTitleRef = useRef(false);
+  const cancelTitleBlurRef = useRef(false);
+
+  useEffect(() => {
+    if (wasEditingTitleRef.current && !isEditingTitle) {
+      titleButtonRef.current?.focus();
+    }
+    wasEditingTitleRef.current = isEditingTitle;
+  }, [isEditingTitle]);
 
   useEffect(() => {
     if (!showSpeakerPopover) return;
@@ -75,7 +85,7 @@ export function ResultViewerHeader({
     <header className="px-6 py-6 sm:px-8 lg:px-12">
       <div className="mb-4 flex items-center gap-2">
         <span className="rounded-full bg-[var(--tertiary-fixed)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--tertiary)]">
-          {result.metadata?.totalDuration > 0 ? 'Finished' : 'Note based'}
+          {result.metadata?.totalDuration > 0 ? '완료' : '노트 기반'}
         </span>
         <span className="text-sm font-medium text-[var(--ink-muted)]">
           {new Date(result.createdAt).toLocaleDateString('ko-KR', {
@@ -91,26 +101,41 @@ export function ResultViewerHeader({
       {isEditingTitle ? (
         <input
           autoFocus
+          aria-label="회의 제목"
           value={editTitle}
           onChange={(event) => onTitleChange(event.target.value)}
-          onBlur={onTitleSave}
+          onBlur={() => {
+            if (cancelTitleBlurRef.current) {
+              cancelTitleBlurRef.current = false;
+              return;
+            }
+            onTitleSave();
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+              event.preventDefault();
               onTitleSave();
             }
             if (event.key === 'Escape') {
+              event.preventDefault();
+              cancelTitleBlurRef.current = true;
               onTitleCancel();
             }
           }}
           className="input-shell font-headline text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
         />
       ) : (
-        <h1
-          onClick={onTitleClick}
-          className="font-headline text-3xl font-extrabold leading-tight tracking-tight cursor-pointer hover:text-indigo-700 transition sm:text-4xl lg:text-5xl"
-          title="클릭하여 제목 편집"
-        >
-          {result.metadata?.title || '회의록'}
+        <h1 className="font-headline text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+          <button
+            ref={titleButtonRef}
+            type="button"
+            onClick={onTitleClick}
+            className="rounded text-left transition hover:text-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600"
+            aria-label={`${result.metadata?.title || '회의록'} 제목 편집`}
+            title="제목 편집"
+          >
+            {result.metadata?.title || '회의록'}
+          </button>
         </h1>
       )}
 

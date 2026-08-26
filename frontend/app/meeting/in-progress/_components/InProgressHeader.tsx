@@ -42,24 +42,24 @@ export function InProgressHeader({
   onEndClick,
 }: InProgressHeaderProps) {
   return (
-    <header className="z-40 sticky top-0 flex items-center justify-between w-full px-6 py-3 bg-slate-50/80 backdrop-blur-xl shadow-sm shadow-[inset_0_-1px_0_0_rgba(197,197,215,0.2)]">
-      <div className="flex min-w-0 items-center gap-6">
-        <span className="font-headline text-xl font-extrabold tracking-tighter text-indigo-700">TransNote</span>
+    <header className="z-40 sticky top-0 flex w-full flex-wrap items-center justify-between gap-2 bg-slate-50/80 px-3 py-2.5 shadow-sm shadow-[inset_0_-1px_0_0_rgba(197,197,215,0.2)] backdrop-blur-xl sm:flex-nowrap sm:px-6 sm:py-3">
+      <div className="flex min-w-0 w-full items-center gap-3 sm:w-auto sm:gap-6">
+        <span className="shrink-0 font-headline text-base font-extrabold tracking-tighter text-indigo-700 sm:text-xl">TransNote</span>
         <div className="hidden sm:block h-6 w-px bg-[var(--outline-variant)]/30" aria-hidden="true" />
         <nav
-          aria-label="Breadcrumb"
-          className="hidden min-w-0 items-center gap-3 text-sm font-medium sm:flex"
+          aria-label="현재 회의 경로"
+          className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium sm:gap-3"
         >
           <button
             type="button"
             onClick={onGoHome}
-            className="text-indigo-700 font-semibold font-headline tracking-tight hover:underline"
+            className="hidden text-indigo-700 font-semibold font-headline tracking-tight hover:underline sm:inline"
           >
             대시보드
           </button>
-          <span className="text-slate-400 text-sm" aria-hidden="true">›</span>
+          <span className="hidden text-slate-400 text-sm sm:inline" aria-hidden="true">›</span>
           <span
-            className="truncate max-w-[40vw] text-slate-900 font-bold font-headline tracking-tight"
+            className="min-w-0 truncate text-slate-900 font-bold font-headline tracking-tight sm:max-w-[32vw]"
             title={meetingTitle}
           >
             {meetingTitle}
@@ -67,7 +67,7 @@ export function InProgressHeader({
         </nav>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-4">
         <div className="hidden sm:flex items-center gap-2">
           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${recordingBadge.className}`}>
             {permission === 'denied' || permission === 'unsupported' ? (
@@ -102,13 +102,17 @@ export function InProgressHeader({
             </select>
           )}
         </div>
+        <span className="sr-only" role="status" aria-live="polite">
+          {recordingBadge.label}, {connectionBadge.label}
+          {micBannerDismissed && permission === 'denied' ? ', 노트 전용' : ''}
+        </span>
 
         <div
-          className="flex items-center rounded-full bg-[var(--surface-container-low)] px-4 py-1.5"
-          aria-live="polite"
+          className="flex items-center rounded-full bg-[var(--surface-container-low)] px-2.5 py-1.5 sm:px-4"
+          role="timer"
           aria-label={`경과 시간 ${formatTime(elapsedSeconds)}`}
         >
-          <div className="relative mr-3 flex items-center justify-center" aria-hidden="true">
+          <div className="relative mr-1.5 flex items-center justify-center sm:mr-3" aria-hidden="true">
             <div className="h-2.5 w-2.5 rounded-full bg-[var(--tertiary-fixed-dim)]" />
             <div className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-[var(--tertiary-fixed-dim)] opacity-40" />
           </div>
@@ -120,7 +124,7 @@ export function InProgressHeader({
           onClick={onEndClick}
           disabled={isLoading || isEnding}
           aria-label="회의 종료"
-          className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-rose-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-rose-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5"
         >
           <Square className="h-4 w-4" aria-hidden="true" />
           회의 종료

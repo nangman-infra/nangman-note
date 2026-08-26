@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { noteApi } from '../api/noteApi';
 
 let latestLoadRequestSeq = 0;
+let latestSaveRequestSeq = 0;
+let saveSessionGeneration = 0;
+const saveQueues = new Map<string, Promise<void>>();
 
 const OFFLINE_NOTE_PREFIX = 'transnote_offline_note_';
 
@@ -69,6 +72,7 @@ interface NoteState {
   error: string | null;
   /** 마지막 loadNote가 오프라인 백업에서 복원됐는지 여부 */
   restoredFromBackup: boolean;
+  contentRevision: number;
   setContent: (content: string) => void;
   saveNote: (meetingId: string) => Promise<boolean>;
   loadNote: (meetingId: string) => Promise<string>;
@@ -82,35 +86,81 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   lastSaved: null,
   error: null,
   restoredFromBackup: false,
+  contentRevision: 0,
 
   setContent: (content) => {
-    set({ noteContent: content, isDirty: true });
+    set((state) => ({
+      noteContent: content,
+      isDirty: true,
+      contentRevision: state.contentRevision + 1,
+    }));
   },
 
   saveNote: async (meetingId) => {
-    const { noteContent } = get();
+    const requestSeq = ++latestSaveRequestSeq;
+    const sessionGeneration = saveSessionGeneration;
+    const { noteContent, contentRevision } = get();
     set({ isSaving: true, error: null });
 
-    try {
-      await noteApi.save(meetingId, noteContent);
-      // On successful save, clear any offline cache for this meeting
-      clearLocalStorage(meetingId);
-      set({
-        isSaving: false,
-        isDirty: false,
-        lastSaved: new Date(),
-        restoredFromBackup: false,
-      });
-      return true;
-    } catch (error) {
-      // Save to localStorage as fallback when API fails
-      saveToLocalStorage(meetingId, noteContent);
-      set({
-        isSaving: false,
-        error: error instanceof Error ? error.message : 'Failed to save note',
-      });
-      return false;
-    }
+    const runSave = async () => {
+      if (
+        sessionGeneration !== saveSessionGeneration ||
+        requestSeq !== latestSaveRequestSeq
+      ) {
+        return false;
+      }
+
+      try {
+        await noteApi.save(meetingId, noteContent);
+        const savedCurrentRevision =
+          sessionGeneration === saveSessionGeneration &&
+          requestSeq === latestSaveRequestSeq &&
+          get().contentRevision === contentRevision;
+        if (savedCurrentRevision) {
+          clearLocalStorage(meetingId);
+        }
+        set((state) => {
+          if (requestSeq !== latestSaveRequestSeq) return state;
+          return {
+            ...state,
+            isSaving: false,
+            isDirty: savedCurrentRevision ? false : state.isDirty,
+            lastSaved: new Date(),
+            restoredFromBackup: savedCurrentRevision
+              ? false
+              : state.restoredFromBackup,
+          };
+        });
+        return true;
+      } catch (error) {
+        const failedCurrentRevision =
+          sessionGeneration === saveSessionGeneration &&
+          requestSeq === latestSaveRequestSeq &&
+          get().contentRevision === contentRevision;
+        if (failedCurrentRevision) {
+          saveToLocalStorage(meetingId, noteContent);
+        }
+        set((state) => {
+          if (requestSeq !== latestSaveRequestSeq) return state;
+          return {
+            ...state,
+            isSaving: false,
+            error: error instanceof Error ? error.message : 'Failed to save note',
+          };
+        });
+        return false;
+      }
+    };
+    const previousSave = saveQueues.get(meetingId);
+    const save = previousSave ? previousSave.then(runSave) : runSave();
+    const queueTail = save.then(() => undefined, () => undefined);
+    saveQueues.set(meetingId, queueTail);
+    queueTail.finally(() => {
+      if (saveQueues.get(meetingId) === queueTail) {
+        saveQueues.delete(meetingId);
+      }
+    });
+    return save;
   },
 
   loadNote: async (meetingId) => {
@@ -190,12 +240,16 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   clearNote: () => {
-    set({
+    latestSaveRequestSeq += 1;
+    saveSessionGeneration += 1;
+    set((state) => ({
       noteContent: '',
       isDirty: false,
+      isSaving: false,
       lastSaved: null,
       error: null,
       restoredFromBackup: false,
-    });
+      contentRevision: state.contentRevision + 1,
+    }));
   },
 }));

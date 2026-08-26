@@ -4,6 +4,7 @@ export interface SubmitBatchTranscriptionJobInput {
   meetingId: string;
   mediaUri: string;
   languageCode: string;
+  providerJobId?: string;
 }
 
 export interface SubmitBatchTranscriptionJobResult {
