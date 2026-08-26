@@ -384,4 +384,75 @@ describe('MeetingService', () => {
       expect(response.pagination.total).toBe(1);
     });
   });
+
+  describe('setGeneratedTitleIfMissing', () => {
+    const mockUpdateQueryBuilder = (affected: number) => {
+      const executeMock = jest.fn().mockResolvedValue({ affected });
+      const queryBuilder = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: executeMock,
+      };
+      (
+        meetingRepository as unknown as {
+          createQueryBuilder: jest.Mock;
+        }
+      ).createQueryBuilder = jest.fn().mockReturnValue(queryBuilder);
+      return queryBuilder;
+    };
+
+    it('returns undefined without querying when the suggested title is blank', async () => {
+      const queryBuilder = mockUpdateQueryBuilder(1);
+
+      await expect(
+        service.setGeneratedTitleIfMissing('meeting-1', '   '),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.setGeneratedTitleIfMissing('meeting-1', undefined),
+      ).resolves.toBeUndefined();
+
+      expect(queryBuilder.execute).not.toHaveBeenCalled();
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('saves the trimmed 255-char capped title and refreshes the search doc', async () => {
+      const queryBuilder = mockUpdateQueryBuilder(1);
+      const longTitle = ` ${'가'.repeat(300)} `;
+
+      const saved = await service.setGeneratedTitleIfMissing(
+        'meeting-1',
+        longTitle,
+      );
+
+      expect(saved).toBe('가'.repeat(255));
+      expect(queryBuilder.set).toHaveBeenCalledWith({
+        title: '가'.repeat(255),
+      });
+      // 수동 제목 보존 가드: title 이 비어 있을 때만 update
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        "(title IS NULL OR TRIM(title) = '')",
+      );
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith('meeting-1');
+    });
+
+    it('returns undefined when the guard rejects (meeting already titled)', async () => {
+      mockUpdateQueryBuilder(0);
+
+      const saved = await service.setGeneratedTitleIfMissing(
+        'meeting-1',
+        'AI 제목',
+      );
+
+      expect(saved).toBeUndefined();
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).not.toHaveBeenCalled();
+    });
+  });
 });

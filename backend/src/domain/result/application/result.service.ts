@@ -697,6 +697,9 @@ export class ResultService {
       });
 
       if (legacyContent && legacyContent.trim().length > 0) {
+        // 구조화 추출이 모두 실패해 suggestedTitle 이 없는 경우에도
+        // 레거시 마크다운의 첫 제목으로 무제 회의의 제목을 채운다.
+        await this.applyLegacyGeneratedTitle(meeting, legacyContent);
         return legacyContent;
       }
     } catch (error) {
@@ -708,6 +711,59 @@ export class ResultService {
     }
 
     return this.buildFallbackContent(params);
+  }
+
+  /**
+   * 레거시 폴백 결과의 첫 마크다운 제목을 회의 제목으로 저장합니다.
+   * (수동 제목이 있으면 setGeneratedTitleIfMissing 가드가 덮어쓰기를 차단)
+   */
+  private async applyLegacyGeneratedTitle(
+    meeting: MeetingEntity,
+    legacyContent: string,
+  ): Promise<void> {
+    if (meeting.title?.trim()) return;
+
+    const extractedTitle = this.extractTitleFromMarkdown(legacyContent);
+    if (!extractedTitle) return;
+
+    const generatedTitle = await this.meetingService.setGeneratedTitleIfMissing(
+      meeting.id,
+      extractedTitle,
+    );
+    if (generatedTitle) {
+      meeting.title = generatedTitle;
+    }
+  }
+
+  /** 마크다운 첫 heading(#~###)에서 제목 후보를 추출합니다. */
+  private extractTitleFromMarkdown(content: string): string | undefined {
+    const genericHeadings = new Set([
+      '회의록',
+      '회의 결과',
+      '회의 요약',
+      '강의노트',
+      '강의 노트',
+      '멘토링 노트',
+      '제목 없는 회의',
+      '요약',
+      '개요',
+    ]);
+
+    for (const line of content.split('\n')) {
+      const match = /^#{1,3}\s+(.+)$/.exec(line.trim());
+      if (!match) continue;
+
+      const title = match[1]
+        .replace(/\*\*|__|`/g, '')
+        .replace(/^["'「『]+|["'」』]+$/g, '')
+        .trim()
+        .slice(0, 255);
+
+      if (!title || genericHeadings.has(title)) return undefined;
+      return title;
+    }
+
+    return undefined;
   }
 
   private buildTranscriptTextForAI(

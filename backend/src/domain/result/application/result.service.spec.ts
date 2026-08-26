@@ -733,4 +733,183 @@ describe('ResultService', () => {
       expect(result.content).toContain('AI 회의록 생성에 일시적 문제가 발생');
     });
   });
+
+  describe('legacy fallback title generation', () => {
+    const setupLegacyFallback = (
+      meeting: MeetingEntity,
+      legacyContent: string,
+    ) => {
+      meetingService.findById.mockResolvedValue(meeting);
+      resultRepository.findOne.mockResolvedValue(null);
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue({
+        id: 'note-1',
+        meetingId: 'meeting-1',
+        content: '테스트 노트',
+      } as NoteEntity);
+      transcriptRepository.find.mockResolvedValue([
+        {
+          id: 'seg-1',
+          meetingId: 'meeting-1',
+          startTime: 0,
+          endTime: 1,
+          text: '테스트 전사',
+          confidence: 0.95,
+        } as TranscriptSegmentEntity,
+      ]);
+      // 구조화 추출은 3회 모두 실패 → 레거시 폴백 경로 진입
+      bedrockService.extractStructuredNotes.mockRejectedValue(
+        new Error('Bedrock error'),
+      );
+      bedrockService.generateMeetingResult.mockResolvedValue(legacyContent);
+      resultRepository.create.mockImplementation(
+        (entity) => entity as ResultEntity,
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+    };
+
+    it('titles an untitled meeting from the legacy markdown heading', async () => {
+      setupLegacyFallback(
+        buildMeeting({ title: undefined }),
+        '# 주간 스프린트 회고\n\n내용',
+      );
+      meetingService.setGeneratedTitleIfMissing.mockResolvedValue(
+        '주간 스프린트 회고',
+      );
+
+      const result = await service.findByMeetingId('meeting-1');
+
+      expect(meetingService.setGeneratedTitleIfMissing).toHaveBeenCalledWith(
+        'meeting-1',
+        '주간 스프린트 회고',
+      );
+      expect(result.metadata.title).toBe('주간 스프린트 회고');
+    });
+
+    it('skips generic headings when extracting a legacy title', async () => {
+      setupLegacyFallback(
+        buildMeeting({ title: undefined }),
+        '# 회의록\n\n내용',
+      );
+
+      await service.findByMeetingId('meeting-1');
+
+      expect(meetingService.setGeneratedTitleIfMissing).not.toHaveBeenCalled();
+    });
+
+    it('never titles a meeting that already has a manual title', async () => {
+      setupLegacyFallback(
+        buildMeeting({ title: '수동 제목' }),
+        '# AI 가 지은 제목\n\n내용',
+      );
+
+      await service.findByMeetingId('meeting-1');
+
+      expect(meetingService.setGeneratedTitleIfMissing).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('regeneration title behavior', () => {
+    it('fills in a title for a still-untitled meeting during regeneration', async () => {
+      const meeting = buildMeeting({ title: undefined });
+      meetingService.findById.mockResolvedValue(meeting);
+      resultRepository.findOne.mockResolvedValue(buildResult());
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue(null);
+      transcriptRepository.find.mockResolvedValue([
+        {
+          id: 'seg-1',
+          meetingId: 'meeting-1',
+          startTime: 0,
+          endTime: 4,
+          text: '재생성 대상 전사 내용입니다',
+          confidence: 0.95,
+        } as TranscriptSegmentEntity,
+      ]);
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        suggestedTitle: '재생성으로 지어진 제목',
+        summary: '재생성된 요약입니다.',
+        participants: ['택준'],
+        agendaItems: [
+          {
+            title: '안건',
+            discussionPoints: ['재생성 대상 전사 내용을 검토했다'],
+            decisions: [],
+            actionItems: [],
+            unresolved: [],
+          },
+        ],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      });
+      meetingService.setGeneratedTitleIfMissing.mockResolvedValue(
+        '재생성으로 지어진 제목',
+      );
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+
+      const result = await service.regenerate('meeting-1', {
+        promptId: 'prompt_default_meeting',
+      });
+
+      expect(meetingService.setGeneratedTitleIfMissing).toHaveBeenCalledWith(
+        'meeting-1',
+        '재생성으로 지어진 제목',
+      );
+      expect(result.metadata.title).toBe('재생성으로 지어진 제목');
+    });
+
+    it('does not touch the title when regenerating a titled meeting', async () => {
+      const meeting = buildMeeting({ title: '수동 제목' });
+      meetingService.findById.mockResolvedValue(meeting);
+      resultRepository.findOne.mockResolvedValue(buildResult());
+      promptService.findById.mockResolvedValue(buildPrompt());
+      noteRepository.findOne.mockResolvedValue(null);
+      transcriptRepository.find.mockResolvedValue([
+        {
+          id: 'seg-1',
+          meetingId: 'meeting-1',
+          startTime: 0,
+          endTime: 4,
+          text: '재생성 대상 전사 내용입니다',
+          confidence: 0.95,
+        } as TranscriptSegmentEntity,
+      ]);
+      bedrockService.extractStructuredNotes.mockResolvedValue({
+        documentType: PromptDocumentType.MEETING,
+        suggestedTitle: 'AI 가 지은 제목',
+        summary: '재생성된 요약입니다.',
+        participants: ['택준'],
+        agendaItems: [
+          {
+            title: '안건',
+            discussionPoints: ['재생성 대상 전사 내용을 검토했다'],
+            decisions: [],
+            actionItems: [],
+            unresolved: [],
+          },
+        ],
+        overallDecisions: [],
+        followUps: [],
+        keywords: [],
+        uncertainties: [],
+      });
+      resultRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as ResultEntity),
+      );
+
+      const result = await service.regenerate('meeting-1', {
+        promptId: 'prompt_default_meeting',
+      });
+
+      expect(meetingService.setGeneratedTitleIfMissing).not.toHaveBeenCalled();
+      expect(result.metadata.title).toBe('수동 제목');
+    });
+  });
 });
