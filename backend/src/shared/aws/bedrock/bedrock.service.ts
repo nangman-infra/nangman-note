@@ -46,6 +46,21 @@ export class BedrockService {
   private readonly modelId: string;
   private readonly maxTokens: number;
 
+  /**
+   * Converse 응답에서 텍스트를 추출합니다.
+   *
+   * reasoning 지원 모델(Sonnet 4.5+/5)은 content 배열의 첫 블록으로
+   * reasoningContent 를 반환할 수 있어 `content[0].text` 만 읽으면
+   * 정상 응답을 빈 응답으로 오판합니다. 모든 text 블록을 이어붙입니다.
+   */
+  private extractOutputText(response: ConverseCommandOutput): string {
+    const blocks = response.output?.message?.content ?? [];
+    return blocks
+      .map((block) => block.text ?? '')
+      .filter((text) => text.length > 0)
+      .join('');
+  }
+
   constructor(
     private readonly configService: ConfigService<AppEnv, true>,
     private readonly awsClientFactory: AwsClientFactory,
@@ -184,12 +199,14 @@ export class BedrockService {
 
       const response = await this.sendWithResilience(command);
 
-      const outputText = response.output?.message?.content?.[0]?.text ?? '';
+      const outputText = this.extractOutputText(response);
 
       if (!outputText) {
         this.logger.warn('ai.bedrock.legacy_generation.empty_response', {
           modelId: this.modelId,
           meetingTitle: meetingTitle ?? 'untitled',
+          stopReason: response.stopReason,
+          contentBlockCount: response.output?.message?.content?.length ?? 0,
         });
         return '';
       }
@@ -285,7 +302,7 @@ export class BedrockService {
       meetingTitle: meetingTitle ?? 'untitled',
     });
     const response = await this.sendWithResilience(command);
-    const outputText = response.output?.message?.content?.[0]?.text ?? '';
+    const outputText = this.extractOutputText(response);
 
     // max_tokens 잘림: JSON이 중간에 끊겨 파싱이 불가능하며,
     // 같은 파라미터로 재시도해도 동일하게 실패하므로 전용 에러로 fail-fast.
@@ -304,6 +321,8 @@ export class BedrockService {
         modelId: this.modelId,
         documentType,
         meetingTitle: meetingTitle ?? 'untitled',
+        stopReason: response.stopReason,
+        contentBlockCount: response.output?.message?.content?.length ?? 0,
       });
       throw new Error('Bedrock returned empty structured extraction response');
     }

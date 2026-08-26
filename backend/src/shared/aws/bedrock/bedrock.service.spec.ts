@@ -53,6 +53,31 @@ const createService = (outputText = '# result') => {
   return { service, send };
 };
 
+/** reasoning 모델처럼 임의의 content 블록 배열을 반환하는 서비스 mock */
+const createServiceWithContentBlocks = (
+  contentBlocks: Array<Record<string, unknown>>,
+) => {
+  const send = jest.fn().mockResolvedValue({
+    output: { message: { content: contentBlocks } },
+    stopReason: 'end_turn',
+  });
+  const mockClient = { send } as unknown as BedrockRuntimeClient;
+  const awsClientFactory = {
+    createBedrockRuntimeClient: jest.fn().mockReturnValue(mockClient),
+  } as unknown as AwsClientFactory;
+
+  const configMap = buildConfigMap();
+  const configService = {
+    get: jest.fn(
+      (key: string) => (configMap as unknown as Record<string, unknown>)[key],
+    ),
+  } as unknown as ConfigService<AppEnv, true>;
+
+  const service = new BedrockService(configService, awsClientFactory);
+
+  return { service, send };
+};
+
 const extractConverseInput = (
   send: jest.Mock,
 ): {
@@ -75,6 +100,72 @@ const extractConverseInput = (
 };
 
 describe('BedrockService', () => {
+  it('reads text after a leading reasoning content block (Sonnet 4.5+/5)', async () => {
+    const { service } = createServiceWithContentBlocks([
+      {
+        reasoningContent: {
+          reasoningText: { text: '어떤 제목이 좋을지 생각해 보면...' },
+        },
+      },
+      { text: '# 실제 회의록 결과' },
+    ]);
+
+    const result = await service.generateMeetingResult({
+      promptContent: '테스트 프롬프트',
+      noteContent: '테스트 노트',
+      transcriptText: '테스트 전사',
+      meetingTitle: '테스트 회의',
+    });
+
+    expect(result).toBe('# 실제 회의록 결과');
+  });
+
+  it('joins multiple text blocks and parses structured extraction', async () => {
+    const extraction = {
+      documentType: 'meeting',
+      suggestedTitle: '주간 회의',
+      summary: '요약입니다.',
+      participants: [],
+      agendaItems: [],
+      overallDecisions: [],
+      followUps: [],
+      keywords: [],
+      uncertainties: [],
+    };
+    const json = JSON.stringify(extraction);
+    const splitAt = Math.floor(json.length / 2);
+    const { service } = createServiceWithContentBlocks([
+      { reasoningContent: { reasoningText: { text: '분석 중...' } } },
+      { text: json.slice(0, splitAt) },
+      { text: json.slice(splitAt) },
+    ]);
+
+    const result = await service.extractStructuredNotes({
+      documentType: PromptDocumentType.MEETING,
+      promptContent: '테스트 프롬프트',
+      noteContent: '테스트 노트',
+      transcriptText: '테스트 전사',
+    });
+
+    expect(result.suggestedTitle).toBe('주간 회의');
+    expect((result as StructuredMeetingExtraction).summary).toBe('요약입니다.');
+  });
+
+  it('still treats reasoning-only responses (no text block) as empty', async () => {
+    const { service } = createServiceWithContentBlocks([
+      { reasoningContent: { reasoningText: { text: '생각만 하고 끝...' } } },
+    ]);
+
+    await expect(
+      service.extractStructuredNotes({
+        documentType: PromptDocumentType.MEETING,
+        promptContent: '테스트 프롬프트',
+        noteContent: '테스트 노트',
+        transcriptText: '테스트 전사',
+      }),
+    ).rejects.toThrow('Bedrock returned empty structured extraction response');
+  });
+
   it('omits deprecated temperature from inference config', async () => {
     const { service, send } = createService();
 
