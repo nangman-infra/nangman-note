@@ -169,28 +169,13 @@ export async function startAudioStreamingRuntime({
   refs: AudioStreamingRuntimeRefs;
   handleChunk: (chunk: ArrayBuffer) => void;
 }) {
-  // 서버(AWS Transcribe)는 16kHz PCM으로 해석하므로 AudioContext를 16kHz로
-  // 고정한다 (브라우저가 하드웨어 레이트에서 리샘플링).
-  // Firefox 계열은 컨텍스트 생성은 성공하지만 createMediaStreamSource에서
-  // 스트림 레이트 불일치로 NotSupportedError를 던지므로, 소스 생성 실패까지
-  // 포괄해 기본 레이트로 폴백한다 (워크릿이 다운샘플).
-  let audioContext: AudioContext;
-  let source: MediaStreamAudioSourceNode;
-  try {
-    audioContext = new AudioContext({
-      latencyHint: 'interactive',
-      sampleRate: 16_000,
-    });
-    try {
-      source = audioContext.createMediaStreamSource(stream);
-    } catch (sourceError) {
-      void audioContext.close().catch(() => undefined);
-      throw sourceError;
-    }
-  } catch {
-    audioContext = new AudioContext({ latencyHint: 'interactive' });
-    source = audioContext.createMediaStreamSource(stream);
-  }
+  // AWS Transcribe는 16kHz PCM을 기대하지만, AudioContext를 16kHz로 고정하면
+  // Chrome이 48kHz 마이크 스트림을 MediaStreamAudioSourceNode에서 리샘플링하지
+  // 않고 "무음"을 출력하는 알려진 버그가 있다 (전사 결과가 전부 빈 값이 됨).
+  // 따라서 컨텍스트는 항상 하드웨어 기본 레이트로 열고,
+  // 워크릿(pcm-processor)이 16kHz로 다운샘플한다.
+  const audioContext = new AudioContext({ latencyHint: 'interactive' });
+  const source = audioContext.createMediaStreamSource(stream);
   refs.audioContextRef.current = audioContext;
   refs.socketRef.current = socket;
   refs.optionsRef.current = options;
