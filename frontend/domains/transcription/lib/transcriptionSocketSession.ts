@@ -43,12 +43,15 @@ export async function recoverTranscriptionSocketAuth({
   accessTokenRef,
   isRecoveringAuthRef,
   setError,
+  onAuthUnrecoverable,
 }: {
   socket: Socket;
   socketRef: MutableRefObject<Socket | null>;
   accessTokenRef: MutableRefObject<string | undefined>;
   isRecoveringAuthRef: MutableRefObject<boolean>;
   setError: (message: string | null) => void;
+  /** refresh token 도 만료되어 복구 불가능할 때 호출 (배치 폴백 등) */
+  onAuthUnrecoverable?: () => void;
 }) {
   if (isRecoveringAuthRef.current) {
     return;
@@ -58,8 +61,13 @@ export async function recoverTranscriptionSocketAuth({
   try {
     const refreshedSession = await getSession();
     const refreshedToken = refreshedSession?.accessToken;
-    if (!refreshedToken) {
+
+    // refresh 실패 시 NextAuth 는 stale accessToken 을 그대로 유지한 채
+    // error 만 세팅한다. 이 토큰으로 재연결하면 handshake 가 영원히
+    // 실패-재시도 루프에 빠지므로 여기서 명시적으로 중단한다.
+    if (refreshedSession?.error === 'RefreshAccessTokenError' || !refreshedToken) {
       setError('인증 세션이 만료되었습니다. 다시 로그인해주세요.');
+      onAuthUnrecoverable?.();
       return;
     }
 

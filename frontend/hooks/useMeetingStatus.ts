@@ -84,7 +84,12 @@ export function useMeetingStatus({
     try {
       const refreshedSession = await getSession();
       const refreshedToken = refreshedSession?.accessToken;
-      if (!refreshedToken) {
+      // refresh 실패 시 stale token 으로 재연결하면 무한 실패 루프가 되므로 중단.
+      // 재로그인 유도는 AuthSessionProvider 가 담당한다.
+      if (
+        refreshedSession?.error === 'RefreshAccessTokenError' ||
+        !refreshedToken
+      ) {
         return;
       }
 

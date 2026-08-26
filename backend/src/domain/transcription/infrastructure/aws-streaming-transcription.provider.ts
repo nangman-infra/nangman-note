@@ -345,6 +345,9 @@ export class AwsStreamingTranscriptionProvider
           meetingId,
         });
         let eventCount = 0;
+        let textResultCount = 0;
+        let emptyResultCount = 0;
+        let noTextWarned = false;
         for await (const event of response.TranscriptResultStream) {
           eventCount++;
           if (eventCount <= 3) {
@@ -354,6 +357,17 @@ export class AwsStreamingTranscriptionProvider
               keys: Object.keys(event),
             });
           }
+          // 오디오는 도달하는데 인식된 텍스트가 전혀 없는 상태를 조기에 드러낸다.
+          // (무음/음소거/잘못된 입력 장치와 "전달 실패"를 로그로 구분)
+          if (!noTextWarned && eventCount === 50 && textResultCount === 0) {
+            noTextWarned = true;
+            this.logger.warn('transcription.streaming.no_text_results', {
+              meetingId,
+              eventCount,
+              emptyResultCount,
+              hint: 'audio reaches AWS but no speech recognized — check mic mute/device/language',
+            });
+          }
           // 이 세션이 다른 세션으로 교체되었으면 루프 탈출.
           // (closed 상태여도 map에 남아있는 동안은 잔여 final을 드레인한다)
           if (this.sessions.get(meetingId) !== session) break;
@@ -361,12 +375,17 @@ export class AwsStreamingTranscriptionProvider
           if (event.TranscriptEvent?.Transcript?.Results) {
             for (const result of event.TranscriptEvent.Transcript.Results) {
               if (!result.Alternatives || result.Alternatives.length === 0) {
+                emptyResultCount++;
                 continue;
               }
 
               const alt = result.Alternatives[0];
               const text = alt.Transcript ?? '';
-              if (!text.trim()) continue;
+              if (!text.trim()) {
+                emptyResultCount++;
+                continue;
+              }
+              textResultCount++;
 
               // Speaker Diarization: Items에서 최다 화자 라벨 추출
               const items = alt.Items ?? [];
@@ -435,6 +454,14 @@ export class AwsStreamingTranscriptionProvider
             }
           }
         }
+
+        // 세션 요약 — "무음 입력"과 "전달 실패"를 사후에 구분할 수 있게 한다.
+        this.logger.log('transcription.streaming.loop.summary', {
+          meetingId,
+          eventCount,
+          textResultCount,
+          emptyResultCount,
+        });
       } catch (error) {
         // AbortError는 정상 종료 (stopSession 호출)
         if (

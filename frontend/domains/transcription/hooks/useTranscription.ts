@@ -63,6 +63,10 @@ export function useTranscription(
       accessTokenRef,
       isRecoveringAuthRef,
       setError,
+      // refresh token 만료 → 실시간 복구 불가. 남은 녹음은 배치 전사로 전환.
+      onAuthUnrecoverable: () => {
+        fallbackCallbackRef.current?.({ reason: 'auth-refresh-failed' });
+      },
     });
   }, [setError]);
 

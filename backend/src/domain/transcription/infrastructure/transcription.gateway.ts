@@ -94,6 +94,8 @@ export class TranscriptionGateway
   private readonly maxAudioChunkBytes: number;
   private readonly backpressureRetryMs: number;
   private readonly lastBackpressureLogAt = new Map<string, number>();
+  /** producer 잠금 거부 로그 스로틀 (청크당 로그 스팸 방지) */
+  private readonly lastProducerRejectLogAt = new Map<string, number>();
 
   constructor(
     private readonly transcriptionService: TranscriptionService,
@@ -246,6 +248,7 @@ export class TranscriptionGateway
       if (clients.size === 0) {
         this.meetingClients.delete(meetingId);
         this.lastBackpressureLogAt.delete(meetingId);
+        this.lastProducerRejectLogAt.delete(meetingId);
 
         const GRACE_MS = 10_000;
         const existingTimer = this.pendingSessionStops.get(meetingId);
@@ -328,6 +331,21 @@ export class TranscriptionGateway
               .get(meetingId)
               ?.has(producerId);
             if (producerStillConnected) {
+              // 다른 탭이 마이크를 점유 중 — 사용자는 "전사가 안 됨"으로
+              // 인지하므로 반드시 로그를 남긴다 (30초 스로틀).
+              const lastLoggedAt =
+                this.lastProducerRejectLogAt.get(meetingId) ?? 0;
+              if (Date.now() - lastLoggedAt > 30_000) {
+                this.lastProducerRejectLogAt.set(meetingId, Date.now());
+                this.logger.warn(
+                  'transcription.gateway.audio.producer_rejected',
+                  {
+                    meetingId,
+                    rejectedSocketId: client.id,
+                    activeProducerSocketId: producerId,
+                  },
+                );
+              }
               return { ok: false, reason: 'another-producer-active' };
             }
             // 기존 프로듀서가 끊겼으면 승계
