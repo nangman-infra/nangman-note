@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AUTH_USER_KEY, IS_PUBLIC_KEY } from './auth.constants';
+import { parseBearerAuthorization } from './bearer-token.util';
 import { OidcTokenVerifierService } from './oidc-token-verifier.service';
 import { updateRequestContext } from '../logging/request-context.storage';
 
@@ -36,8 +37,9 @@ export class HttpAuthGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<Record<string, unknown>>();
-    const authorization = this.extractAuthorizationHeader(request);
-    const accessToken = this.parseBearerToken(authorization);
+    const accessToken = this.parseBearerToken(
+      this.extractAuthorizationHeader(request),
+    );
     const user = await this.tokenVerifier.verifyAccessToken(accessToken);
 
     request[AUTH_USER_KEY] = user;
@@ -57,15 +59,14 @@ export class HttpAuthGuard implements CanActivate {
   }
 
   private parseBearerToken(authorization?: string): string {
-    if (!authorization) {
+    const parsed = parseBearerAuthorization(authorization);
+    if (parsed.ok) {
+      return parsed.token;
+    }
+
+    if (parsed.reason === 'missing') {
       throw new UnauthorizedException('Missing Authorization header');
     }
-
-    const [scheme, credentials] = authorization.split(' ');
-    if (!scheme || scheme.toLowerCase() !== 'bearer' || !credentials) {
-      throw new UnauthorizedException('Authorization header must use Bearer');
-    }
-
-    return credentials;
+    throw new UnauthorizedException('Authorization header must use Bearer');
   }
 }

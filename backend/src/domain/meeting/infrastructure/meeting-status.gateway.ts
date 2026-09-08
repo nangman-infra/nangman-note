@@ -16,6 +16,8 @@ import {
 import { createWsCorsOriginHandler } from '../../../shared/config/ws-cors.factory';
 import { MeetingStatusChangedEvent } from '../../../shared/events/meeting-status-changed.event';
 import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
+import { ACCESS_TOKEN_CLOCK_TOLERANCE_MS } from '../../../shared/auth/auth.constants';
+import { extractBearerToken } from '../../../shared/auth/bearer-token.util';
 import { OidcTokenVerifierService } from '../../../shared/auth/oidc-token-verifier.service';
 import { MeetingService } from '../application/meeting.service';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
@@ -207,15 +209,7 @@ export class MeetingStatusGateway
       return fromAuth.trim();
     }
 
-    const authHeader = client.handshake.headers.authorization;
-    if (typeof authHeader === 'string') {
-      const [scheme, credentials] = authHeader.split(' ');
-      if (scheme?.toLowerCase() === 'bearer' && credentials) {
-        return credentials.trim();
-      }
-    }
-
-    return undefined;
+    return extractBearerToken(client.handshake.headers.authorization);
   }
 
   private registerSocketAuthExpiry(client: Socket, expiresAtMs?: number): void {
@@ -225,7 +219,9 @@ export class MeetingStatusGateway
       return;
     }
 
-    const disconnectDelayMs = expiresAtMs - Date.now() + 1000;
+    // HTTP 검증(clockTolerance)과 같은 여유를 두고 끊는다.
+    const disconnectDelayMs =
+      expiresAtMs + ACCESS_TOKEN_CLOCK_TOLERANCE_MS - Date.now();
     if (disconnectDelayMs <= 0) {
       this.disconnectExpiredSocket(client);
       return;

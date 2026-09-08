@@ -58,10 +58,16 @@ services:
       AUTH_ENABLED: "true"
       AUTH_OIDC_ISSUER: ${AUTH_OIDC_ISSUER}
       AUTH_OIDC_AUDIENCE: ${AUTH_OIDC_AUDIENCE}
-      AUTH_OIDC_JWKS_URI: ${AUTH_OIDC_JWKS_URI}
+      # 운영에서는 명시 권장 (Authentik: ${AUTH_OIDC_ISSUER}jwks/). 비우면 OIDC discovery 사용.
+      AUTH_OIDC_JWKS_URI: ${AUTH_OIDC_JWKS_URI:-}
+      AUTH_OIDC_ALGORITHMS: ${AUTH_OIDC_ALGORITHMS:-RS256}
+      # NPM → Next.js proxy → Nest 모두 같은 호스트(loopback)이므로 X-Forwarded-For 를 신뢰
+      TRUST_PROXY: ${TRUST_PROXY:-loopback}
 
       # ─── Misc ───
       LOG_LEVEL: info
+      # 브라우저가 접속하는 공개 origin. 콤마로 복수 지정 가능하지만, 그 경우 아래 프론트의
+      # NEXTAUTH_URL / WS_URL 은 단일 URL 로 따로 지정해야 한다.
       CORS_ORIGIN: ${CORS_ORIGIN}
 
   frontend:
@@ -88,7 +94,8 @@ services:
       BACKEND_URL: http://localhost:9999
 
       # ─── WebSocket (same-origin, NPM이 프록시) ───
-      WS_URL: ${CORS_ORIGIN}
+      # 단일 공개 URL. CORS_ORIGIN 이 콤마 목록이면 .env 에 WS_URL 을 따로 지정한다.
+      WS_URL: ${WS_URL:-${CORS_ORIGIN}}
 
       # ─── App ───
       NEXT_PUBLIC_APP_NAME: TransNote
@@ -101,6 +108,10 @@ services:
       NEXT_PUBLIC_ANALYTICS_SITE_ID: ${NEXT_PUBLIC_ANALYTICS_SITE_ID:-}
 
       # ─── Auth.js + Authentik ───
-      NEXTAUTH_URL: ${CORS_ORIGIN}
+      # NEXTAUTH_URL 은 반드시 단일 URL(브라우저가 접속하는 공개 origin). 세션 쿠키 이름(__Secure- 접두)과
+      # OAuth redirect_uri({NEXTAUTH_URL}/api/auth/callback/authentik) 산출에 쓰인다.
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-${CORS_ORIGIN}}
       AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER_FE}
       AUTHENTIK_CLIENT_ID: ${AUTH_OIDC_AUDIENCE}
+      # NEXTAUTH_SECRET / AUTHENTIK_CLIENT_SECRET 은 SECRET_AUTH_ID 시크릿(JSON)에서 부팅 시 로딩.
+      # NEXTAUTH_SECRET 회전은 재시작으로만 반영된다(런타임 교체 시 전 세션 즉시 무효화 방지).

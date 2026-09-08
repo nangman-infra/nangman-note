@@ -23,8 +23,20 @@ Required keys for both profiles:
 Optional keys:
 
 - `NEXT_PUBLIC_API_URL` (default: empty string = same-origin `/api/*` proxy)
-- `NEXT_PUBLIC_WS_URL` (default: empty string = same-origin `/ws/*` proxy)
+- `WS_URL` (server runtime, injected to the browser; default: empty string = same-origin `/ws/*`)
 - `BACKEND_URL` (server runtime proxy target, default: `http://localhost:9999`)
+
+Auth (NextAuth v4 + Authentik):
+
+- `NEXTAUTH_URL` — single public origin of the app (used for the OAuth redirect URI and cookie flags)
+- `NEXTAUTH_SECRET` — session cookie (JWE) key. In production it is loaded once at boot from Secrets Manager (`SECRET_AUTH_ID`); rotating it requires a restart, otherwise every logged-in session would be invalidated instantly
+- `AUTHENTIK_ISSUER`, `AUTHENTIK_CLIENT_ID`, `AUTHENTIK_CLIENT_SECRET`
+
+Request/auth flow (see `proxy.ts`, `lib/api/client.ts`, `components/auth/AuthSessionProvider.tsx`):
+
+- `/api/*` and `/ws/*` are proxied to `BACKEND_URL` only when the NextAuth session cookie carries an access token; otherwise the proxy answers `401` itself so anonymous/expired sessions never reach the backend.
+- `apiClient` never sends a request without a Bearer token. A missing token triggers a single re-authentication (sign-in redirect) instead of a stream of 401s.
+- Access tokens are refreshed server-side in the `jwt` callback (90s before expiry). A permanent refresh failure (`invalid_grant`) clears the tokens and the client re-logs in via Authentik SSO; transient IdP failures keep the current tokens and retry later.
 
 Validation policy:
 

@@ -9,3 +9,6 @@ coverage
 test
 .prettierrc
 eslint.config.mjs
+.next
+.env*.example
+*.log

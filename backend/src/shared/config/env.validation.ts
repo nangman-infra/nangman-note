@@ -38,6 +38,13 @@ export interface AppEnv {
   AUTH_OIDC_ISSUER: string;
   AUTH_OIDC_AUDIENCE: string;
   AUTH_OIDC_JWKS_URI: string;
+  /** 허용하는 JWS 서명 알고리즘 목록 (비대칭 키만). 기본 RS256 */
+  AUTH_OIDC_ALGORITHMS: string[];
+  /**
+   * Express `trust proxy` 설정 값. 리버스 프록시(NPM/Next.js) 뒤에서 X-Forwarded-For 로
+   * 실제 클라이언트 IP 를 복원하기 위해 필요. 'false' 면 비활성.
+   */
+  TRUST_PROXY: string;
   PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: string;
   PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: number | null;
   LOG_LEVEL: string;
@@ -186,6 +193,90 @@ function isLikelyPlaceholderEncryptionKey(value: string): boolean {
   );
 }
 
+/**
+ * JWKS(공개키)로 검증 가능한 비대칭 JWS 알고리즘만 허용한다.
+ * HS*(대칭)와 none 은 원격 JWKS 검증 모델에서 의미가 없고 알고리즘 혼동 공격 표면이 된다.
+ */
+const ALLOWED_OIDC_ALGORITHMS = new Set([
+  'RS256',
+  'RS384',
+  'RS512',
+  'PS256',
+  'PS384',
+  'PS512',
+  'ES256',
+  'ES384',
+  'ES512',
+  'EdDSA',
+]);
+
+function readOidcAlgorithms(config: Record<string, unknown>): string[] {
+  const raw = readString(config, 'AUTH_OIDC_ALGORITHMS', 'RS256');
+  const algorithms = Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (algorithms.length === 0) {
+    throw new Error(
+      'Environment variable AUTH_OIDC_ALGORITHMS must list at least one algorithm.',
+    );
+  }
+
+  const invalid = algorithms.filter((alg) => !ALLOWED_OIDC_ALGORITHMS.has(alg));
+  if (invalid.length > 0) {
+    throw new Error(
+      `Environment variable AUTH_OIDC_ALGORITHMS contains unsupported value(s): ${invalid.join(
+        ', ',
+      )}. Allowed: ${Array.from(ALLOWED_OIDC_ALGORITHMS).join(', ')}.`,
+    );
+  }
+
+  return algorithms;
+}
+
+/**
+ * Express `trust proxy` 값. 기본은 loopback — 같은 호스트의 리버스 프록시(NPM, Next.js proxy)만 신뢰.
+ * 허용: false | true | loopback | linklocal | uniquelocal | IP/CIDR 목록(콤마) | 홉 수(정수)
+ */
+function readTrustProxy(config: Record<string, unknown>): string {
+  const raw = readString(config, 'TRUST_PROXY', 'loopback');
+  const normalized = raw.toLowerCase();
+
+  if (
+    ['true', 'false', 'loopback', 'linklocal', 'uniquelocal'].includes(
+      normalized,
+    )
+  ) {
+    return normalized;
+  }
+  if (/^\d+$/.test(raw)) {
+    return raw;
+  }
+  const entries = raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const looksLikeAddressList =
+    entries.length > 0 &&
+    entries.every(
+      (entry) =>
+        /^[0-9a-f.:]+(\/\d{1,3})?$/i.test(entry) ||
+        ['loopback', 'linklocal', 'uniquelocal'].includes(entry.toLowerCase()),
+    );
+  if (looksLikeAddressList) {
+    return entries.join(', ');
+  }
+
+  throw new Error(
+    'Environment variable TRUST_PROXY must be true, false, loopback, linklocal, uniquelocal, a hop count, or a comma-separated IP/CIDR list.',
+  );
+}
+
 export function validateEnv(config: Record<string, unknown>): AppEnv {
   const nodeEnv = readString(config, 'NODE_ENV', 'development');
 
@@ -282,6 +373,8 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     ? readString(config, 'AUTH_OIDC_AUDIENCE')
     : readString(config, 'AUTH_OIDC_AUDIENCE', '');
   const authJwksUri = readString(config, 'AUTH_OIDC_JWKS_URI', '');
+  const authAlgorithms = readOidcAlgorithms(config);
+  const trustProxy = readTrustProxy(config);
 
   return {
     PORT: port,
@@ -415,6 +508,8 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     AUTH_OIDC_ISSUER: authIssuer,
     AUTH_OIDC_AUDIENCE: authAudience,
     AUTH_OIDC_JWKS_URI: authJwksUri,
+    AUTH_OIDC_ALGORITHMS: authAlgorithms,
+    TRUST_PROXY: trustProxy,
     PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: readString(
       config,
       'PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH',

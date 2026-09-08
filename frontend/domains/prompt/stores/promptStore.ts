@@ -5,6 +5,8 @@ import type { CreatePromptDto, Prompt } from '../types/prompt.types';
 interface PromptState {
   prompts: Prompt[];
   isLoading: boolean;
+  /** 최초 목록 로드가 성공적으로 끝났는지. consumer 마운트마다 재요청하지 않기 위한 플래그 */
+  hasLoaded: boolean;
   error: string | null;
   fetchPrompts: () => Promise<void>;
   createPrompt: (dto: CreatePromptDto) => Promise<boolean>;
@@ -12,18 +14,22 @@ interface PromptState {
   deletePrompt: (id: string) => Promise<boolean>;
 }
 
-export const usePromptStore = create<PromptState>()((set) => ({
+export const usePromptStore = create<PromptState>()((set, get) => ({
   prompts: [],
   isLoading: false,
+  hasLoaded: false,
   error: null,
 
   fetchPrompts: async () => {
+    // 여러 consumer 가 동시에 마운트돼도 요청은 1개만 나간다.
+    if (get().isLoading) return;
     try {
       set({ isLoading: true, error: null });
       const prompts = await promptApi.list();
       set({
         prompts,
         isLoading: false,
+        hasLoaded: true,
       });
     } catch (error) {
       set({

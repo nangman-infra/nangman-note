@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { getSession, useSession } from 'next-auth/react';
 import { Socket } from 'socket.io-client';
 import { createSocket } from '@/lib/api/websocket';
@@ -39,6 +39,11 @@ interface UseMeetingStatusOptions {
   enabled?: boolean;
 }
 
+export interface UseMeetingStatusResult {
+  /** 실시간 상태 소켓이 연결되어 있는지. 폴링 주기를 완화하는 데 사용 */
+  isConnected: boolean;
+}
+
 /**
  * 회의 상태 변경을 WebSocket 으로 실시간 수신하는 훅.
  * 백엔드 MeetingStatusGateway(/ws/meeting-status) 에 연결됩니다.
@@ -48,15 +53,16 @@ export function useMeetingStatus({
   onStatusChange,
   onResultRegenerate,
   enabled = true,
-}: UseMeetingStatusOptions): void {
+}: UseMeetingStatusOptions): UseMeetingStatusResult {
   const { data: session, status: authStatus } = useSession();
-  const hasSessionToken = Boolean(session?.accessToken);
+  const hasSessionToken = Boolean(session?.accessToken) && !session?.error;
   const accessTokenRef = useRef<string | undefined>(undefined);
   const socketRef = useRef<Socket | null>(null);
   const authRecoveryPendingRef = useRef(false);
   const isRecoveringAuthRef = useRef(false);
   const callbackRef = useRef(onStatusChange);
   const regenerateCallbackRef = useRef(onResultRegenerate);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     callbackRef.current = onStatusChange;
@@ -73,6 +79,7 @@ export function useMeetingStatus({
     }
     authRecoveryPendingRef.current = false;
     isRecoveringAuthRef.current = false;
+    setIsConnected(false);
   }, []);
 
   const recoverSocketAuth = useCallback(async (socket: Socket) => {
@@ -126,6 +133,7 @@ export function useMeetingStatus({
 
     socket.on('connect', () => {
       authRecoveryPendingRef.current = false;
+      setIsConnected(true);
     });
 
     socket.on('error', (payload: unknown) => {
@@ -147,6 +155,7 @@ export function useMeetingStatus({
     });
 
     socket.on('disconnect', (reason) => {
+      setIsConnected(false);
       if (reason !== 'io server disconnect' || !authRecoveryPendingRef.current) {
         return;
       }
@@ -179,4 +188,6 @@ export function useMeetingStatus({
       accessTokenRef.current = session.accessToken;
     }
   }, [session?.accessToken]);
+
+  return { isConnected };
 }

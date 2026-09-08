@@ -4,6 +4,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Express } from 'express';
 import helmet from 'helmet';
 import {
   isAllowedCorsOrigin,
@@ -14,6 +15,20 @@ import { AllExceptionsFilter } from '../shared/filters/all-exceptions.filter';
 import { HttpRequestLoggingInterceptor } from '../shared/interceptors/http-request-logging.interceptor';
 import { ResponseInterceptor } from '../shared/interceptors/response.interceptor';
 import { requestContextMiddleware } from '../shared/logging/request-context.middleware';
+
+/**
+ * env 문자열을 Express `trust proxy` 설정값으로 변환.
+ * - 'true'/'false' → boolean, 홉 수 → number, 나머지(loopback, IP/CIDR 목록)는 문자열 그대로.
+ */
+export function parseTrustProxySetting(
+  value: string,
+): boolean | number | string {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  if (/^\d+$/.test(normalized)) return Number(normalized);
+  return value.trim();
+}
 
 export function applyGlobalAppConfig(
   app: INestApplication,
@@ -29,6 +44,7 @@ export function applyGlobalAppConfig(
 
   const nodeEnv = configService.get('NODE_ENV', { infer: true });
   const corsOriginConfig = configService.get('CORS_ORIGIN', { infer: true });
+  const trustProxy = configService.get('TRUST_PROXY', { infer: true });
   const allowedOrigins = parseAllowedOrigins(corsOriginConfig);
   const corsOriginHandler = (
     origin: string | undefined,
@@ -41,6 +57,13 @@ export function applyGlobalAppConfig(
     });
     callback(isAllowed ? null : new Error('Not allowed by CORS'), isAllowed);
   };
+
+  // 리버스 프록시(NPM → Next.js proxy → Nest) 뒤에서 request.ip / protocol 을 복원.
+  // 기본 'loopback' 은 같은 호스트에서 온 X-Forwarded-* 만 신뢰한다.
+  const expressApp = app.getHttpAdapter().getInstance() as Express | undefined;
+  if (typeof expressApp?.set === 'function') {
+    expressApp.set('trust proxy', parseTrustProxySetting(trustProxy));
+  }
 
   app.use(helmet());
   app.enableCors({

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import type { SidebarTimeFilter } from '@/components/layout/Sidebar';
+import { useAuthReady } from '@/hooks/useAuthReady';
 import { useMeetingStatus } from '@/hooks/useMeetingStatus';
 import { useMeetings } from '../hooks/useMeeting';
 import { MeetingCompletionState } from '../types/meeting-completion-state.enum';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import {
   DEFAULT_MEETING_VISIBLE_LIMIT,
+  MEETING_LIST_POLL_INTERVAL_CONNECTED_MS,
   MEETING_LIST_POLL_INTERVAL_MS,
   isMeetingStatus,
   type MeetingFilterKey,
@@ -102,7 +104,7 @@ export function useMeetingListController({
     pushToast,
   });
 
-  useMeetingStatus({
+  const { isConnected: isStatusSocketConnected } = useMeetingStatus({
     onStatusChange: (message) => {
       if (!isMeetingStatus(message.status)) return;
       applyMeetingStatusUpdate({
@@ -121,15 +123,22 @@ export function useMeetingListController({
     },
   });
 
+  // 인증이 준비되기 전(세션 로딩/만료)에는 목록 요청·폴링을 시작하지 않는다.
+  // 토큰 없는 요청은 apiClient 가 거절하지만, 여기서 막아야 불필요한 rejected promise 와
+  // 재인증 트리거 반복을 피할 수 있다.
+  const isAuthReady = useAuthReady();
+
   useEffect(() => {
+    if (!isAuthReady) return;
     if (showTrash) {
       void fetchTrashMeetings();
       return;
     }
     void fetchMeetings();
-  }, [fetchMeetings, fetchTrashMeetings, refreshToken, showTrash]);
+  }, [isAuthReady, fetchMeetings, fetchTrashMeetings, refreshToken, showTrash]);
 
   useEffect(() => {
+    if (!isAuthReady) return;
     if (!showTrash && search.isSearchApplied) {
       return;
     }
@@ -143,7 +152,11 @@ export function useMeetingListController({
       }
     };
 
-    const timerId = window.setInterval(poll, MEETING_LIST_POLL_INTERVAL_MS);
+    // 실시간 소켓이 살아있으면 폴링은 안전망 역할만 하므로 주기를 늘린다.
+    const intervalMs = isStatusSocketConnected
+      ? MEETING_LIST_POLL_INTERVAL_CONNECTED_MS
+      : MEETING_LIST_POLL_INTERVAL_MS;
+    const timerId = window.setInterval(poll, intervalMs);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -158,6 +171,8 @@ export function useMeetingListController({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [
+    isAuthReady,
+    isStatusSocketConnected,
     fetchMeetings,
     fetchTrashMeetings,
     search.isSearchApplied,

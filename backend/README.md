@@ -78,6 +78,12 @@ Required/used variables:
 - `PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS` (`1` ~ `8`, optional override; when omitted the app computes a safe default from container CPU/memory)
 - `LOG_LEVEL`
 - `CORS_ORIGIN` (comma-separated)
+- `TRUST_PROXY` (Express `trust proxy`; default `loopback` — trust `X-Forwarded-*` only from same-host reverse proxies such as NPM / the Next.js proxy)
+- `AUTH_ENABLED` (must be `true` in production; `false` disables auth **and** tenant scoping — local development only)
+- `AUTH_OIDC_ISSUER` (Authentik issuer URL, e.g. `https://auth.example.com/application/o/transnote/`; trailing-slash variants are both accepted)
+- `AUTH_OIDC_AUDIENCE` (Authentik client ID)
+- `AUTH_OIDC_JWKS_URI` (optional; when empty the `jwks_uri` from OIDC discovery is used. Discovery failures fail closed and are retried after a short cooldown — set explicitly in production, Authentik: `<issuer>jwks/`)
+- `AUTH_OIDC_ALGORITHMS` (comma-separated allow-list of asymmetric JWS algorithms; default `RS256`)
 
 Recommended mode:
 

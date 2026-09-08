@@ -51,5 +51,10 @@ USER nestjs
 
 EXPOSE 9999
 
+# GET /health 는 @Public 이며 DB 연결(SELECT 1)까지 확인한다.
+# 이미지에 curl/wget 이 없으므로 node 의 내장 fetch 를 사용한다.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD ["node", "-e", "fetch(`http://127.0.0.1:${process.env.PORT || 9999}/health`).then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main"]

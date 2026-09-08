@@ -29,6 +29,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
   ) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
+    // 글로벌 필터는 WS/RPC 컨텍스트의 예외도 받을 수 있다. HTTP 응답 객체가 없는 곳에서
+    // response.status() 를 호출하면 2차 크래시가 나므로 로그만 남기고 끝낸다.
+    if (host.getType() !== 'http') {
+      this.logger.error('request.failed', exception, {
+        transport: host.getType(),
+        code: this.resolveCode(exception),
+      });
+      return;
+    }
+
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
@@ -39,19 +49,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const message = this.resolveMessage(exception, statusCode);
+    const code = this.resolveCode(exception);
     updateRequestContext({
       method: request.method,
       path: request.originalUrl || request.url,
     });
-    this.logger.error('http.request.failed', exception, {
-      statusCode,
-      code: this.resolveCode(exception),
-    });
+    this.logFailure(exception, statusCode, code, message);
 
     const payload: ApiErrorResponse = {
       success: false,
       error: {
-        code: this.resolveCode(exception),
+        code,
         statusCode,
         message,
         path: request.url,
@@ -59,7 +67,33 @@ export class AllExceptionsFilter implements ExceptionFilter {
       },
     };
 
+    if (response.headersSent) {
+      return;
+    }
     response.status(statusCode).json(payload);
+  }
+
+  /**
+   * 5xx 는 서버 결함이므로 스택 포함 error 레벨.
+   * 4xx 는 클라이언트 상태(만료 토큰, 잘못된 입력 등)라 정상 운영 중에도 흔하다 —
+   * 스택 없이 warn 으로 남겨 실제 장애 신호가 묻히지 않게 한다.
+   */
+  private logFailure(
+    exception: unknown,
+    statusCode: number,
+    code: string,
+    message: string,
+  ): void {
+    if (statusCode >= 500) {
+      this.logger.error('http.request.failed', exception, { statusCode, code });
+      return;
+    }
+
+    this.logger.warn('http.request.rejected', {
+      statusCode,
+      code,
+      errorMessage: message,
+    });
   }
 
   private resolveMessage(exception: unknown, statusCode: number): string {

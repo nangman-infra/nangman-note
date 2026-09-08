@@ -54,7 +54,7 @@ interface AuthEntryPageProps {
 
 function AuthEntryContent({ mode }: AuthEntryPageProps) {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const errorInfo = getErrorInfo(searchParams.get('error'));
   const [email, setEmail] = useState('');
@@ -65,7 +65,12 @@ function AuthEntryContent({ mode }: AuthEntryPageProps) {
 
   // 이미 로그인된 상태에서 signin 페이지에 진입(예: 로그인 후 Back)하면
   // 로그인 폼을 다시 노출하지 않고 callbackUrl로 replace한다.
-  const isAuthenticated = status === 'authenticated';
+  // 단, 세션 쿠키는 있지만 access token 이 없는(refresh 실패) "깨진 세션"은
+  // 로그인된 것으로 취급하지 않는다 — 홈으로 보내면 다시 로그인 페이지로 튕기는 루프가 생긴다.
+  const isAuthenticated =
+    status === 'authenticated' &&
+    Boolean(session?.accessToken) &&
+    !session?.error;
   useEffect(() => {
     if (isAuthenticated) {
       router.replace(callbackUrl);

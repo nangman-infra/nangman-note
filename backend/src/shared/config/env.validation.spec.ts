@@ -255,4 +255,61 @@ describe('validateEnv', () => {
       'Environment variable PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS must be an integer between 1 and 8.',
     );
   });
+
+  describe('AUTH_OIDC_ALGORITHMS', () => {
+    const base = {
+      NODE_ENV: 'development',
+      PORT: '9999',
+      ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+    };
+
+    it('defaults to RS256', () => {
+      expect(validateEnv(base).AUTH_OIDC_ALGORITHMS).toEqual(['RS256']);
+    });
+
+    it('parses a comma-separated list and dedupes', () => {
+      expect(
+        validateEnv({ ...base, AUTH_OIDC_ALGORITHMS: 'RS256, ES256,RS256' })
+          .AUTH_OIDC_ALGORITHMS,
+      ).toEqual(['RS256', 'ES256']);
+    });
+
+    it('rejects symmetric or unknown algorithms', () => {
+      expect(() =>
+        validateEnv({ ...base, AUTH_OIDC_ALGORITHMS: 'HS256' }),
+      ).toThrow(/unsupported value\(s\): HS256/);
+      expect(() =>
+        validateEnv({ ...base, AUTH_OIDC_ALGORITHMS: 'none' }),
+      ).toThrow(/unsupported value\(s\): none/);
+    });
+  });
+
+  describe('TRUST_PROXY', () => {
+    const base = {
+      NODE_ENV: 'development',
+      PORT: '9999',
+      ENCRYPTION_KEY: 'dev-only-encryption-key-replace-in-production',
+    };
+
+    it('defaults to loopback', () => {
+      expect(validateEnv(base).TRUST_PROXY).toBe('loopback');
+    });
+
+    it('accepts booleans, hop counts and address lists', () => {
+      expect(validateEnv({ ...base, TRUST_PROXY: 'FALSE' }).TRUST_PROXY).toBe(
+        'false',
+      );
+      expect(validateEnv({ ...base, TRUST_PROXY: '2' }).TRUST_PROXY).toBe('2');
+      expect(
+        validateEnv({ ...base, TRUST_PROXY: '10.0.0.0/8, 127.0.0.1' })
+          .TRUST_PROXY,
+      ).toBe('10.0.0.0/8, 127.0.0.1');
+    });
+
+    it('rejects garbage', () => {
+      expect(() => validateEnv({ ...base, TRUST_PROXY: 'yes please' })).toThrow(
+        /TRUST_PROXY/,
+      );
+    });
+  });
 });

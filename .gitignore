@@ -73,6 +73,8 @@ backend/data/*.db-journal
 # Frontend (Next.js)
 # ========================================
 frontend/.next/
+# Next.js trace files accidentally emitted when running next from the wrong cwd
+backend/.next/
 frontend/out/
 frontend/build/
 frontend/.vercel

@@ -8,6 +8,10 @@ import { AuthEntryPage } from './AuthEntryPage';
 const replaceMock = vi.fn();
 let sessionStatus: 'authenticated' | 'unauthenticated' | 'loading' =
   'unauthenticated';
+let sessionData: {
+  accessToken?: string;
+  error?: 'RefreshAccessTokenError';
+} | null = null;
 let searchParams = new URLSearchParams();
 
 vi.mock('next/navigation', () => ({
@@ -22,13 +26,19 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-auth/react', () => ({
   signIn: vi.fn(),
-  useSession: () => ({ status: sessionStatus, data: null }),
+  useSession: () => ({ status: sessionStatus, data: sessionData }),
 }));
+
+function authenticate(overrides: Partial<NonNullable<typeof sessionData>> = {}) {
+  sessionStatus = 'authenticated';
+  sessionData = { accessToken: 'access-token', ...overrides };
+}
 
 describe('AuthEntryPage', () => {
   beforeEach(() => {
     replaceMock.mockClear();
     sessionStatus = 'unauthenticated';
+    sessionData = null;
     searchParams = new URLSearchParams();
   });
 
@@ -46,7 +56,7 @@ describe('AuthEntryPage', () => {
   });
 
   it('replaces to "/" when already authenticated (no callbackUrl)', () => {
-    sessionStatus = 'authenticated';
+    authenticate();
 
     render(<AuthEntryPage mode="signin" />);
 
@@ -54,7 +64,7 @@ describe('AuthEntryPage', () => {
   });
 
   it('replaces to the callbackUrl when already authenticated', () => {
-    sessionStatus = 'authenticated';
+    authenticate();
     searchParams = new URLSearchParams('callbackUrl=%2Fsettings');
 
     render(<AuthEntryPage mode="signin" />);
@@ -63,7 +73,7 @@ describe('AuthEntryPage', () => {
   });
 
   it('hides the sign-in form while redirecting an authenticated visitor', () => {
-    sessionStatus = 'authenticated';
+    authenticate();
 
     render(<AuthEntryPage mode="signin" />);
 
@@ -72,8 +82,19 @@ describe('AuthEntryPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps the sign-in form when the session exists but has no access token (broken session)', () => {
+    authenticate({ accessToken: undefined, error: 'RefreshAccessTokenError' });
+
+    render(<AuthEntryPage mode="signin" />);
+
+    expect(
+      screen.getByRole('button', { name: /낭만 계정으로 로그인/ }),
+    ).toBeInTheDocument();
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
   it('normalizes external callbackUrl to "/"', () => {
-    sessionStatus = 'authenticated';
+    authenticate();
     searchParams = new URLSearchParams('callbackUrl=https%3A%2F%2Fevil.example%2Fphish');
 
     render(<AuthEntryPage mode="signin" />);

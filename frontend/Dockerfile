@@ -44,5 +44,10 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# /api/health 는 Next.js 자체 헬스체크(백엔드 프록시 대상 아님).
+# 시크릿 로딩 실패로 서버가 뜨지 못하는 상태를 오케스트레이터/NPM 이 감지할 수 있게 한다.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["node", "-e", "fetch(`http://127.0.0.1:${process.env.PORT || 3000}/api/health`).then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]
