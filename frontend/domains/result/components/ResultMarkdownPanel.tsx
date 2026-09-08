@@ -17,8 +17,8 @@ export function ResultMarkdownPanel({
   const selectedPrompt = promptOptions.find((prompt) => prompt.id === result.promptId);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
-      <div className="lg:col-span-8">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="min-w-0">
         <div className="mb-3 flex items-center gap-2 text-sm text-[var(--ink-muted)]">
           <Sparkles className="h-3.5 w-3.5 text-electric" strokeWidth={1.5} />
           AI 요약
@@ -28,7 +28,7 @@ export function ResultMarkdownPanel({
         </article>
       </div>
 
-      <aside className="flex flex-col gap-4 lg:col-span-4">
+      <aside className="flex flex-col gap-4">
         <div className="surface-card p-5">
           <h3 className="label-sm mb-3">생성 정보</h3>
           <dl className="space-y-2.5 text-sm">

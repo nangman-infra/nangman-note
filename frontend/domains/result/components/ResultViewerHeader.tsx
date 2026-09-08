@@ -82,7 +82,7 @@ export function ResultViewerHeader({
   }, [showSpeakerPopover]);
 
   return (
-    <header className="mx-auto w-full max-w-[880px] px-6 pb-2 pt-8 sm:px-8 lg:px-10">
+    <header className="mx-auto w-full max-w-[1200px] px-6 pb-2 pt-8 sm:px-8 lg:px-10">
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <span className="text-sm text-[var(--ink-muted)]">
           {result.metadata?.totalDuration > 0 ? 'AI 회의록' : '노트 기반 회의록'}

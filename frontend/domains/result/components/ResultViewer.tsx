@@ -270,7 +270,7 @@ export function ResultViewer({
         role="tabpanel"
         aria-labelledby={`result-tab-${activeTab}`}
         tabIndex={0}
-        className="mx-auto w-full max-w-[880px] flex-1 px-6 py-8 sm:px-8 lg:px-10"
+        className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-8 sm:px-8 lg:px-10"
       >
         <ResultViewerTabContent
           activeTab={activeTab}
@@ -288,7 +288,7 @@ export function ResultViewer({
 
       {!isEditing && activeTab === 'result' && (
         <footer className="border-t border-[var(--line-soft)] bg-[var(--bg-card)] px-6 py-5">
-          <div className="mx-auto w-full max-w-[880px] sm:px-2 lg:px-4">
+          <div className="mx-auto w-full max-w-[1200px] sm:px-2 lg:px-4">
           <ResultRegeneratePanel
             isOpen={showRegenerate}
             isRegenerating={isRegenerating}

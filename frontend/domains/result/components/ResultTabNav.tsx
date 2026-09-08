@@ -32,7 +32,7 @@ export function ResultTabNav({ activeTab, onTabChange }: ResultTabNavProps) {
 
   return (
     <div className="sticky top-0 z-20 border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] backdrop-blur-xl">
-      <div role="tablist" aria-label="회의 문서 보기" className="mx-auto flex w-full max-w-[880px] gap-6 px-6 sm:px-8 lg:px-10">
+      <div role="tablist" aria-label="회의 문서 보기" className="mx-auto flex w-full max-w-[1200px] gap-6 px-6 sm:px-8 lg:px-10">
         {RESULT_TABS.map((tab, index) => (
           <button
             key={tab.key}
