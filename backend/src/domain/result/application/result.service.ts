@@ -217,16 +217,25 @@ export class ResultService {
         );
       }
 
-      // 프롬프트 존재 확인 + 변경 (동기) — 실패 시 background compensation을
-      // 시작하기 전이므로 인메모리 lock만 해제하고 오류를 전파한다.
+      // 프롬프트 존재와 기존 결과를 side-effect 없이 확인한다. findByMeetingId는
+      // 결과가 없으면 즉시 생성하므로 background 재생성과 중복 모델 호출이 된다.
       const originalPromptId = meeting.promptId;
       await this.promptService.ensureExists(dto.promptId, ownerSub);
+      const existing = await this.resultRepository.findOne({
+        where: { meetingId },
+      });
+      if (!existing) {
+        throw new NotFoundException({
+          code: 'RESULT_NOT_FOUND',
+          message: `Result for meeting ${meetingId} does not exist yet`,
+        });
+      }
+
       await this.meetingService.updatePrompt(
         meetingId,
         { promptId: dto.promptId },
         ownerSub,
       );
-      await this.findByMeetingId(meetingId, ownerSub);
       await this.meetingService.updateProcessingPhase(
         meetingId,
         MeetingProcessingPhase.REGENERATING,

@@ -327,10 +327,12 @@ export class StalledMeetingRecoveryService
           return;
         }
 
+        let anyJobRecovered = false;
         for (const job of jobs) {
           if (!this.shouldRecoverJob(job, threshold)) {
             continue;
           }
+          anyJobRecovered = true;
 
           if (job.errorMessage === TRANSCRIPTION_SUBMISSION_PENDING_ERROR) {
             await this.transcriptionService.recoverPendingBatchSubmission(
@@ -353,7 +355,12 @@ export class StalledMeetingRecoveryService
           );
         }
 
-        if (jobs.some((job) => Boolean(job.collectedAt))) {
+        // 잡 복구 작업이 없으면 수집 후 결과 생성 도중 중단됐을 수 있다.
+        // collector 내부의 pending job/upload gate가 미완료 상태는 안전하게 유예한다.
+        if (!anyJobRecovered) {
+          this.logger.warn('meeting.recovery.batch_generation_stalled', {
+            meetingId: meeting.id,
+          });
           await this.transcriptionResultCollectorService.retriggerGenerationIfStuck(
             meeting.id,
             meeting.ownerSub,

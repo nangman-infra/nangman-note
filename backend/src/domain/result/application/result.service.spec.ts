@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError, Repository } from 'typeorm';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
@@ -662,6 +662,33 @@ describe('ResultService', () => {
           promptId: 'prompt_user_new',
         }),
       ).rejects.toThrow('prompt lookup failed');
+      await expect(
+        service.regenerateAsync('meeting-1', {
+          promptId: 'prompt_user_new',
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('rejects a missing result without synchronous generation or prompt mutation', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      promptService.ensureExists.mockResolvedValue(undefined);
+      resultRepository.findOne.mockResolvedValueOnce(null);
+      const privateService = getPrivateService();
+      jest
+        .spyOn(privateService, 'executeRegenerateInBackground')
+        .mockImplementation(() => undefined);
+
+      await expect(
+        service.regenerateAsync('meeting-1', {
+          promptId: 'prompt_user_new',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(meetingService.updatePrompt).not.toHaveBeenCalled();
+      expect(bedrockService.extractStructuredNotes).not.toHaveBeenCalled();
+      expect(privateService.regeneratingMeetings.has('meeting-1')).toBe(false);
+
+      resultRepository.findOne.mockResolvedValueOnce(buildResult());
       await expect(
         service.regenerateAsync('meeting-1', {
           promptId: 'prompt_user_new',

@@ -222,12 +222,8 @@ describe('StalledMeetingRecoveryService', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('skips fresh queued jobs that are still within the threshold', async () => {
-    meetingRepository.find.mockResolvedValue([
-      buildMeeting({
-        endedAt: new Date('2026-03-13T11:20:00.000Z'),
-      }),
-    ]);
+  it('skips fresh queued job recovery and safely rechecks generation gates', async () => {
+    meetingRepository.find.mockResolvedValue([buildMeeting()]);
     resultRepository.findOne.mockResolvedValue(null);
     transcriptionJobRepository.find.mockResolvedValue([
       buildJob({
@@ -241,6 +237,9 @@ describe('StalledMeetingRecoveryService', () => {
     expect(
       transcriptionResultCollectorService.recoverStalledBatchJob,
     ).not.toHaveBeenCalled();
+    expect(
+      transcriptionResultCollectorService.retriggerGenerationIfStuck,
+    ).toHaveBeenCalledWith('meeting-1', 'user-1');
   });
 
   it('recovers stale queued or processing jobs through the collector', async () => {
