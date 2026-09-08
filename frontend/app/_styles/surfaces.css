@@ -8,23 +8,20 @@
   isolation: isolate;
 }
 
-/* Feature card — one step above the void, colour alone */
+/* Feature card — one step above the void, colour alone. No border, no shadow. */
 .surface-card {
   background: var(--bg-card);
   border: none;
   border-radius: var(--radius-card);
-  box-shadow: var(--elevation-sm);
-  transition: box-shadow 0.2s ease;
 }
-.surface-card:hover {
-  box-shadow: var(--elevation-md);
+[data-theme='light'] .surface-card {
+  box-shadow: var(--elevation-sm);
 }
 
 /* Dark feature panel — large 24px stage */
 .surface-product {
   background: var(--surface-container-low);
   border-radius: var(--radius-card-lg);
-  box-shadow: var(--elevation-sm);
 }
 
 /* Glowing inset widget — transparent, backlit indicator edge */
@@ -70,7 +67,6 @@
   background: var(--surface-frosted);
   border: 1px solid var(--line-inset);
   border-radius: var(--radius-card);
-  box-shadow: var(--elevation-halo);
 }
 
 /* AI / data accent card — electric rule on the left */

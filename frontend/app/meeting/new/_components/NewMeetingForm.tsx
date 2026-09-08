@@ -54,7 +54,7 @@ export function NewMeetingForm({
         className="surface-card !rounded-[24px] p-8 sm:p-10"
       >
         <div className="mb-7">
-          <p className="label-sm">New meeting</p>
+          <p className="label-sm">새 회의</p>
           <h2 className="font-headline mt-1.5 text-2xl text-[var(--ink-strong)]">
             회의 시작
           </h2>
@@ -111,7 +111,7 @@ export function NewMeetingForm({
             </p>
           </div>
 
-          <div className="surface-tonal px-4 py-3.5 shadow-[var(--elevation-sm)]">
+          <div className="surface-tonal px-4 py-3.5">
             <div className="flex items-start gap-2.5">
               <Settings2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-muted)]" />
               <div className="min-w-0 flex-1">

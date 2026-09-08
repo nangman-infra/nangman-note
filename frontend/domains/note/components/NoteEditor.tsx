@@ -52,10 +52,8 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
       <div className="flex h-full w-full min-h-0 flex-col px-6">
         <header className="bg-transparent py-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <span className="tag-dot">Notes</span>
-            </div>
-            <p className="data-mono flex items-center gap-1.5 text-[11px] text-[var(--ink-muted)]">
+            <p className="text-sm text-[var(--ink-subtle)]">노트</p>
+            <p className="flex items-center gap-1.5 text-xs text-[var(--ink-muted)]">
               <span
                 className={`inline-block h-1.5 w-1.5 rounded-full ${getSaveDotClass(isSaving, lastSaved)}`}
                 aria-hidden="true"
@@ -94,8 +92,8 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
 
         {showShortcutHint && (
           <div className="flex items-center justify-between bg-transparent py-2">
-            <p className="data-mono text-[11px] text-[var(--ink-muted)]">
-              ⌘Z undo · ⌘Y redo · ⌘B bold
+            <p className="text-xs text-[var(--ink-muted)]">
+              ⌘Z 실행취소 · ⌘Y 다시실행 · ⌘B 굵게
             </p>
             <button
               type="button"

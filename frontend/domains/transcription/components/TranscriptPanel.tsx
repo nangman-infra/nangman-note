@@ -91,14 +91,14 @@ export function TranscriptPanel({
         scrollRef={scrollRef}
       />
       <div className="border-t border-[var(--line-soft)] px-3 py-2">
-        <div className="data-mono flex items-center justify-between gap-2 text-[11px]">
+        <div className="flex items-center justify-between gap-2 text-xs">
           <button
             type="button"
             onClick={toggleFollowLive}
-            className={`rounded-[6px] border px-2 py-1 transition ${
+            className={`rounded-[6px] px-2 py-1 transition ${
               followLive
-                ? 'border-[rgba(7,122,199,0.5)] bg-[var(--tertiary-fixed)] text-electric'
-                : 'border-[var(--line-inset)] bg-[var(--surface-frosted)] text-[var(--ink-muted)]'
+                ? 'bg-[var(--tertiary-fixed)] text-electric'
+                : 'bg-[var(--surface-container)] text-[var(--ink-muted)]'
             }`}
           >
             자동 스크롤 {followLive ? 'ON' : 'OFF'}
@@ -108,7 +108,7 @@ export function TranscriptPanel({
             <button
               type="button"
               onClick={() => scrollToBottom({ forceFollow: true })}
-              className="inline-flex items-center gap-1 rounded-[6px] border border-[var(--line-inset)] bg-[var(--surface-frosted)] px-2 py-1 text-[var(--ink-subtle)] transition hover:bg-[var(--surface-container)]"
+              className="inline-flex items-center gap-1 rounded-[6px] bg-[var(--surface-container)] px-2 py-1 text-[var(--ink-subtle)] transition hover:bg-[var(--surface-container-high)]"
             >
               <ArrowDown className="h-3.5 w-3.5" />
               최신으로 이동

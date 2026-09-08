@@ -63,10 +63,10 @@ export function MeetingListFilterToolbar({
           type="button"
           onClick={() => setIsAdvancedFilterOpen((prev) => !prev)}
           disabled={showTrash}
-          className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
+          className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm transition ${
             hasAdvancedFilter && !showTrash
-              ? 'border-[var(--outline-variant)] bg-[var(--surface-container)] text-white'
-              : 'border-[var(--line-inset)] bg-[var(--surface-frosted)] text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
+              ? 'bg-[var(--surface-container)] text-white'
+              : 'text-[var(--ink-muted)] hover:bg-[var(--surface-container-low)] hover:text-[var(--ink-strong)]'
           } disabled:cursor-not-allowed disabled:opacity-50`}
           aria-expanded={shouldShowAdvancedFilter}
           aria-controls="meeting-advanced-filters"
@@ -81,10 +81,10 @@ export function MeetingListFilterToolbar({
               type="button"
               onClick={() => onFilterChange(filter.key)}
               disabled={showTrash}
-              className={`h-8 whitespace-nowrap rounded-lg border px-3.5 text-xs font-medium transition ${
+              className={`h-8 whitespace-nowrap rounded-lg px-3.5 text-sm transition ${
                 activeFilter === filter.key && !showTrash
-                  ? 'border-[var(--outline-variant)] bg-[var(--surface-container)] text-white'
-                  : 'border-[var(--line-inset)] bg-[var(--surface-frosted)] text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
+                  ? 'bg-[var(--surface-container)] text-white'
+                  : 'text-[var(--ink-muted)] hover:bg-[var(--surface-container-low)] hover:text-[var(--ink-strong)]'
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {filter.label}
@@ -96,7 +96,7 @@ export function MeetingListFilterToolbar({
       {shouldShowAdvancedFilter && !showTrash ? (
         <div
           id="meeting-advanced-filters"
-          className="grid gap-3 rounded-[12px] bg-[var(--surface-container-low)] p-3 shadow-[var(--elevation-sm)] md:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] md:items-end"
+          className="grid gap-3 rounded-[12px] bg-[var(--surface-container-low)] p-3 md:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] md:items-end"
         >
           <div>
             <p className="label-sm mb-2 text-[var(--ink-muted)]">기간</p>
@@ -106,10 +106,10 @@ export function MeetingListFilterToolbar({
                   key={filter.key}
                   type="button"
                   onClick={() => onTimeFilterChange(filter.key)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                  className={`rounded-lg px-3 py-1.5 text-sm transition ${
                     timeFilter === filter.key
-                      ? 'border-[var(--outline-variant)] bg-[var(--surface-container)] text-white'
-                      : 'border-transparent text-[var(--ink-subtle)] hover:bg-[var(--surface-container)]'
+                      ? 'bg-[var(--surface-container)] text-white'
+                      : 'text-[var(--ink-muted)] hover:bg-[var(--surface-container)]'
                   }`}
                 >
                   {filter.label}
@@ -138,8 +138,8 @@ export function MeetingListFilterToolbar({
       ) : null}
 
       {!showTrash && hasAppliedFilter ? (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] bg-[var(--surface-container-low)] px-3 py-2 shadow-[var(--elevation-sm)]">
-          <span className="label-sm">Applied</span>
+        <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] bg-[var(--surface-container-low)] px-3 py-2">
+          <span className="label-sm">적용 중</span>
           <AppliedFilterChip
             visible={activeFilter !== 'all'}
             label={activeFilterLabel}
@@ -207,7 +207,7 @@ function AppliedFilterChip({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--line-inset)] bg-[var(--surface-container)] px-2.5 py-1 text-[11px] before:h-1.5 before:w-1.5 before:rounded-full before:content-[''] ${toneClassName}`}
+      className={`inline-flex items-center gap-1.5 rounded-full bg-[var(--surface-container)] px-2.5 py-1 text-xs before:h-1.5 before:w-1.5 before:rounded-full before:content-[''] ${toneClassName}`}
     >
       {label}
       <button

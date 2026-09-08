@@ -92,39 +92,31 @@ export function MeetingListHeader({
   onRunSearch,
 }: MeetingListHeaderProps) {
   return (
-    <header className="space-y-3 border-b border-[var(--line-soft)] px-5 py-4 lg:px-6">
+    <header className="space-y-4 px-5 pb-2 pt-6 lg:px-6">
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <span className={`tag-dot ${showTrash ? 'tag-dot--ember' : ''}`}>{showTrash ? 'Trash' : 'Archive'}</span>
-          <h2 className="font-headline mt-1.5 truncate text-xl text-[var(--ink-strong)]">
-            {showTrash ? '회의 휴지통' : '회의 아카이브'}
+        <div className="flex min-w-0 flex-1 items-baseline gap-3">
+          <h2 className="font-headline truncate text-[22px] text-[var(--ink-strong)]">
+            {showTrash ? '휴지통' : '전체 회의'}
           </h2>
-          <p className="mt-1 text-xs text-[var(--ink-muted)]">
-            {showTrash
-              ? '삭제된 회의를 복구하거나 영구 삭제할 수 있어요.'
-              : '최근 회의와 처리 상태를 빠르게 확인하세요.'}
-          </p>
+          <span className="text-sm text-[var(--ink-muted)]">{meetingCount}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="badge-white data-mono">
-            {meetingCount}
-          </span>
           {allowTrashViewToggle && showTrash ? (
             <button
               type="button"
               onClick={onToggleTrash}
-              className="btn-neo inline-flex !px-3 !py-1.5 text-xs"
+              className="link-electric text-sm text-[var(--ink-subtle)]"
             >
-              아카이브로
+              전체 회의로
             </button>
           ) : null}
           {allowTrashViewToggle && !showTrash ? (
             <button
               type="button"
               onClick={onToggleTrash}
-              className="btn-neo inline-flex !px-3 !py-1.5 text-xs"
+              className="link-electric text-sm text-[var(--ink-subtle)]"
             >
-              삭제한 회의
+              휴지통
             </button>
           ) : null}
           {canToggleSelectionMode ? (
@@ -174,8 +166,8 @@ export function MeetingListHeader({
         />
 
         {!showTrash ? (
-          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--line-inset)] bg-[var(--surface-frosted)] px-3 text-xs text-[var(--ink-subtle)]">
-            <span className="label-sm">Sort</span>
+          <label className="inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--surface-container-low)] px-3 text-xs text-[var(--ink-subtle)]">
+            <span className="label-sm">정렬</span>
             <select
               id="meeting-sort"
               value={sortBy}

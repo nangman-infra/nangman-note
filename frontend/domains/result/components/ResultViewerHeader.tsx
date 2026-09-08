@@ -84,10 +84,9 @@ export function ResultViewerHeader({
   return (
     <header className="mx-auto w-full max-w-[880px] px-6 pb-2 pt-8 sm:px-8 lg:px-10">
       <div className="mb-5 flex flex-wrap items-center gap-3">
-        <span className="tag-dot">
-          {result.metadata?.totalDuration > 0 ? 'AI minutes' : 'Note-based minutes'}
-        </span>
-        <span className="data-mono text-xs text-[var(--ink-muted)]">
+        <span className="text-sm text-[var(--ink-muted)]">
+          {result.metadata?.totalDuration > 0 ? 'AI 회의록' : '노트 기반 회의록'}
+          {' · '}
           {new Date(result.createdAt).toLocaleDateString('ko-KR', {
             year: 'numeric',
             month: 'long',
@@ -141,19 +140,19 @@ export function ResultViewerHeader({
 
       <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
         <div>
-          <dt className="label-sm">Transcript words</dt>
+          <dt className="label-sm">전사 단어</dt>
           <dd className="font-headline mt-0.5 text-[22px] text-[var(--ink-strong)]">
             {result.metadata.transcriptWordCount.toLocaleString()}
           </dd>
         </div>
         <div>
-          <dt className="label-sm">Note length</dt>
+          <dt className="label-sm">노트 길이</dt>
           <dd className="font-headline mt-0.5 text-[22px] text-[var(--ink-strong)]">
             {result.metadata.noteLength.toLocaleString()}
           </dd>
         </div>
         <div>
-          <dt className="label-sm">Duration</dt>
+          <dt className="label-sm">진행 시간</dt>
           <dd className="font-headline mt-0.5 text-[22px] text-[var(--ink-strong)]">
             {Math.round(result.metadata.totalDuration / 60)}m
           </dd>
@@ -187,7 +186,7 @@ export function ResultViewerHeader({
                 </button>
                 {showSpeakerPopover ? (
                   <div className="absolute left-0 top-full z-20 mt-1 min-w-[160px] rounded-[12px] bg-[var(--surface-container-low)] p-2 shadow-[var(--elevation-md)]">
-                    <p className="label-sm mb-1">Participants</p>
+                    <p className="label-sm mb-1">참가자</p>
                     <ul className="space-y-1">
                       {uniqueSpeakers.map((label, index) => (
                         <li key={label} className="flex items-center gap-2 text-xs">

@@ -15,7 +15,7 @@
 export function MeetingCardSkeleton() {
   return (
     <div
-      className="w-full rounded-[12px] bg-card px-4 py-3 shadow-[var(--elevation-sm)]"
+      className="w-full rounded-[12px] bg-card px-5 py-4"
       aria-hidden="true"
     >
       <div className="flex items-center gap-3">

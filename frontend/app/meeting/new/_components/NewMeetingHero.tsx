@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Clock3, Mic, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Clock3, Mic, ShieldCheck, type LucideIcon } from 'lucide-react';
 
 interface NewMeetingHeroProps {
   onBack: () => void;
@@ -18,12 +18,7 @@ export function NewMeetingHero({ onBack }: NewMeetingHeroProps) {
         워크스페이스로 돌아가기
       </button>
 
-      <span className="tag-dot">
-        <Sparkles className="h-3.5 w-3.5 text-electric" strokeWidth={1.5} />
-        Start session
-      </span>
-
-      <h1 className="font-display mt-6 text-[44px] text-[var(--ink-strong)] sm:text-[48px]">
+      <h1 className="font-display text-[44px] text-[var(--ink-strong)] sm:text-[48px]">
         회의를 시작하고
         <br />
         <span className="text-electric-gradient">노트를 바로 작성하세요</span>

@@ -93,9 +93,9 @@ export function getCardSelectionClassName({
   isSelected: boolean;
   isActive?: boolean;
 }): string {
-  if (isSelected) return '!shadow-[inset_0_0_0_1px_var(--color-electric-current)] !bg-[var(--tertiary-fixed)]';
-  if (isActive) return '!shadow-[inset_0_0_0_1px_rgba(7,122,199,0.6),0_0_12px_rgba(7,122,199,0.18)]';
-  return 'hover:!bg-[var(--surface-container)]';
+  if (isSelected) return '!bg-[var(--tertiary-fixed)] shadow-[inset_0_0_0_1px_var(--color-electric-current)]';
+  if (isActive) return '!bg-[var(--surface-container)]';
+  return 'hover:bg-[var(--surface-container-low)]';
 }
 
 export function getProcessingBannerClassName(needsAttention?: boolean): string {

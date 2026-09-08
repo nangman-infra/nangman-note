@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Check, Sparkles } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 
 const FEATURE_BULLETS: ReadonlyArray<{ title: string; description: string }> = [
   {
@@ -19,12 +19,7 @@ const FEATURE_BULLETS: ReadonlyArray<{ title: string; description: string }> = [
 export function SignInHero() {
   return (
     <section className="motion-rise lg:col-span-7">
-      <span className="tag-dot">
-        <Sparkles className="h-3.5 w-3.5 text-electric" strokeWidth={1.5} />
-        Meeting notes, engineered
-      </span>
-
-      <h1 className="font-display mt-6 text-[44px] text-[var(--ink-strong)] sm:text-[48px] lg:text-[54px]">
+      <h1 className="font-display text-[44px] text-[var(--ink-strong)] sm:text-[48px] lg:text-[54px]">
         AI가 함께하는
         <br />
         <span className="text-electric-gradient">회의 노트</span>

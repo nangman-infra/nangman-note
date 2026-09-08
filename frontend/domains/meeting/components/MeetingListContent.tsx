@@ -105,7 +105,7 @@ export function MeetingListContent({
   };
 
   return (
-    <div aria-busy={isLoading} className="scroll-muted flex-1 space-y-2 overflow-y-auto px-4 py-3 lg:px-5">
+    <div aria-busy={isLoading} className="scroll-muted flex-1 space-y-2 overflow-y-auto">
       {renderContent()}
     </div>
   );

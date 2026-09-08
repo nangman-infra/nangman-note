@@ -43,7 +43,7 @@ const AUTH_ENTRY_COPY: Record<
   }
 > = {
   signin: {
-    eyebrow: 'General login',
+    eyebrow: '로그인',
     title: '이메일로 로그인',
     description: '비밀번호 없이 이메일로 받은 매직 링크를 눌러 로그인합니다.',
     emailButton: '일반 로그인',
@@ -52,7 +52,7 @@ const AUTH_ENTRY_COPY: Record<
     switchAction: '회원가입',
   },
   signup: {
-    eyebrow: 'Create account',
+    eyebrow: '회원가입',
     title: '이메일로 시작하기',
     description: '이름과 비밀번호 없이 이메일 주소 하나로 시작합니다.',
     emailButton: '매직 링크 받기',
@@ -181,7 +181,7 @@ export function SignInCard({
 
         <div className="my-6 flex items-center gap-3">
           <div className="h-px flex-1 bg-[var(--line-soft)]" />
-          <span className="label-sm">or</span>
+          <span className="label-sm">또는</span>
           <div className="h-px flex-1 bg-[var(--line-soft)]" />
         </div>
 
@@ -194,7 +194,7 @@ export function SignInCard({
           낭만 계정으로 로그인
         </button>
 
-        <div className="surface-tonal mt-4 px-4 py-3 shadow-[var(--elevation-sm)]">
+        <div className="surface-tonal mt-4 px-4 py-3">
           <div className="flex gap-2.5">
             <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-electric" strokeWidth={1.5} />
             <div>
@@ -239,7 +239,7 @@ export function SignInCard({
         </p>
       </div>
 
-      <p className="data-mono mt-5 text-center text-[11px] text-[var(--ink-muted)]">
+      <p className="mt-5 text-center text-xs text-[var(--ink-muted)]">
         © 낭만 인프라 · TransNote v1.0
       </p>
     </aside>

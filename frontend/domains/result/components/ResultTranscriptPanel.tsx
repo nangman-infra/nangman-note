@@ -36,13 +36,13 @@ export function ResultTranscriptPanel({
   return (
     <div className="surface-card overflow-hidden">
       <div className="flex items-center justify-between border-b border-[var(--line-soft)] px-5 py-3">
-        <span className="tag-dot">Transcript</span>
-        <span className="data-mono text-[11px] text-[var(--ink-muted)]">{transcripts.length} segments</span>
+        <span className="text-sm text-[var(--ink-subtle)]">전체 전사</span>
+        <span className="text-xs text-[var(--ink-muted)]">{transcripts.length}개 구간</span>
       </div>
       <div className="divide-y divide-[var(--line-soft)]">
         {transcripts.map((segment) => (
           <div key={segment.id} className="flex gap-4 px-5 py-3 text-sm">
-            <span className="data-mono shrink-0 pt-0.5 text-[11px] text-electric">
+            <span className="font-mono shrink-0 pt-0.5 text-[11px] text-electric">
               {formatSegmentTime(segment.startTime)}
             </span>
             {segment.speakerLabel ? (

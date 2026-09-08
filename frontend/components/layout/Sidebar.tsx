@@ -47,16 +47,12 @@ export function Sidebar({
       <header className="mb-8 px-2">
         <Link href="/" className="flex items-center gap-3 rounded-lg" aria-label="TransNote 홈">
           <BrandMark />
-          <div>
-            <h1 className="font-headline text-[17px] leading-none text-foreground">TransNote</h1>
-            <p className="label-sm mt-1.5">Meeting automation</p>
-          </div>
+          <h1 className="font-headline text-[17px] leading-none text-foreground">TransNote</h1>
         </Link>
       </header>
 
       {/* Navigation */}
-      <nav className="space-y-0.5" aria-label="주요 메뉴">
-        <p className="label-sm mb-2 px-3">Workspace</p>
+      <nav className="space-y-1" aria-label="주요 메뉴">
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.key;
           return (
@@ -123,7 +119,7 @@ function UserInfo() {
   if (!session?.user) return null;
 
   return (
-    <div className="surface-card flex items-center justify-between px-3 py-2.5">
+    <div className="flex items-center justify-between rounded-[12px] bg-[var(--surface-container-low)] px-3 py-2.5">
       <div className="flex items-center gap-2.5 overflow-hidden">
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--surface-container)] text-[var(--ink-subtle)]">
           <User className="h-4 w-4" strokeWidth={1.75} />
@@ -132,7 +128,7 @@ function UserInfo() {
           <p className="truncate text-xs font-medium text-[var(--ink-strong)]">
             {session.user.email || '사용자'}
           </p>
-          <p className="label-sm mt-0.5 !normal-case !tracking-normal">Signed in</p>
+          <p className="label-sm mt-0.5">로그인됨</p>
         </div>
       </div>
       <button

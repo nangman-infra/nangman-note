@@ -108,7 +108,7 @@ export function InProgressHeader({
         </span>
 
         <div
-          className="flex h-9 items-center rounded-lg bg-[var(--surface-container)] px-2.5 shadow-[var(--elevation-sm)] sm:px-3"
+          className="flex h-9 items-center rounded-lg bg-[var(--surface-container-low)] px-2.5 sm:px-3"
           role="timer"
           aria-label={`경과 시간 ${formatTime(elapsedSeconds)}`}
         >
@@ -116,7 +116,7 @@ export function InProgressHeader({
             <div className="h-2 w-2 rounded-full bg-ember" />
             <div className="absolute h-2 w-2 animate-ping rounded-full bg-ember opacity-40" />
           </div>
-          <span className="data-mono text-sm font-medium text-[var(--ink-strong)]">{formatTime(elapsedSeconds)}</span>
+          <span className="font-mono text-sm text-[var(--ink-strong)]">{formatTime(elapsedSeconds)}</span>
         </div>
 
         <button

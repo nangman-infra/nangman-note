@@ -13,15 +13,9 @@ export function HeroSection() {
       <div className="ember-orb -right-40 top-10 -z-10 hidden h-[640px] w-[640px] opacity-35 blur-3xl lg:block" aria-hidden="true" />
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         {/* Tag with dot */}
-        <div className="landing-rise flex justify-center">
-          <span className="tag-dot">
-            AI-powered meeting notes
-          </span>
-        </div>
-
         {/* 헤드라인 */}
         <div className="landing-rise landing-rise-d1">
-          <h1 className="font-display mx-auto mt-6 max-w-3xl text-center text-[40px] text-[var(--ink-strong)] sm:text-[48px] lg:text-[54px]">
+          <h1 className="font-display mx-auto max-w-3xl text-center text-[40px] text-[var(--ink-strong)] sm:text-[48px] lg:text-[54px]">
             회의가 끝나면,{' '}
             <span className="landing-gradient-text">회의록은 이미 완성</span>
             되어 있습니다
@@ -47,7 +41,7 @@ export function HeroSection() {
               어떻게 사용하나요?
             </Link>
           </div>
-          <p className="data-mono mt-4 text-center text-[11px] text-[var(--ink-muted)]">
+          <p className="mt-4 text-center text-xs text-[var(--ink-muted)]">
             설치 없음 · 로그인만으로 바로 시작 · 데이터 자체 호스팅
           </p>
         </div>

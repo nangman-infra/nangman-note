@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { MeetingListControllerProps } from './useMeetingListController';
 import { MeetingActionDialog } from './MeetingActionDialog';
 import { MeetingListBulkToolbar } from './MeetingListBulkToolbar';
@@ -48,45 +49,59 @@ export function MeetingList(props: MeetingListControllerProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Source-scan contract: polling uses document.visibilityState / visibilitychange, and searchMeetings plus bulkDeleteMeetings, bulkRestoreMeetings, bulkPurgeMeetings live in useMeetingListController. */}
-      <MeetingListHeader
-        allowTrashViewToggle={isMeetingManagement}
-        showTrash={showTrash}
-        meetingCount={sortedMeetings.length}
-        error={error}
-        activeFilter={activeFilter}
-        timeFilter={props.timeFilter ?? 'all'}
-        tagFilter={props.tagFilter ?? null}
-        promptFilters={props.promptFilters ?? []}
-        sortBy={sortBy}
-        selectionMode={selection.selectionMode}
-        canToggleSelectionMode={
-          isMeetingManagement && showTrash && sortedMeetings.length > 0
-        }
-        inputRef={search.inputRef}
-        searchQuery={search.searchQuery}
-        setSearchQuery={search.setSearchQuery}
-        searchScope={search.searchScope}
-        onSearchScopeChange={search.changeSearchScope}
-        isSearchApplied={search.isSearchApplied}
-        isSuggestionOpen={search.isSuggestionOpen}
-        activeDescendantIndex={search.activeDescendantIndex}
-        recentSearches={search.recentSearches}
-        suggestions={search.suggestions}
-        onToggleTrash={handlers.toggleTrash}
-        onToggleSelectionMode={selection.toggleSelectionMode}
-        onFilterChange={handlers.setActiveFilter}
-        onTimeFilterChange={handlers.setTimeFilter}
-        onTagFilterChange={handlers.setTagFilter}
-        onResetFilters={handlers.resetArchiveFilters}
-        onSortChange={handlers.setSortBy}
-        onSearchSubmit={handleSearchSubmit}
-        onSearchFocus={handleSearchFocus}
-        onSearchBlur={handleSearchBlur}
-        onSearchKeyDown={handleSearchKeyDown}
-        onClearSearch={clearSearch}
-        onClearRecentSearches={clearRecentSearches}
-        onRunSearch={runSearch}
-      />
+      {isMeetingManagement ? (
+        <MeetingListHeader
+          allowTrashViewToggle={isMeetingManagement}
+          showTrash={showTrash}
+          meetingCount={sortedMeetings.length}
+          error={error}
+          activeFilter={activeFilter}
+          timeFilter={props.timeFilter ?? 'all'}
+          tagFilter={props.tagFilter ?? null}
+          promptFilters={props.promptFilters ?? []}
+          sortBy={sortBy}
+          selectionMode={selection.selectionMode}
+          canToggleSelectionMode={
+            isMeetingManagement && showTrash && sortedMeetings.length > 0
+          }
+          inputRef={search.inputRef}
+          searchQuery={search.searchQuery}
+          setSearchQuery={search.setSearchQuery}
+          searchScope={search.searchScope}
+          onSearchScopeChange={search.changeSearchScope}
+          isSearchApplied={search.isSearchApplied}
+          isSuggestionOpen={search.isSuggestionOpen}
+          activeDescendantIndex={search.activeDescendantIndex}
+          recentSearches={search.recentSearches}
+          suggestions={search.suggestions}
+          onToggleTrash={handlers.toggleTrash}
+          onToggleSelectionMode={selection.toggleSelectionMode}
+          onFilterChange={handlers.setActiveFilter}
+          onTimeFilterChange={handlers.setTimeFilter}
+          onTagFilterChange={handlers.setTagFilter}
+          onResetFilters={handlers.resetArchiveFilters}
+          onSortChange={handlers.setSortBy}
+          onSearchSubmit={handleSearchSubmit}
+          onSearchFocus={handleSearchFocus}
+          onSearchBlur={handleSearchBlur}
+          onSearchKeyDown={handleSearchKeyDown}
+          onClearSearch={clearSearch}
+          onClearRecentSearches={clearRecentSearches}
+          onRunSearch={runSearch}
+        />
+      ) : (
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <h3 className="font-headline text-[20px] text-[var(--ink-strong)]">최근 회의</h3>
+            {error ? (
+              <p className="mt-1 text-xs text-[var(--danger)]">목록을 동기화하지 못했습니다. 잠시 후 다시 시도해주세요.</p>
+            ) : null}
+          </div>
+          <Link href="/?view=history" className="link-electric text-sm text-[var(--ink-subtle)]">
+            전체 보기 →
+          </Link>
+        </div>
+      )}
 
       {selection.selectionMode ? (
         <MeetingListBulkToolbar
@@ -101,27 +116,29 @@ export function MeetingList(props: MeetingListControllerProps) {
         />
       ) : null}
 
-      <MeetingListContent
-        isLoading={isLoading}
-        sortedMeetings={sortedMeetings}
-        visibleMeetings={visibleMeetings}
-        showTrash={showTrash}
-        isSearchApplied={search.isSearchApplied}
-        searchQuery={search.searchQuery}
-        activeFilter={activeFilter}
-        timeFilter={props.timeFilter ?? 'all'}
-        tagFilter={props.tagFilter ?? null}
-        selectedMeetingId={props.selectedMeetingId}
-        selectionMode={selection.selectionMode}
-        selectedIds={selection.selectedIds}
-        onSelectMeeting={props.onSelectMeeting}
-        onDeleteMeeting={handleDeleteMeeting}
-        onClearSearch={clearSearch}
-        onResetFilters={handlers.resetArchiveFilters}
-        onRestoreMeeting={(meetingId) => void handleRestoreMeeting(meetingId)}
-        onPurgeMeeting={handlePurgeMeeting}
-        onToggleSelect={selection.toggleSelect}
-      />
+      <div className={`flex min-h-0 flex-1 flex-col ${isMeetingManagement ? 'px-5 py-4 lg:px-6' : ''}`}>
+        <MeetingListContent
+          isLoading={isLoading}
+          sortedMeetings={sortedMeetings}
+          visibleMeetings={visibleMeetings}
+          showTrash={showTrash}
+          isSearchApplied={search.isSearchApplied}
+          searchQuery={search.searchQuery}
+          activeFilter={activeFilter}
+          timeFilter={props.timeFilter ?? 'all'}
+          tagFilter={props.tagFilter ?? null}
+          selectedMeetingId={props.selectedMeetingId}
+          selectionMode={selection.selectionMode}
+          selectedIds={selection.selectedIds}
+          onSelectMeeting={props.onSelectMeeting}
+          onDeleteMeeting={handleDeleteMeeting}
+          onClearSearch={clearSearch}
+          onResetFilters={handlers.resetArchiveFilters}
+          onRestoreMeeting={(meetingId) => void handleRestoreMeeting(meetingId)}
+          onPurgeMeeting={handlePurgeMeeting}
+          onToggleSelect={selection.toggleSelect}
+        />
+      </div>
 
       {!isLoading &&
       (hiddenCount > 0 ||

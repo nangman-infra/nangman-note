@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { AlertTriangle, Check, FileText, Loader2, RotateCcw, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, Loader2, RotateCcw, Trash2 } from 'lucide-react';
 import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import type { Meeting } from '../types/meeting.types';
 import { formatDate, formatDuration } from '@/lib/utils/date';
@@ -59,10 +59,8 @@ export const MeetingCard = memo(
 
     return (
       <article
-        className={`group relative w-full rounded-[12px] border px-4 py-3 transition-all ${
-          isRecording
-            ? 'border-transparent bg-card shadow-[var(--elevation-glow)]'
-            : 'border-transparent bg-card shadow-[var(--elevation-sm)]'
+        className={`group relative w-full rounded-[12px] bg-card px-5 py-4 transition-colors ${
+          isRecording ? 'shadow-[var(--elevation-glow)]' : ''
         } ${cardSelectionClassName} ${selectionMode ? 'cursor-pointer' : ''}`}
         onClick={selectionMode ? handleCardClick : undefined}
         onKeyDown={selectionMode ? (event) => {
@@ -90,16 +88,12 @@ export const MeetingCard = memo(
             </span>
           ) : null}
 
-          <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition ${
-              isRecording
-                ? 'bg-[var(--accent-soft)] text-ember-text'
-                : 'bg-[var(--surface-container)] text-[var(--ink-muted)] group-hover:text-[var(--ink-strong)]'
-            }`}
-            aria-hidden="true"
-          >
-            <FileText className="h-4 w-4" strokeWidth={1.75} />
-          </div>
+          {isRecording ? (
+            <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-ember opacity-60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-ember" />
+            </span>
+          ) : null}
 
           {/* Content — inbox-style: title + metadata */}
           <div className="min-w-0 flex-1">
@@ -110,18 +104,18 @@ export const MeetingCard = memo(
               disabled={mode === 'trash' || selectionMode}
               aria-current={isActive ? 'true' : undefined}
             >
-              <h3 className="line-clamp-1 text-sm text-[var(--ink-strong)]">
+              <h3 className="line-clamp-1 text-[15px] text-[var(--ink-strong)]">
                 {meeting.title || '제목 없는 회의'}
               </h3>
               {meeting.searchSnippet && meeting.searchMatchedIn ? (
                 <p className="mt-1 line-clamp-2 text-xs text-[var(--ink-muted)]">
-                  <span className="label-sm mr-1.5 inline-flex items-center rounded-[4px] bg-[var(--tertiary-fixed)] px-1.5 py-0.5 !text-[10px] !text-electric">
+                  <span className="mr-1.5 inline-flex items-center rounded-[4px] bg-[var(--tertiary-fixed)] px-1.5 py-0.5 text-[10px] text-electric">
                     {getSearchMatchLabel(meeting.searchMatchedIn)}
                   </span>
                   {meeting.searchSnippet}
                 </p>
               ) : null}
-              <div className="data-mono mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--ink-muted)]">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--ink-muted)]">
                 <span>{formatDate(meeting.startedAt)}</span>
                 {duration > 0 && (
                   <>

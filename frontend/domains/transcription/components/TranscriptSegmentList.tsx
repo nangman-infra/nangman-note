@@ -34,7 +34,7 @@ function TranscriptSegmentItem({ segment }: { segment: FinalSegment }) {
   return (
     <div className="group">
       <div className="flex items-start gap-2">
-        <span className="data-mono mt-0.5 shrink-0 rounded-[4px] px-1 py-0.5 text-[10px] text-electric">
+        <span className="font-mono mt-0.5 shrink-0 rounded-[4px] px-1 py-0.5 text-[10px] text-electric">
           {formatSegmentTime(segment.startTime)}
         </span>
         {segment.speakerLabel ? (
@@ -74,7 +74,7 @@ function PartialTranscriptSegment({ partial }: { partial: PartialSegment }) {
   return (
     <div className="group opacity-80">
       <div className="flex items-start gap-2">
-        <span className="data-mono mt-0.5 shrink-0 rounded-[4px] bg-ember-text/10 px-1.5 py-0.5 text-[10px] text-ember-text">
+        <span className="font-mono mt-0.5 shrink-0 rounded-[4px] bg-ember/10 px-1.5 py-0.5 text-[10px] text-ember-text">
           {formatSegmentTime(partial.startTime)}
         </span>
         <p className="min-w-0 flex-1 text-sm italic leading-relaxed text-[var(--ink-muted)]">

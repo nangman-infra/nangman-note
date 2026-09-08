@@ -19,9 +19,9 @@ export function ResultMarkdownPanel({
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       <div className="lg:col-span-8">
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-2 text-sm text-[var(--ink-muted)]">
           <Sparkles className="h-3.5 w-3.5 text-electric" strokeWidth={1.5} />
-          <span className="tag-dot">AI summary</span>
+          AI 요약
         </div>
         <article className="result-markdown surface-card p-6 sm:p-10">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
@@ -30,7 +30,7 @@ export function ResultMarkdownPanel({
 
       <aside className="flex flex-col gap-4 lg:col-span-4">
         <div className="surface-card p-5">
-          <h3 className="label-sm mb-3">Generation</h3>
+          <h3 className="label-sm mb-3">생성 정보</h3>
           <dl className="space-y-2.5 text-sm">
             <div className="flex items-baseline justify-between gap-3">
               <dt className="shrink-0 whitespace-nowrap text-xs text-[var(--ink-muted)]">생성 시각</dt>
@@ -62,8 +62,8 @@ export function ResultMarkdownPanel({
         </div>
 
         {result.promptId ? (
-          <div className="surface-glow p-5 !rounded-[16px]">
-            <h3 className="label-sm mb-2">Prompt</h3>
+          <div className="surface-card p-5">
+            <h3 className="label-sm mb-2">사용 프롬프트</h3>
             <p className="text-sm font-medium text-[var(--ink-strong)]">
               {selectedPrompt?.name ?? result.promptId}
             </p>
