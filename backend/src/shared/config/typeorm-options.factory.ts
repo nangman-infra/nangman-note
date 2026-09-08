@@ -1,5 +1,5 @@
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { mkdirSync } from 'fs';
+import { mkdirSync, readFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import type { DataSourceOptions } from 'typeorm';
 import { Signer } from '@aws-sdk/rds-signer';
@@ -20,6 +20,8 @@ export type DatabaseEnv = Pick<
   | 'DB_IAM_AUTH'
   | 'DB_SSL'
   | 'DB_SSL_REJECT_UNAUTHORIZED'
+  | 'DB_SSL_CA'
+  | 'DB_SSL_CA_PATH'
   | 'DB_POOL_MAX'
   | 'DB_CONNECTION_TIMEOUT_MS'
   | 'DB_IDLE_TIMEOUT_MS'
@@ -65,6 +67,21 @@ function resolveSqljsDatabasePath(dbPath: string): string {
   return resolved;
 }
 
+function resolveDatabaseCa(env: DatabaseEnv): string | undefined {
+  if (env.DB_SSL_CA) {
+    return env.DB_SSL_CA.replace(/\\n/g, '\n');
+  }
+  if (env.DB_SSL_CA_PATH) {
+    const caPath = resolve(process.cwd(), env.DB_SSL_CA_PATH);
+    const ca = readFileSync(caPath, 'utf8');
+    if (!ca.trim()) {
+      throw new Error(`Database CA file is empty: ${caPath}`);
+    }
+    return ca;
+  }
+  return undefined;
+}
+
 export function buildTypeOrmDataSourceOptions(
   env: DatabaseEnv,
 ): DataSourceOptions {
@@ -74,6 +91,18 @@ export function buildTypeOrmDataSourceOptions(
     // IAM DB auth가 활성화되면 password 대신 콜백 함수를 사용한다.
     // node-postgres Pool은 새 연결마다 이 콜백을 호출하여 IAM 토큰을 받는다.
     const useIamAuth = env.DB_IAM_AUTH;
+    if (
+      (useIamAuth || env.NODE_ENV === 'production') &&
+      !env.DB_SSL_REJECT_UNAUTHORIZED
+    ) {
+      throw new Error(
+        'PostgreSQL certificate verification cannot be disabled for production or IAM auth.',
+      );
+    }
+    if (env.NODE_ENV === 'production' && !env.DB_SSL) {
+      throw new Error('PostgreSQL SSL cannot be disabled in production.');
+    }
+    const ca = resolveDatabaseCa(env);
 
     const passwordOrCallback = useIamAuth
       ? createIamPasswordCallback({
@@ -95,7 +124,10 @@ export function buildTypeOrmDataSourceOptions(
       // IAM DB auth는 SSL 필수
       ssl:
         env.DB_SSL || useIamAuth
-          ? { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED }
+          ? {
+              rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED,
+              ...(ca ? { ca } : {}),
+            }
           : false,
       connectTimeoutMS: env.DB_CONNECTION_TIMEOUT_MS,
       extra: {

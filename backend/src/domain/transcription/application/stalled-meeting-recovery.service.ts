@@ -352,6 +352,13 @@ export class StalledMeetingRecoveryService
             meeting.ownerSub,
           );
         }
+
+        if (jobs.some((job) => Boolean(job.collectedAt))) {
+          await this.transcriptionResultCollectorService.retriggerGenerationIfStuck(
+            meeting.id,
+            meeting.ownerSub,
+          );
+        }
       },
     );
   }

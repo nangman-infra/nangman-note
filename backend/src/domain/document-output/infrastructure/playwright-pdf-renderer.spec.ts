@@ -257,4 +257,39 @@ describe('PlaywrightPdfRenderer', () => {
     expect(launchMock).toHaveBeenCalledTimes(2);
     expect(firstBrowser.close).toHaveBeenCalledTimes(1);
   });
+
+  it('releases the render slot when a render exceeds the watchdog timeout', async () => {
+    jest.useFakeTimers();
+    try {
+      configGet.mockImplementation((key: string) => {
+        if (key === 'PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS') return 1;
+        if (key === 'PLAYWRIGHT_PDF_RENDER_TIMEOUT_MS') return 100;
+        return '/bin/echo';
+      });
+      const privateRenderer = renderer as unknown as {
+        renderOnce: (input: { title: string; html: string }) => Promise<Buffer>;
+      };
+      const renderOnce = jest
+        .spyOn(privateRenderer, 'renderOnce')
+        .mockImplementationOnce(() => new Promise<Buffer>(() => undefined))
+        .mockResolvedValueOnce(Buffer.from('after-timeout'));
+
+      const hung = renderer.render({ title: 'hung', html: '<p>hung</p>' });
+      const queued = renderer.render({
+        title: 'queued',
+        html: '<p>queued</p>',
+      });
+      const hungExpectation = expect(hung).rejects.toThrow(
+        'PDF render timed out after 100ms',
+      );
+
+      await jest.advanceTimersByTimeAsync(100);
+
+      await hungExpectation;
+      await expect(queued).resolves.toEqual(Buffer.from('after-timeout'));
+      expect(renderOnce).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

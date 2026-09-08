@@ -3,6 +3,7 @@ import { BadGatewayException, BadRequestException } from '@nestjs/common';
 import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { MeetingService } from '../../meeting/application/meeting.service';
 import { MeetingEntity } from '../../meeting/domain/meeting.entity';
+import { MeetingProcessingPhase } from '../../meeting/domain/meeting-processing-phase.enum';
 import { MeetingStatus } from '../../meeting/domain/meeting-status.enum';
 import { MeetingTranscriptionMode } from '../../meeting/domain/meeting-transcription-mode.enum';
 import { TranscriptSegmentEntity } from '../domain/transcript-segment.entity';
@@ -69,7 +70,7 @@ describe('TranscriptionService', () => {
       | 'generateUploadUrl'
       | 'objectExists'
       | 'objectExistsForMediaUri'
-      | 'isManagedMediaUri'
+      | 'isManagedMediaUriForMeeting'
     >
   >;
 
@@ -178,7 +179,7 @@ describe('TranscriptionService', () => {
       generateUploadUrl: jest.fn(),
       objectExists: jest.fn().mockResolvedValue(true),
       objectExistsForMediaUri: jest.fn().mockResolvedValue(true),
-      isManagedMediaUri: jest.fn().mockReturnValue(true),
+      isManagedMediaUriForMeeting: jest.fn().mockReturnValue(true),
     };
 
     service = new TranscriptionService(
@@ -471,6 +472,7 @@ describe('TranscriptionService', () => {
         expect.objectContaining({
           startTime: 125,
           endTime: 130,
+          providerResultId: 'r1',
         }),
       );
 
@@ -725,6 +727,9 @@ describe('TranscriptionService', () => {
 
       expect(upload.uploadId).toBe('upload-1');
       expect(upload.mediaUri).toBe('s3://bucket/audio/meeting-1/file.webm');
+      const createdUpload = transcriptionUploadRepository.create.mock
+        .calls[0]?.[0] as TranscriptionUploadEntity | undefined;
+      expect(createdUpload?.expiresAt).toBeInstanceOf(Date);
       expect(transcriptionUploadRepository.save).toHaveBeenCalled();
     });
 
@@ -910,6 +915,7 @@ describe('TranscriptionService', () => {
       const result = await service.queueBatchJob('meeting-1', {
         mediaUri: 's3://bucket/audio.wav',
         languageCode: '  en-US  ',
+        startOffsetSeconds: 42.5,
       });
 
       const submissionInput =
@@ -917,12 +923,53 @@ describe('TranscriptionService', () => {
       expect(submissionInput?.meetingId).toBe('meeting-1');
       expect(submissionInput?.mediaUri).toBe('s3://bucket/audio.wav');
       expect(submissionInput?.languageCode).toBe('en-US');
+      expect(transcriptionJobRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ startOffsetSeconds: 42.5 }),
+      );
       expect(typeof submissionInput?.providerJobId).toBe('string');
       expect(result.provider).toBe(TranscriptionJobProvider.AWS_TRANSCRIBE);
       expect(result.status).toBe(TranscriptionJobStatus.QUEUED);
       expect(
         transcriptionResultCollectorService.pollAndCollect,
       ).toHaveBeenCalledWith('meeting-1', result.id);
+      expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+        'meeting-1',
+        MeetingProcessingPhase.TRANSCRIBING,
+        undefined,
+      );
+    });
+
+    it('does not overwrite lifecycle when the meeting completes during submission', async () => {
+      meetingService.findById
+        .mockResolvedValueOnce(
+          buildMeeting({ status: MeetingStatus.RECORDING }),
+        )
+        .mockResolvedValueOnce(
+          buildMeeting({
+            status: MeetingStatus.COMPLETED,
+            needsAttention: true,
+          }),
+        );
+      batchTranscriptionProvider.submitBatchJob.mockResolvedValue({
+        providerJobId: 'aws-job-queued',
+        status: TranscriptionJobStatus.QUEUED,
+      });
+      transcriptionJobRepository.create.mockImplementation(
+        (entity) => entity as TranscriptionJobEntity,
+      );
+      transcriptionJobRepository.save.mockImplementation((entity) =>
+        Promise.resolve({
+          ...(entity as object),
+          id: (entity as TranscriptionJobEntity).id ?? 'job-1',
+        } as TranscriptionJobEntity),
+      );
+
+      await service.queueBatchJob('meeting-1', {
+        mediaUri: 's3://bucket/audio.wav',
+      });
+
+      expect(meetingService.findById).toHaveBeenCalledTimes(2);
+      expect(meetingService.updateProcessingPhase).not.toHaveBeenCalled();
     });
 
     it('defaults language code to ko-KR when omitted', async () => {
@@ -1151,7 +1198,7 @@ describe('TranscriptionService', () => {
 
     it('rejects unmanaged mediaUri values before queueing', async () => {
       meetingService.findById.mockResolvedValue(buildMeeting());
-      s3AudioService.isManagedMediaUri.mockReturnValue(false);
+      s3AudioService.isManagedMediaUriForMeeting.mockReturnValue(false);
 
       await expect(
         service.queueBatchJob('meeting-1', {
@@ -1159,6 +1206,10 @@ describe('TranscriptionService', () => {
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
+      expect(s3AudioService.isManagedMediaUriForMeeting).toHaveBeenCalledWith(
+        's3://other-bucket/file.webm',
+        'meeting-1',
+      );
       expect(batchTranscriptionProvider.submitBatchJob).not.toHaveBeenCalled();
     });
   });

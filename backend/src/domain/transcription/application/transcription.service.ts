@@ -371,6 +371,7 @@ export class TranscriptionService implements OnModuleInit {
       status: TranscriptionUploadStatus.ISSUED,
       contentType: upload.contentType,
       startOffsetSeconds: options?.startOffsetSeconds ?? null,
+      expiresAt: new Date(Date.now() + upload.expiresInSeconds * 1000),
     });
     const savedUpload =
       await this.transcriptionUploadRepository.save(issuedUpload);
@@ -451,9 +452,11 @@ export class TranscriptionService implements OnModuleInit {
   ): Promise<TranscriptionJobEntity> {
     const meeting = await this.ensureBatchMeeting(meetingId, ownerSub);
 
-    if (!this.s3AudioService.isManagedMediaUri(dto.mediaUri)) {
+    if (
+      !this.s3AudioService.isManagedMediaUriForMeeting(dto.mediaUri, meeting.id)
+    ) {
       throw new BadRequestException(
-        'mediaUri must reference a managed audio upload for this service',
+        'mediaUri must reference a managed audio upload for this meeting',
       );
     }
 
@@ -480,6 +483,7 @@ export class TranscriptionService implements OnModuleInit {
       dto.mediaUri,
       dto.languageCode,
       ownerSub,
+      dto.startOffsetSeconds ?? null,
     );
 
     const existingUpload = await this.transcriptionUploadRepository.findOne({
@@ -604,6 +608,7 @@ export class TranscriptionService implements OnModuleInit {
         startTime: event.startTime,
         endTime: event.endTime,
         text: event.text,
+        providerResultId: event.resultId,
         confidence: event.confidence ?? 0.9,
         detectedLanguage: event.detectedLanguage,
         speakerLabel: event.speakerLabel,
@@ -989,12 +994,17 @@ export class TranscriptionService implements OnModuleInit {
     }
 
     try {
-      await this.meetingService.updateProcessingPhase(
+      const currentMeeting = await this.meetingService.findById(
         meeting.id,
-        MeetingProcessingPhase.TRANSCRIBING,
         ownerSub,
-        { status: meeting.status, needsAttention: false },
       );
+      if (currentMeeting.status !== MeetingStatus.COMPLETED) {
+        await this.meetingService.updateProcessingPhase(
+          meeting.id,
+          MeetingProcessingPhase.TRANSCRIBING,
+          ownerSub,
+        );
+      }
     } catch (error) {
       this.logger.warn('transcription.batch.meeting_phase_update_failed', {
         meetingId: meeting.id,

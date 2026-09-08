@@ -19,8 +19,14 @@ export class AwsClientFactory {
     const profile = this.configService.get('AWS_PROFILE', { infer: true });
 
     // fromNodeProviderChain은 credential_process, SSO, fromIni, 환경 변수 등
-    // 모든 AWS 인증 방식을 자동으로 지원합니다.
-    this.credentials = fromNodeProviderChain({ profile });
+    // 모든 AWS 인증 방식을 자동으로 지원합니다. 빈 값/default를 명시하면
+    // 환경/컨테이너 role보다 shared config profile을 강제할 수 있으므로 생략합니다.
+    const normalizedProfile = profile.trim();
+    this.credentials = fromNodeProviderChain(
+      normalizedProfile && normalizedProfile !== 'default'
+        ? { profile: normalizedProfile }
+        : undefined,
+    );
   }
 
   createS3Client(): S3Client {
@@ -61,10 +67,18 @@ export class AwsClientFactory {
   }
 
   warmCredentials(): Promise<void> {
-    if (!this.credentialWarmupPromise) {
-      this.credentialWarmupPromise = this.credentials().then(() => undefined);
+    if (this.credentialWarmupPromise) {
+      return this.credentialWarmupPromise;
     }
-    return this.credentialWarmupPromise;
+
+    const pending = this.credentials().then(() => undefined);
+    this.credentialWarmupPromise = pending;
+    void pending.catch(() => {
+      if (this.credentialWarmupPromise === pending) {
+        this.credentialWarmupPromise = null;
+      }
+    });
+    return pending;
   }
 
   getRegion(): string {

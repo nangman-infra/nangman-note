@@ -14,6 +14,7 @@ import {
 const DEFAULT_DYNAMIC_PDF_CONCURRENCY = 2;
 const MAX_DYNAMIC_PDF_CONCURRENCY = 4;
 const PDF_RENDER_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024;
+const DEFAULT_PDF_RENDER_TIMEOUT_MS = 60_000;
 
 @Injectable()
 export class PlaywrightPdfRenderer implements PdfRendererPort, OnModuleDestroy {
@@ -29,7 +30,7 @@ export class PlaywrightPdfRenderer implements PdfRendererPort, OnModuleDestroy {
   async render(input: PdfRenderInput): Promise<Buffer> {
     return this.withRenderSlot(async () => {
       try {
-        return await this.renderOnce(input);
+        return await this.renderWithWatchdog(input);
       } catch (error) {
         if (!this.isRetryableBrowserError(error)) {
           throw error;
@@ -44,7 +45,7 @@ export class PlaywrightPdfRenderer implements PdfRendererPort, OnModuleDestroy {
         );
         await this.resetBrowser();
 
-        return this.renderOnce(input);
+        return this.renderWithWatchdog(input);
       }
     });
   }
@@ -134,6 +135,38 @@ export class PlaywrightPdfRenderer implements PdfRendererPort, OnModuleDestroy {
 
     this.browserPromise = browserPromise;
     return browserPromise;
+  }
+
+  private async renderWithWatchdog(input: PdfRenderInput): Promise<Buffer> {
+    const configuredTimeout = this.configService.get(
+      'PLAYWRIGHT_PDF_RENDER_TIMEOUT_MS',
+      { infer: true },
+    );
+    const timeoutMs =
+      typeof configuredTimeout === 'number'
+        ? configuredTimeout
+        : DEFAULT_PDF_RENDER_TIMEOUT_MS;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    try {
+      return await Promise.race([
+        this.renderOnce(input),
+        new Promise<never>((_resolve, reject) => {
+          timeoutId = setTimeout(() => {
+            const error = new Error(
+              `PDF render timed out after ${timeoutMs}ms`,
+            );
+            error.name = 'PdfRenderTimeoutError';
+            reject(error);
+          }, timeoutMs);
+          timeoutId.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 
   private async renderOnce(input: PdfRenderInput): Promise<Buffer> {

@@ -49,6 +49,8 @@ import { buildTypeOrmModuleOptions } from './shared/config/typeorm-options.facto
               infer: true,
             },
           ),
+          DB_SSL_CA: configService.get('DB_SSL_CA', { infer: true }),
+          DB_SSL_CA_PATH: configService.get('DB_SSL_CA_PATH', { infer: true }),
           DB_POOL_MAX: configService.get('DB_POOL_MAX', {
             infer: true,
           }),

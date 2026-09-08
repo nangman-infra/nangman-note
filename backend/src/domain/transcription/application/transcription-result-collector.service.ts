@@ -1,7 +1,7 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, LessThan, Repository } from 'typeorm';
+import { DataSource, In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import {
   BATCH_TRANSCRIPTION_PROVIDER,
   type BatchTranscriptionProvider,
@@ -76,6 +76,10 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
   private readonly logger = new StructuredLogger(
     TranscriptionResultCollectorService.name,
   );
+  private readonly activePolls = new Map<
+    string,
+    Promise<{ success: boolean; segmentCount: number }>
+  >();
 
   constructor(
     @InjectRepository(TranscriptionJobEntity)
@@ -100,19 +104,27 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     try {
       const pendingJobs = await this.jobRepository.find({
-        where: {
-          status: In([
-            TranscriptionJobStatus.QUEUED,
-            TranscriptionJobStatus.PROCESSING,
-          ]),
-        },
+        where: [
+          {
+            status: In([
+              TranscriptionJobStatus.QUEUED,
+              TranscriptionJobStatus.PROCESSING,
+            ]),
+          },
+          { collectedAt: Not(IsNull()) },
+        ],
       });
+      const generationRecoveryMeetings = new Set<string>();
 
       for (const job of pendingJobs) {
-        if (
-          job.collectedAt ||
-          job.errorMessage === TRANSCRIPTION_SUBMISSION_PENDING_ERROR
-        ) {
+        if (job.collectedAt) {
+          if (!generationRecoveryMeetings.has(job.meetingId)) {
+            generationRecoveryMeetings.add(job.meetingId);
+            await this.retriggerGenerationIfStuck(job.meetingId);
+          }
+          continue;
+        }
+        if (job.errorMessage === TRANSCRIPTION_SUBMISSION_PENDING_ERROR) {
           continue;
         }
         this.logger.log('transcription.batch.poll.resumed_on_boot', {
@@ -134,6 +146,30 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
    * 완료 후 오디오 파일을 삭제하고 Meeting 상태를 COMPLETED로 변경합니다.
    */
   async pollAndCollect(
+    meetingId: string,
+    jobId: string,
+  ): Promise<{ success: boolean; segmentCount: number }> {
+    const active = this.activePolls.get(jobId);
+    if (active) {
+      this.logger.debug('transcription.batch.poll.already_active', {
+        meetingId,
+        jobId,
+      });
+      return active;
+    }
+
+    const poll = this.pollAndCollectInternal(meetingId, jobId);
+    this.activePolls.set(jobId, poll);
+    try {
+      return await poll;
+    } finally {
+      if (this.activePolls.get(jobId) === poll) {
+        this.activePolls.delete(jobId);
+      }
+    }
+  }
+
+  private async pollAndCollectInternal(
     meetingId: string,
     jobId: string,
   ): Promise<{ success: boolean; segmentCount: number }> {
@@ -191,7 +227,15 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
             if (result.errorMessage) {
               job.errorMessage = result.errorMessage;
             }
-            await this.jobRepository.save(job);
+            await this.jobRepository.update(job.id, {
+              status: result.status,
+              ...(result.transcriptUri
+                ? { transcriptUri: result.transcriptUri }
+                : {}),
+              ...(result.errorMessage
+                ? { errorMessage: result.errorMessage }
+                : {}),
+            });
 
             if (result.status === TranscriptionJobStatus.COMPLETED) {
               this.logger.log('transcription.batch.job.completed', {
@@ -317,7 +361,15 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
           if (result.errorMessage) {
             job.errorMessage = result.errorMessage;
           }
-          await this.jobRepository.save(job);
+          await this.jobRepository.update(job.id, {
+            status: result.status,
+            ...(result.transcriptUri
+              ? { transcriptUri: result.transcriptUri }
+              : {}),
+            ...(result.errorMessage
+              ? { errorMessage: result.errorMessage }
+              : {}),
+          });
 
           if (result.status === TranscriptionJobStatus.COMPLETED) {
             this.logger.log('transcription.batch.job.recovered_completed', {
@@ -394,7 +446,10 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
 
         job.status = TranscriptionJobStatus.FAILED;
         job.errorMessage = `Batch transcription did not finish within ${MAX_JOB_LIFETIME_MS / 3_600_000}h`;
-        await this.jobRepository.save(job);
+        await this.jobRepository.update(job.id, {
+          status: job.status,
+          errorMessage: job.errorMessage,
+        });
         this.logger.warn('transcription.batch.job.marked_failed_after_stall', {
           meetingId,
           jobId,
@@ -548,17 +603,19 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
     meetingId: string,
     ownerSub?: string,
   ): Promise<void> {
-    // 아직 녹음 중인 회의를 결과 생성으로 밀어내지 않는다
+    // 녹음 중이거나 이미 완료된 회의를 결과 생성으로 밀어내지 않는다.
     try {
       const meeting = await this.meetingService.findById(meetingId, ownerSub);
-      if (meeting.status === MeetingStatus.RECORDING) {
-        this.logger.log('transcription.batch.generating_deferred_recording', {
+      if (meeting.status !== MeetingStatus.PROCESSING) {
+        this.logger.log('transcription.batch.generating_deferred_status', {
           meetingId,
+          meetingStatus: meeting.status,
         });
         return;
       }
     } catch {
-      // 회의 조회 실패 시 기존 동작 유지
+      // 회의 조회 실패 시 생성 phase를 강제로 덮어쓰지 않는다.
+      return;
     }
 
     const pendingCount = await this.jobRepository.count({
@@ -587,10 +644,15 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
         ]),
       },
     });
-    const recentPendingUploads = pendingUploads.filter(
-      (upload) =>
-        Date.now() - upload.createdAt.getTime() < PENDING_UPLOAD_WINDOW_MS,
-    );
+    const now = Date.now();
+    const recentPendingUploads = pendingUploads.filter((upload) => {
+      if (upload.status === TranscriptionUploadStatus.ISSUED) {
+        return upload.expiresAt
+          ? upload.expiresAt.getTime() > now
+          : now - upload.createdAt.getTime() < PENDING_UPLOAD_WINDOW_MS;
+      }
+      return now - upload.createdAt.getTime() < PENDING_UPLOAD_WINDOW_MS;
+    });
     if (recentPendingUploads.length > 0) {
       this.logger.log('transcription.batch.generating_deferred_uploads', {
         meetingId,
@@ -612,16 +674,25 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
 
     const lockKey = `${JOB_COLLECTION_LOCK_PREFIX}:${jobId}`;
     const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.query('SELECT pg_advisory_lock(hashtext($1))', [lockKey]);
+    let locked = false;
 
     try {
-      return await task();
-    } finally {
-      await queryRunner.query('SELECT pg_advisory_unlock(hashtext($1))', [
+      await queryRunner.connect();
+      await queryRunner.query('SELECT pg_advisory_lock(hashtext($1))', [
         lockKey,
       ]);
-      await queryRunner.release();
+      locked = true;
+      return await task();
+    } finally {
+      try {
+        if (locked) {
+          await queryRunner.query('SELECT pg_advisory_unlock(hashtext($1))', [
+            lockKey,
+          ]);
+        }
+      } finally {
+        await queryRunner.release();
+      }
     }
   }
 
@@ -920,14 +991,23 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
     meetingId: string,
     options?: { needsAttention?: boolean },
   ): Promise<void> {
+    if (options?.needsAttention) {
+      try {
+        await this.meetingService.markNeedsAttention(meetingId);
+      } catch (error) {
+        this.logger.warn('meeting.attention.mark_failed', {
+          meetingId,
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
     try {
-      const meeting = await this.meetingService.updateStatus(
+      await this.meetingService.updateStatus(
         meetingId,
         MeetingStatus.COMPLETED,
       );
-      if (options?.needsAttention && !meeting.needsAttention) {
-        await this.meetingService.markNeedsAttention(meetingId);
-      }
       this.logger.log('meeting.status.completed_after_transcription', {
         meetingId,
         needsAttention: Boolean(options?.needsAttention),
@@ -951,6 +1031,7 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
         meetingId,
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
       });
+      throw error;
     }
   }
 
@@ -1030,11 +1111,14 @@ export class TranscriptionResultCollectorService implements OnModuleInit {
     meetingId: string,
     ownerSub?: string,
   ): Promise<void> {
+    const current = await this.meetingService.findById(meetingId, ownerSub);
+    if (current.status !== MeetingStatus.PROCESSING) {
+      return;
+    }
     const updated = await this.meetingService.updateProcessingPhase(
       meetingId,
       MeetingProcessingPhase.GENERATING,
       ownerSub,
-      { status: MeetingStatus.PROCESSING },
     );
     this.logger.log('meeting.phase.generating.emitted', {
       meetingId,

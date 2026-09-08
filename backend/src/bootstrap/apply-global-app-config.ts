@@ -30,6 +30,23 @@ export function parseTrustProxySetting(
   return value.trim();
 }
 
+export function createHttpCorsOriginHandler(options: {
+  allowedOrigins: string[];
+  nodeEnv: AppEnv['NODE_ENV'];
+}): (
+  origin: string | undefined,
+  callback: (error: Error | null, allow?: boolean) => void,
+) => void {
+  return (origin, callback) => {
+    const isAllowed = isAllowedCorsOrigin({
+      origin,
+      allowedOrigins: options.allowedOrigins,
+      nodeEnv: options.nodeEnv,
+    });
+    callback(null, isAllowed);
+  };
+}
+
 export function applyGlobalAppConfig(
   app: INestApplication,
   configService: ConfigService<AppEnv, true>,
@@ -46,17 +63,10 @@ export function applyGlobalAppConfig(
   const corsOriginConfig = configService.get('CORS_ORIGIN', { infer: true });
   const trustProxy = configService.get('TRUST_PROXY', { infer: true });
   const allowedOrigins = parseAllowedOrigins(corsOriginConfig);
-  const corsOriginHandler = (
-    origin: string | undefined,
-    callback: (error: Error | null, allow?: boolean) => void,
-  ): void => {
-    const isAllowed = isAllowedCorsOrigin({
-      origin,
-      allowedOrigins,
-      nodeEnv,
-    });
-    callback(isAllowed ? null : new Error('Not allowed by CORS'), isAllowed);
-  };
+  const corsOriginHandler = createHttpCorsOriginHandler({
+    allowedOrigins,
+    nodeEnv,
+  });
 
   // 리버스 프록시(NPM → Next.js proxy → Nest) 뒤에서 request.ip / protocol 을 복원.
   // 기본 'loopback' 은 같은 호스트에서 온 X-Forwarded-* 만 신뢰한다.

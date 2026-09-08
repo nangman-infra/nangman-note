@@ -8,6 +8,7 @@ export interface TranscriptSegment {
   translatedText?: string;
   detectedLanguage?: string;
   speakerLabel?: string;
+  providerResultId?: string;
   createdAt: string;
 }
 

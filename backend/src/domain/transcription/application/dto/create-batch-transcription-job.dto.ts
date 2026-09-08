@@ -1,4 +1,11 @@
-import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateBatchTranscriptionJobDto {
   @IsString()
@@ -7,6 +14,11 @@ export class CreateBatchTranscriptionJobDto {
     message: 'mediaUri must be a valid s3://bucket/key URI',
   })
   mediaUri: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  startOffsetSeconds?: number;
 
   @IsOptional()
   @IsString()

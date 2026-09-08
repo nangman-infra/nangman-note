@@ -22,8 +22,9 @@ const privacySections: LegalDocumentSection[] = [
       <>
         <p>
           낭만 인프라는 TransNote 제공에 필요한 최소 범위의 개인정보와 서비스
-          데이터를 처리합니다. 회원가입을 위해 이름과 비밀번호를 직접 받지
-          않으며, 이메일 기반 로그인은 이메일 주소만 직접 입력받습니다.
+          데이터를 처리합니다. TransNote 로그인 화면에서 이름과 비밀번호를 직접
+          수집하지 않으며, 조직 인증 제공자가 전달하는 사용자 식별자, 이메일,
+          프로필과 인증 세션 정보를 처리합니다.
         </p>
         <p>
           다만 회의 제목, 음성, 전사문, 노트, 프롬프트, AI 생성 결과물에는
@@ -47,19 +48,11 @@ const privacySections: LegalDocumentSection[] = [
           <tbody className="divide-y divide-[var(--line-soft)]">
             <tr>
               <td className="px-4 py-3 font-medium text-[var(--ink-strong)]">
-                로그인
-              </td>
-              <td className="px-4 py-3">
-                이메일 주소, 로그인 링크 발송·검증 정보, 세션 정보
-              </td>
-            </tr>
-            <tr>
-              <td className="px-4 py-3 font-medium text-[var(--ink-strong)]">
                 조직 계정 로그인
               </td>
               <td className="px-4 py-3">
                 인증 제공자가 전달하는 사용자 식별자, 이메일, 프로필 정보,
-                접근 토큰과 갱신 토큰
+                접근 토큰과 갱신 토큰, 세션 정보
               </td>
             </tr>
             <tr>
@@ -99,7 +92,7 @@ const privacySections: LegalDocumentSection[] = [
     title: '처리 목적',
     children: (
       <ul className="list-disc space-y-2 pl-5">
-        <li>이메일 매직 링크 발송, 로그인 처리, 계정 식별</li>
+        <li>조직 계정 인증, 로그인 처리, 계정 식별과 접근 권한 확인</li>
         <li>회의 생성, 회의 아카이브, 휴지통, 복원과 삭제 기능 제공</li>
         <li>실시간 전사, 음성 업로드, 번역 보조, 노트 편집 기능 제공</li>
         <li>프롬프트 기반 AI 결과물 생성, 결과물 재생성, 파일 내보내기 제공</li>
@@ -136,9 +129,9 @@ const privacySections: LegalDocumentSection[] = [
     children: (
       <>
         <p>
-          TransNote는 인증, 이메일 발송, 저장소, 음성 전사, AI 결과물 생성을
-          위해 외부 시스템이나 처리 제공자를 사용할 수 있습니다. 이 경우 필요한
-          범위의 데이터만 전달되며, 서비스 제공 목적 외 사용을 제한하는 방식으로
+          TransNote는 인증, 저장소, 음성 전사, AI 결과물 생성을 위해 외부
+          시스템이나 처리 제공자를 사용할 수 있습니다. 이 경우 필요한 범위의
+          데이터만 전달되며, 서비스 제공 목적 외 사용을 제한하는 방식으로
           관리합니다.
         </p>
         <p>
@@ -211,7 +204,7 @@ export default function PrivacyPage() {
     <LegalDocumentLayout
       eyebrow="Privacy Policy"
       title="개인정보 처리방침"
-      description="TransNote가 이메일 로그인, 회의 기록, 전사, 노트, AI 결과물 생성을 위해 어떤 데이터를 처리하는지 설명합니다."
+      description="TransNote가 조직 계정 로그인, 회의 기록, 전사, 노트, AI 결과물 생성을 위해 어떤 데이터를 처리하는지 설명합니다."
       effectiveDate={EFFECTIVE_DATE}
       sections={privacySections}
     />

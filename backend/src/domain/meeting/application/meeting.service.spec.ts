@@ -19,7 +19,10 @@ import { MeetingService } from './meeting.service';
 describe('MeetingService', () => {
   let service: MeetingService;
   let meetingRepository: jest.Mocked<
-    Pick<Repository<MeetingEntity>, 'create' | 'find' | 'findOne' | 'save'>
+    Pick<
+      Repository<MeetingEntity>,
+      'create' | 'find' | 'findOne' | 'save' | 'createQueryBuilder'
+    >
   >;
   let resultRepository: jest.Mocked<
     Pick<Repository<ResultEntity>, 'findOne' | 'save'>
@@ -59,6 +62,7 @@ describe('MeetingService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       save: jest.fn(),
+      createQueryBuilder: jest.fn(),
     };
     resultRepository = {
       findOne: jest.fn(),
@@ -444,6 +448,88 @@ describe('MeetingService', () => {
       });
       expect(response.results[0]?.meetingId).toBe('older-meeting-201');
       expect(response.pagination.total).toBe(1);
+    });
+  });
+
+  describe('update and export consistency', () => {
+    it('refreshes the search projection after a manual title change', async () => {
+      const meeting = buildMeeting({ title: '기존 제목' });
+      meetingRepository.findOne.mockResolvedValue(meeting);
+      meetingRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as MeetingEntity),
+      );
+      resultRepository.findOne.mockResolvedValue(null);
+
+      await service.updatePrompt(meeting.id, { title: ' 새 제목 ' });
+
+      expect(meeting.title).toBe('새 제목');
+      expect(
+        meetingSearchDocumentService.refreshByMeetingId,
+      ).toHaveBeenCalledWith(meeting.id);
+    });
+
+    it('includes soft-deleted meetings in a full export', async () => {
+      meetingRepository.find.mockResolvedValue([
+        buildMeeting({ deletedAt: new Date('2026-03-02T00:00:00.000Z') }),
+      ]);
+
+      const exported = await service.exportAllData('owner-1');
+
+      expect(meetingRepository.find).toHaveBeenCalledWith({
+        where: { ownerSub: 'owner-1' },
+        relations: ['note', 'result', 'transcripts'],
+        withDeleted: true,
+        order: { startedAt: 'DESC' },
+      });
+      expect(exported.meetingCount).toBe(1);
+      expect(exported.meetings[0]?.deletedAt).toBeInstanceOf(Date);
+    });
+
+    it('emits regenerating phase while the meeting status remains completed', async () => {
+      const meeting = buildMeeting({ status: MeetingStatus.COMPLETED });
+      meetingRepository.findOne.mockResolvedValue(meeting);
+      meetingRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as MeetingEntity),
+      );
+
+      await service.updateProcessingPhase(
+        meeting.id,
+        MeetingProcessingPhase.REGENERATING,
+        undefined,
+        { status: MeetingStatus.COMPLETED },
+      );
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        MeetingStatusChangedEvent.EVENT_NAME,
+        expect.objectContaining({
+          status: MeetingStatus.COMPLETED,
+          phase: MeetingProcessingPhase.REGENERATING,
+        }),
+      );
+    });
+
+    it('escapes wildcard characters in legacy title LIKE search', async () => {
+      meetingSearchDocumentService.ensureCoverage.mockResolvedValue(false);
+      const queryBuilder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        clone: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(0),
+        orderBy: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      meetingRepository.createQueryBuilder.mockReturnValue(
+        queryBuilder as never,
+      );
+
+      await service.search({ q: '100%_\\', scope: 'title' });
+
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        "LOWER(COALESCE(meeting.title, '')) LIKE :keyword ESCAPE '\\'",
+        { keyword: '%100\\%\\_\\\\%' },
+      );
     });
   });
 

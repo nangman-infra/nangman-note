@@ -32,6 +32,10 @@ interface PendingChunk {
 const MAX_PENDING_CHUNKS = 300;
 /** 청크당 최대 재전송 횟수 (워밍업/백프레셔 재시도) */
 const MAX_CHUNK_RETRIES = 50;
+/** 서버가 retryAfterMs를 생략했을 때 200ms 청크 한 개만큼 대기 */
+const DEFAULT_RETRY_AFTER_MS = 200;
+/** 비정상적으로 큰 서버 값이 캡처를 장시간 멈추지 않도록 제한 */
+const MAX_RETRY_AFTER_MS = 5_000;
 /** 소켓 장기 단절 시 배치 폴백까지의 허용 시간 */
 const MAX_DISCONNECTED_MS = 45_000;
 
@@ -58,6 +62,10 @@ export interface AudioStreamingRuntimeRefs {
   consecutiveTimeoutRef: MutableRefObject<number>;
   consecutiveBackpressureRef: MutableRefObject<number>;
   saturationStartAtRef: MutableRefObject<number | null>;
+  /** 서버가 요청한 재전송 backoff가 끝나는 시각 */
+  retryBackoffUntilRef: MutableRefObject<number>;
+  /** backoff 종료 후 drain을 재개하는 단일 타이머 */
+  retryDrainTimerRef: MutableRefObject<number | null>;
   stoppedByGuardRef: MutableRefObject<boolean>;
   lastTransportNoticeAtRef: MutableRefObject<number | null>;
 }
@@ -80,6 +88,8 @@ export function useAudioStreamingRuntimeRefs(): AudioStreamingRuntimeRefs {
   const consecutiveTimeoutRef = useRef(0);
   const consecutiveBackpressureRef = useRef(0);
   const saturationStartAtRef = useRef<number | null>(null);
+  const retryBackoffUntilRef = useRef(0);
+  const retryDrainTimerRef = useRef<number | null>(null);
   const stoppedByGuardRef = useRef(false);
   const lastTransportNoticeAtRef = useRef<number | null>(null);
 
@@ -102,6 +112,8 @@ export function useAudioStreamingRuntimeRefs(): AudioStreamingRuntimeRefs {
       consecutiveTimeoutRef,
       consecutiveBackpressureRef,
       saturationStartAtRef,
+      retryBackoffUntilRef,
+      retryDrainTimerRef,
       stoppedByGuardRef,
       lastTransportNoticeAtRef,
     }),
@@ -133,6 +145,11 @@ export function clearAudioAckTrackers(refs: AudioStreamingRuntimeRefs) {
   refs.ackTimeoutMapRef.current.forEach((timerId) => {
     window.clearTimeout(timerId);
   });
+  if (refs.retryDrainTimerRef.current !== null) {
+    window.clearTimeout(refs.retryDrainTimerRef.current);
+    refs.retryDrainTimerRef.current = null;
+  }
+  refs.retryBackoffUntilRef.current = 0;
   refs.ackTimeoutMapRef.current.clear();
   refs.chunkByAckIdRef.current.clear();
   refs.pendingChunksRef.current = [];
@@ -253,6 +270,23 @@ export function drainPendingChunks({
   const socket = refs.socketRef.current;
   if (!socket?.connected) return;
 
+  const now = Date.now();
+  const backoffRemainingMs = refs.retryBackoffUntilRef.current - now;
+  if (backoffRemainingMs > 0) {
+    if (refs.retryDrainTimerRef.current === null) {
+      refs.retryDrainTimerRef.current = window.setTimeout(() => {
+        refs.retryDrainTimerRef.current = null;
+        drainPendingChunks({ refs, stopForRealtimeInstability, onAck });
+      }, backoffRemainingMs);
+    }
+    return;
+  }
+  refs.retryBackoffUntilRef.current = 0;
+  if (refs.retryDrainTimerRef.current !== null) {
+    window.clearTimeout(refs.retryDrainTimerRef.current);
+    refs.retryDrainTimerRef.current = null;
+  }
+
   const pending = refs.pendingChunksRef.current;
 
   while (pending.length > 0 && refs.inFlightAckCountRef.current === 0) {
@@ -268,9 +302,11 @@ export function drainPendingChunks({
     sendAudioChunk({ pending: head, refs, stopForRealtimeInstability, onAck });
   }
 
+  // 전송은 순서 보장을 위해 의도적으로 single-in-flight다. 따라서 포화는
+  // 도달 불가능한 in-flight 개수가 아니라, ACK 대기 중 backlog가 계속 남는지로 판단한다.
   if (
     pending.length > 0 &&
-    refs.inFlightAckCountRef.current >= AUDIO_STREAMING_LIMITS.MAX_IN_FLIGHT_ACKS
+    refs.inFlightAckCountRef.current > 0
   ) {
     handleSaturatedAudioQueue({ refs, stopForRealtimeInstability });
   } else {
@@ -423,6 +459,17 @@ export function handleAudioAckResponse({
   ) {
     sentChunk.retries += 1;
     bufferPendingChunk(refs, sentChunk);
+    const retryAfterMs = Math.min(
+      MAX_RETRY_AFTER_MS,
+      Math.max(
+        DEFAULT_RETRY_AFTER_MS,
+        response.retryAfterMs ?? DEFAULT_RETRY_AFTER_MS,
+      ),
+    );
+    refs.retryBackoffUntilRef.current = Math.max(
+      refs.retryBackoffUntilRef.current,
+      Date.now() + retryAfterMs,
+    );
   }
 
   if (response.reason === 'backpressure') {

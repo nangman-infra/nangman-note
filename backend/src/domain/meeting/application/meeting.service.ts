@@ -208,6 +208,7 @@ export class MeetingService {
     const meetings = await this.meetingRepository.find({
       where: ownerSub ? { ownerSub } : undefined,
       relations: ['note', 'result', 'transcripts'],
+      withDeleted: true,
       order: { startedAt: 'DESC' },
     });
 
@@ -427,6 +428,7 @@ export class MeetingService {
         result.metadata = { ...result.metadata, title: saved.title };
         await this.resultRepository.save(result);
       }
+      await this.meetingSearchDocumentService.refreshByMeetingId(id);
     }
 
     return saved;
@@ -740,7 +742,8 @@ export class MeetingService {
   }> {
     const { scope, keyword, loweredKeyword, page, limit, ownerSub } = params;
     const skip = (page - 1) * limit;
-    const likeKeyword = `%${loweredKeyword}%`;
+    const escapedLikeKeyword = loweredKeyword.replace(/[\\%_]/gu, '\\$&');
+    const likeKeyword = `%${escapedLikeKeyword}%`;
 
     let total = 0;
     let pagedMeetings: MeetingEntity[] = [];
@@ -748,7 +751,7 @@ export class MeetingService {
     if (scope === 'title') {
       const titleQuery = this.meetingRepository
         .createQueryBuilder('meeting')
-        .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword", {
+        .where("LOWER(COALESCE(meeting.title, '')) LIKE :keyword ESCAPE '\\'", {
           keyword: likeKeyword,
         });
       if (ownerSub) {
@@ -1048,9 +1051,8 @@ export class MeetingService {
     this.emitStatusChanged(
       updated.id,
       updated.status,
-      updated.status === MeetingStatus.COMPLETED
-        ? 'completed'
-        : (updated.processingPhase ?? undefined),
+      updated.processingPhase ??
+        (updated.status === MeetingStatus.COMPLETED ? 'completed' : undefined),
       updated.ownerSub,
       updated.needsAttention,
       updated.completionState,

@@ -109,11 +109,19 @@ export class PendingUploadReconciliationService
       async () => {
         try {
           const result =
-            await this.transcriptionService.reconcilePendingBatchUpload(
-              upload.meetingId,
-              upload.id,
-              meeting.ownerSub,
-            );
+            upload.status === TranscriptionUploadStatus.ISSUED &&
+            upload.expiresAt &&
+            upload.expiresAt.getTime() <= Date.now()
+              ? await this.transcriptionService.recoverPendingBatchUpload(
+                  upload.meetingId,
+                  upload.id,
+                  meeting.ownerSub,
+                )
+              : await this.transcriptionService.reconcilePendingBatchUpload(
+                  upload.meetingId,
+                  upload.id,
+                  meeting.ownerSub,
+                );
           if (result.queued) {
             this.logger.log('transcription.batch.upload.reconciled', {
               meetingId: upload.meetingId,

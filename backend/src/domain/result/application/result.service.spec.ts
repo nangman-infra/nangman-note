@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { QueryFailedError, Repository } from 'typeorm';
 import { BedrockService } from '../../../shared/aws/bedrock/bedrock.service';
 import { MeetingSearchDocumentService } from '../../meeting/application/meeting-search-document.service';
@@ -14,6 +15,7 @@ import { TranscriptSegmentEntity } from '../../transcription/domain/transcript-s
 import { ResultEntity } from '../domain/result.entity';
 import { ResultService } from './result.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ResultRegenerateEvent } from '../../../shared/events/result-regenerate.event';
 
 describe('ResultService', () => {
   let service: ResultService;
@@ -604,6 +606,120 @@ describe('ResultService', () => {
       expect(
         meetingSearchDocumentService.refreshByMeetingId,
       ).toHaveBeenCalledWith('meeting-1');
+    });
+  });
+
+  describe('regenerateAsync lifecycle', () => {
+    const getPrivateService = () =>
+      service as unknown as {
+        regeneratingMeetings: Set<string>;
+        executeRegenerateInBackground: (
+          meetingId: string,
+          promptId: string,
+          originalPromptId: string,
+          ownerSub?: string,
+        ) => void;
+      };
+
+    it('rejects a concurrent request before the first preflight await finishes', async () => {
+      let resolveMeeting!: (meeting: MeetingEntity) => void;
+      const meetingRequest = new Promise<MeetingEntity>((resolve) => {
+        resolveMeeting = resolve;
+      });
+      meetingService.findById.mockReturnValue(meetingRequest);
+      promptService.ensureExists.mockResolvedValue(undefined);
+      resultRepository.findOne.mockResolvedValue(buildResult());
+      jest
+        .spyOn(getPrivateService(), 'executeRegenerateInBackground')
+        .mockImplementation(() => undefined);
+
+      const first = service.regenerateAsync('meeting-1', {
+        promptId: 'prompt_user_new',
+      });
+      await expect(
+        service.regenerateAsync('meeting-1', {
+          promptId: 'prompt_user_other',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(meetingService.findById).toHaveBeenCalledTimes(1);
+
+      resolveMeeting(buildMeeting());
+      await first;
+    });
+
+    it('releases the in-memory lock when preflight fails', async () => {
+      meetingService.findById.mockResolvedValue(buildMeeting());
+      promptService.ensureExists
+        .mockRejectedValueOnce(new Error('prompt lookup failed'))
+        .mockResolvedValueOnce(undefined);
+      resultRepository.findOne.mockResolvedValue(buildResult());
+      jest
+        .spyOn(getPrivateService(), 'executeRegenerateInBackground')
+        .mockImplementation(() => undefined);
+
+      await expect(
+        service.regenerateAsync('meeting-1', {
+          promptId: 'prompt_user_new',
+        }),
+      ).rejects.toThrow('prompt lookup failed');
+      await expect(
+        service.regenerateAsync('meeting-1', {
+          promptId: 'prompt_user_new',
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('rolls back prompt and phase and emits failed on background failure', async () => {
+      const privateService = getPrivateService();
+      privateService.regeneratingMeetings.add('meeting-1');
+      resultRepository.findOne.mockRejectedValue(
+        new Error('generation failed'),
+      );
+      meetingService.updatePrompt.mockResolvedValue(buildMeeting());
+      meetingService.updateProcessingPhase.mockResolvedValue(buildMeeting());
+      let resolveFailure!: () => void;
+      const failureEvent = new Promise<void>((resolve) => {
+        resolveFailure = resolve;
+      });
+      eventEmitter.emit.mockImplementation((_name, event: unknown) => {
+        if (
+          event instanceof ResultRegenerateEvent &&
+          event.phase === 'failed'
+        ) {
+          resolveFailure();
+        }
+        return true;
+      });
+
+      privateService.executeRegenerateInBackground(
+        'meeting-1',
+        'prompt_user_new',
+        'prompt_default_meeting',
+        'user-1',
+      );
+      await failureEvent;
+      await Promise.resolve();
+
+      expect(meetingService.updatePrompt).toHaveBeenCalledWith(
+        'meeting-1',
+        { promptId: 'prompt_default_meeting' },
+        'user-1',
+      );
+      expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+        'meeting-1',
+        null,
+        'user-1',
+        { status: MeetingStatus.COMPLETED },
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        ResultRegenerateEvent.EVENT_NAME,
+        expect.objectContaining({
+          meetingId: 'meeting-1',
+          phase: 'failed',
+          errorMessage: 'generation failed',
+        }),
+      );
+      expect(privateService.regeneratingMeetings.has('meeting-1')).toBe(false);
     });
   });
 

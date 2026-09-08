@@ -50,6 +50,15 @@ export class TranscriptSegmentEntity {
   })
   speakerLabel?: string;
 
+  /** 실시간 Transcribe ResultId. 재연결 후 live/DB 이벤트 identity를 유지한다. */
+  @Column({
+    name: 'provider_result_id',
+    type: 'varchar',
+    length: 200,
+    nullable: true,
+  })
+  providerResultId?: string;
+
   /**
    * 이 세그먼트를 생성한 배치 전사 잡 ID (실시간 세그먼트는 null).
    * 재수집 시 해당 잡의 세그먼트만 교체하여 멱등성을 보장하고,

@@ -54,6 +54,21 @@ function sanitizeTranscriptText(text: string): string {
   return squashExcessiveTokenRepeats(collapsedPattern);
 }
 
+const LEGACY_SEGMENT_TIME_TOLERANCE_SECONDS = 1;
+
+function isEquivalentSegment(
+  left: Pick<FinalSegment, 'text' | 'startTime' | 'endTime'>,
+  right: Pick<FinalSegment, 'text' | 'startTime' | 'endTime'>,
+): boolean {
+  return (
+    normalizeTextForCompare(left.text) === normalizeTextForCompare(right.text) &&
+    Math.abs(left.startTime - right.startTime) <=
+      LEGACY_SEGMENT_TIME_TOLERANCE_SECONDS &&
+    Math.abs(left.endTime - right.endTime) <=
+      LEGACY_SEGMENT_TIME_TOLERANCE_SECONDS
+  );
+}
+
 /** 확정된 전사 세그먼트 */
 export interface FinalSegment {
   resultId: string;
@@ -101,6 +116,7 @@ interface TranscriptionState {
       endTime: number;
       detectedLanguage?: string;
       speakerLabel?: string;
+      providerResultId?: string;
     }>,
   ) => void;
   clearTranscripts: () => void;
@@ -228,28 +244,55 @@ export const useTranscriptionStore = create<TranscriptionState>((set) => ({
       const synced: FinalSegment[] = serverSegments
         .slice()
         .sort((a, b) => a.startTime - b.startTime)
-        .map((segment) => ({
-          resultId: `server-${segment.id}`,
-          text: sanitizeTranscriptText(segment.text),
-          translatedText: segment.translatedText,
-          translationStatus: segment.translatedText
-            ? ('done' as const)
-            : undefined,
-          startTime: segment.startTime,
-          endTime: segment.endTime,
-          detectedLanguage: segment.detectedLanguage,
-          speakerLabel: segment.speakerLabel,
-        }));
+        .map((segment) => {
+          const sanitizedText = sanitizeTranscriptText(segment.text);
+          const localMatch = state.segments.find(
+            (local) =>
+              (segment.providerResultId &&
+                local.resultId === segment.providerResultId) ||
+              isEquivalentSegment(local, {
+                text: sanitizedText,
+                startTime: segment.startTime,
+                endTime: segment.endTime,
+              }),
+          );
 
-      // 아직 서버에 반영되지 않았을 수 있는 로컬 최신 세그먼트는 보존
+          return {
+            resultId:
+              segment.providerResultId ??
+              localMatch?.resultId ??
+              `server-${segment.id}`,
+            text: sanitizedText,
+            translatedText:
+              segment.translatedText ?? localMatch?.translatedText,
+            translationStatus: segment.translatedText
+              ? ('done' as const)
+              : localMatch?.translationStatus,
+            startTime: segment.startTime,
+            endTime: segment.endTime,
+            detectedLanguage: segment.detectedLanguage,
+            speakerLabel: segment.speakerLabel,
+          };
+        });
+
+      // 아직 서버에 반영되지 않았을 수 있는 로컬 최신 세그먼트는 보존하되,
+      // providerResultId가 없는 legacy DB 행과 같은 구간은 중복시키지 않는다.
       const maxServerEndTime = synced[synced.length - 1]?.endTime ?? 0;
       const localTail = state.segments.filter(
-        (segment) => segment.endTime > maxServerEndTime + 0.5,
+        (segment) =>
+          segment.endTime > maxServerEndTime + 0.5 &&
+          !synced.some(
+            (serverSegment) =>
+              serverSegment.resultId === segment.resultId ||
+              isEquivalentSegment(serverSegment, segment),
+          ),
       );
 
       return {
         ...state,
-        segments: [...synced, ...localTail],
+        segments: [...synced, ...localTail].sort(
+          (a, b) => a.startTime - b.startTime,
+        ),
       };
     });
   },

@@ -34,10 +34,17 @@ const SUPPORTED_AUDIO_CONTENT_TYPES: Record<string, string> = {
   'audio/amr': 'amr',
 };
 
+export function normalizeAudioContentType(contentType: string): string {
+  return contentType.split(';', 1)[0].trim().toLowerCase();
+}
+
 export function resolveSupportedAudioExtension(
   contentType: string,
 ): string | null {
-  return SUPPORTED_AUDIO_CONTENT_TYPES[contentType.toLowerCase()] ?? null;
+  return (
+    SUPPORTED_AUDIO_CONTENT_TYPES[normalizeAudioContentType(contentType)] ??
+    null
+  );
 }
 
 @Injectable()
@@ -76,7 +83,9 @@ export class S3AudioService {
       );
     }
 
-    const contentType = options?.contentType?.trim() || 'audio/webm';
+    const contentType = normalizeAudioContentType(
+      options?.contentType?.trim() || 'audio/webm',
+    );
     const extension = resolveSupportedAudioExtension(contentType);
     if (!extension) {
       throw new BadRequestException(
@@ -169,6 +178,18 @@ export class S3AudioService {
     }
   }
 
+  isManagedMediaUriForMeeting(mediaUri: string, meetingId: string): boolean {
+    try {
+      const { bucket, s3Key } = this.parseMediaUri(mediaUri);
+      return (
+        bucket === this.bucket &&
+        s3Key.startsWith(`${this.keyPrefix}/${meetingId}/`)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   async objectExists(bucket: string, s3Key: string): Promise<boolean> {
     const command = new HeadObjectCommand({
       Bucket: bucket,
@@ -178,9 +199,31 @@ export class S3AudioService {
     try {
       await this.s3Client.send(command);
       return true;
-    } catch {
+    } catch (error) {
+      if (this.isObjectNotFoundError(error)) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  private isObjectNotFoundError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
       return false;
     }
+
+    const candidate = error as {
+      name?: unknown;
+      code?: unknown;
+      Code?: unknown;
+      $metadata?: { httpStatusCode?: unknown };
+    };
+    return (
+      candidate.$metadata?.httpStatusCode === 404 ||
+      [candidate.name, candidate.code, candidate.Code].some(
+        (value) => value === 'NotFound' || value === 'NoSuchKey',
+      )
+    );
   }
 
   async objectExistsForMediaUri(mediaUri: string): Promise<boolean> {

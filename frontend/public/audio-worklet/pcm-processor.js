@@ -14,18 +14,19 @@ const TARGET_RATE = 16000;
 /**
  * 고품질 안티앨리어싱 다운샘플링 (ARTS 동일)
  */
-function downsampleBufferHQ(input, inputRate, targetRate) {
+function downsampleBufferHQ(input, inputRate, targetRate, state) {
   if (targetRate === inputRate) return input;
   if (targetRate > inputRate) return input; // 업샘플링은 하지 않음
 
   const ratio = inputRate / targetRate;
-  const newLength = Math.round(input.length / ratio);
-  const result = new Float32Array(newLength);
+  const result = [];
+  let position = state.position || 0;
 
-  for (let i = 0; i < newLength; i++) {
-    const center = i * ratio;
-    const start = Math.max(0, Math.floor(center - ratio / 2));
-    const end = Math.min(input.length - 1, Math.ceil(center + ratio / 2));
+  // position은 현재 입력 블록 기준의 연속 sample 위치다. 블록 끝을 넘긴
+  // 위치를 다음 호출로 넘겨 블록별 Math.round에서 생기는 누적 drift를 막는다.
+  while (position < input.length) {
+    const start = Math.max(0, Math.floor(position - ratio / 2));
+    const end = Math.min(input.length - 1, Math.ceil(position + ratio / 2));
 
     let sum = 0;
     let count = 0;
@@ -33,10 +34,12 @@ function downsampleBufferHQ(input, inputRate, targetRate) {
       sum += input[j];
       count++;
     }
-    result[i] = count > 0 ? sum / count : 0;
+    result.push(count > 0 ? sum / count : 0);
+    position += ratio;
   }
 
-  return result;
+  state.position = position - input.length;
+  return Float32Array.from(result);
 }
 
 /**
@@ -69,6 +72,7 @@ class PcmProcessor extends AudioWorkletProcessor {
     super();
     this._stopped = false;
     this._inputRate = sampleRate; // 브라우저 기본 (보통 48000)
+    this._resampleState = { position: 0 };
     // 200ms 분량을 16kHz 기준으로 계산 (ARTS 검증 크기)
     this._chunkSizeSamples = TARGET_RATE * 0.2; // 3200 samples
     this._buffer = [];
@@ -97,7 +101,12 @@ class PcmProcessor extends AudioWorkletProcessor {
     }
 
     // HQ 다운샘플링: 48kHz → 16kHz (ARTS 동일)
-    const downsampled = downsampleBufferHQ(channelData, this._inputRate, TARGET_RATE);
+    const downsampled = downsampleBufferHQ(
+      channelData,
+      this._inputRate,
+      TARGET_RATE,
+      this._resampleState,
+    );
 
     // 버퍼에 추가
     this._buffer.push(downsampled);

@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { Suspense, useEffect } from 'react';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { SignInCard, type AuthEntryMode, type EmailSignInStatus } from './SignInCard';
+import { SignInCard, type AuthEntryMode } from './SignInCard';
 import { SignInHero } from './SignInHero';
 
 function getErrorInfo(errorCode: string | null): { title: string; description: string } | null {
@@ -18,16 +18,6 @@ function getErrorInfo(errorCode: string | null): { title: string; description: s
       return {
         title: '인증 처리 중 오류가 발생했습니다',
         description: '서버와의 통신 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
-      };
-    case 'EmailSignin':
-      return {
-        title: '메일 발송을 시작하지 못했습니다',
-        description: '이메일 로그인 설정을 확인한 뒤 다시 시도해주세요.',
-      };
-    case 'Verification':
-      return {
-        title: '로그인 링크가 유효하지 않습니다',
-        description: '링크가 만료되었거나 이미 사용되었습니다. 새 로그인 링크를 요청해주세요.',
       };
     case 'AccessDenied':
       return {
@@ -57,9 +47,6 @@ function AuthEntryContent({ mode }: AuthEntryPageProps) {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const errorInfo = getErrorInfo(searchParams.get('error'));
-  const [email, setEmail] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [emailStatus, setEmailStatus] = useState<EmailSignInStatus>('idle');
 
   const callbackUrl = normalizeCallbackUrl(searchParams.get('callbackUrl'));
 
@@ -81,37 +68,6 @@ function AuthEntryContent({ mode }: AuthEntryPageProps) {
     void signIn('authentik', { callbackUrl });
   };
 
-  const handleEmailSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-
-    if (!isValidEmail(normalizedEmail)) {
-      setEmailError('이메일 형식으로 입력해주세요.');
-      setEmailStatus('idle');
-      return;
-    }
-
-    setEmailError('');
-    setEmailStatus('submitting');
-
-    try {
-      const response = await signIn('email', {
-        email: normalizedEmail,
-        callbackUrl,
-        redirect: false,
-      });
-
-      if (response?.error) {
-        setEmailStatus('error');
-        return;
-      }
-
-      setEmailStatus('sent');
-    } catch {
-      setEmailStatus('error');
-    }
-  };
-
   if (isAuthenticated) {
     // 리다이렉트 중에는 폼 대신 스피너만 노출한다.
     return <AuthEntryFallback />;
@@ -129,15 +85,6 @@ function AuthEntryContent({ mode }: AuthEntryPageProps) {
           <SignInCard
             mode={mode}
             errorInfo={errorInfo}
-            email={email}
-            emailError={emailError}
-            emailStatus={emailStatus}
-            onEmailChange={(value) => {
-              setEmail(value);
-              if (emailError) setEmailError('');
-              if (emailStatus !== 'idle') setEmailStatus('idle');
-            }}
-            onEmailSubmit={handleEmailSubmit}
             onSsoSignIn={handleSsoSignIn}
           />
         </div>
@@ -196,8 +143,4 @@ function sanitizeInternalPath(path: string): string {
     return '/';
   }
   return path;
-}
-
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }

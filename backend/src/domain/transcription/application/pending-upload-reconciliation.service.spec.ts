@@ -14,7 +14,10 @@ describe('PendingUploadReconciliationService', () => {
     Pick<Repository<TranscriptionUploadEntity>, 'find'>
   >;
   let transcriptionService: jest.Mocked<
-    Pick<TranscriptionService, 'reconcilePendingBatchUpload'>
+    Pick<
+      TranscriptionService,
+      'reconcilePendingBatchUpload' | 'recoverPendingBatchUpload'
+    >
   >;
   let dataSource: jest.Mocked<
     Pick<DataSource, 'options' | 'createQueryRunner'>
@@ -32,6 +35,10 @@ describe('PendingUploadReconciliationService', () => {
         queued: true,
         objectPresent: true,
         jobId: 'job-1',
+      }),
+      recoverPendingBatchUpload: jest.fn().mockResolvedValue({
+        queued: false,
+        objectPresent: false,
       }),
     };
     queryRunner = {
@@ -74,6 +81,37 @@ describe('PendingUploadReconciliationService', () => {
     expect(
       transcriptionService.reconcilePendingBatchUpload,
     ).toHaveBeenCalledWith('meeting-1', 'upload-1', 'user-1');
+  });
+
+  it('finalizes an expired issued upload through the recovery path', async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    transcriptionUploadRepository.find.mockResolvedValue([
+      {
+        id: 'upload-expired',
+        meetingId: 'meeting-1',
+        status: TranscriptionUploadStatus.ISSUED,
+        expiresAt: new Date(Date.now() - 1),
+        createdAt,
+        updatedAt: createdAt,
+        meeting: {
+          id: 'meeting-1',
+          ownerSub: 'user-1',
+          status: MeetingStatus.PROCESSING,
+          transcriptionMode: MeetingTranscriptionMode.BATCH,
+        } as MeetingEntity,
+      } as TranscriptionUploadEntity,
+    ]);
+
+    await (service as any).reconcilePendingUploads();
+
+    expect(transcriptionService.recoverPendingBatchUpload).toHaveBeenCalledWith(
+      'meeting-1',
+      'upload-expired',
+      'user-1',
+    );
+    expect(
+      transcriptionService.reconcilePendingBatchUpload,
+    ).not.toHaveBeenCalled();
   });
 
   it('skips uploads for completed meetings', async () => {

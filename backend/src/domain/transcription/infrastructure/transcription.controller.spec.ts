@@ -49,6 +49,26 @@ describe('TranscriptionController', () => {
     expect(JSON.stringify(response)).not.toContain('s3://');
     expect(JSON.stringify(response)).not.toContain('internal provider error');
   });
+
+  it('forwards startOffsetSeconds from the legacy jobs endpoint', async () => {
+    transcriptionService.queueBatchJob.mockResolvedValue(buildJob());
+
+    await controller.queueBatchJob(
+      'meeting-1',
+      {
+        mediaUri: 's3://audio-bucket/audio/meeting-1/audio.webm',
+        languageCode: 'ko-KR',
+        startOffsetSeconds: 37.5,
+      },
+      { sub: 'user-1' } as never,
+    );
+
+    expect(transcriptionService.queueBatchJob).toHaveBeenCalledWith(
+      'meeting-1',
+      expect.objectContaining({ startOffsetSeconds: 37.5 }),
+      'user-1',
+    );
+  });
 });
 
 function buildJob(): TranscriptionJobEntity {

@@ -68,6 +68,13 @@ export class TranscriptionUploadEntity {
   })
   jobQueuedAt?: Date | null;
 
+  @Column({
+    name: 'expires_at',
+    type: nullableDateColumnType,
+    nullable: true,
+  })
+  expiresAt?: Date | null;
+
   /**
    * 이 업로드 파일이 회의 시작 기준 몇 초 지점부터 녹음됐는지 (멀티 세션 녹음 지원).
    * null이면 단일 세션 녹음(오프셋 0) 또는 레거시 업로드.

@@ -12,11 +12,16 @@ export interface AppEnv {
   DB_IAM_AUTH: boolean;
   DB_SSL: boolean;
   DB_SSL_REJECT_UNAUTHORIZED: boolean;
+  DB_SSL_CA: string;
+  DB_SSL_CA_PATH: string;
   DB_POOL_MAX: number;
   DB_CONNECTION_TIMEOUT_MS: number;
   DB_IDLE_TIMEOUT_MS: number;
   DB_STATEMENT_TIMEOUT_MS: number;
+  /** Legacy ciphertext fallback key. New deployments should use ENCRYPTION_KEYS. */
   ENCRYPTION_KEY: string;
+  ENCRYPTION_KEYS: Record<string, string>;
+  ENCRYPTION_ACTIVE_KID: string;
   AWS_REGION: string;
   AWS_PROFILE: string;
   AWS_TRANSCRIBE_JOB_PREFIX: string;
@@ -47,6 +52,7 @@ export interface AppEnv {
   TRUST_PROXY: string;
   PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: string;
   PLAYWRIGHT_PDF_MAX_CONCURRENT_RENDERS: number | null;
+  PLAYWRIGHT_PDF_RENDER_TIMEOUT_MS: number;
   LOG_LEVEL: string;
   CORS_ORIGIN: string;
 }
@@ -67,6 +73,14 @@ function readString(
   }
 
   throw new Error(`Environment variable ${key} is required.`);
+}
+
+function readOptionalString(
+  config: Record<string, unknown>,
+  key: string,
+): string {
+  const rawValue = config[key];
+  return typeof rawValue === 'string' ? rawValue.trim() : '';
 }
 
 function readNumber(
@@ -193,6 +207,53 @@ function isLikelyPlaceholderEncryptionKey(value: string): boolean {
   );
 }
 
+function readEncryptionKeys(
+  config: Record<string, unknown>,
+): Record<string, string> {
+  const raw = readOptionalString(config, 'ENCRYPTION_KEYS');
+  if (!raw) {
+    return {};
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      'Environment variable ENCRYPTION_KEYS must be a JSON object of key IDs to key values.',
+    );
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(
+      'Environment variable ENCRYPTION_KEYS must be a JSON object of key IDs to key values.',
+    );
+  }
+
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  if (entries.length === 0) {
+    throw new Error(
+      'Environment variable ENCRYPTION_KEYS must contain at least one key.',
+    );
+  }
+
+  const validatedEntries = entries.map(([kid, value]) => {
+    if (!/^[A-Za-z0-9._-]{1,64}$/.test(kid)) {
+      throw new Error(
+        `Environment variable ENCRYPTION_KEYS contains invalid key ID: ${kid}.`,
+      );
+    }
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      throw new Error(
+        `Environment variable ENCRYPTION_KEYS key ${kid} must be a non-empty string.`,
+      );
+    }
+    return [kid, value.trim()] as const;
+  });
+
+  return Object.fromEntries(validatedEntries);
+}
+
 /**
  * JWKS(공개키)로 검증 가능한 비대칭 JWS 알고리즘만 허용한다.
  * HS*(대칭)와 none 은 원격 JWKS 검증 모델에서 의미가 없고 알고리즘 혼동 공격 표면이 된다.
@@ -300,11 +361,43 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
   }
 
   const port = readNumber(config, 'PORT', 9999);
-  const encryptionKey = readString(
+  const configuredEncryptionKeys = readEncryptionKeys(config);
+  const configuredActiveKid = readOptionalString(
     config,
-    'ENCRYPTION_KEY',
-    'dev-only-encryption-key-replace-in-production',
+    'ENCRYPTION_ACTIVE_KID',
   );
+  const hasConfiguredKeyring = Object.keys(configuredEncryptionKeys).length > 0;
+  const encryptionKey =
+    readOptionalString(config, 'ENCRYPTION_KEY') ||
+    (hasConfiguredKeyring
+      ? ''
+      : 'dev-only-encryption-key-replace-in-production');
+  let encryptionKeys: Record<string, string>;
+  let encryptionActiveKid: string;
+
+  if (hasConfiguredKeyring) {
+    if (!configuredActiveKid) {
+      throw new Error(
+        'Environment variable ENCRYPTION_ACTIVE_KID is required when ENCRYPTION_KEYS is configured.',
+      );
+    }
+    if (!configuredEncryptionKeys[configuredActiveKid]) {
+      throw new Error(
+        `Environment variable ENCRYPTION_ACTIVE_KID references unknown key ID: ${configuredActiveKid}.`,
+      );
+    }
+    encryptionKeys = configuredEncryptionKeys;
+    encryptionActiveKid = configuredActiveKid;
+  } else {
+    if (configuredActiveKid && configuredActiveKid !== 'legacy') {
+      throw new Error(
+        'Environment variable ENCRYPTION_ACTIVE_KID requires ENCRYPTION_KEYS.',
+      );
+    }
+    encryptionKeys = { legacy: encryptionKey };
+    encryptionActiveKid = 'legacy';
+  }
+
   const defaultDbPath =
     typedNodeEnv === 'test'
       ? ':memory:'
@@ -319,6 +412,42 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
   );
   const dbIamAuth =
     dbEngine === 'postgres' ? readBoolean(config, 'DB_IAM_AUTH', false) : false;
+  const dbSsl =
+    dbEngine === 'postgres'
+      ? readBoolean(config, 'DB_SSL', typedNodeEnv === 'production')
+      : false;
+  const dbSslRejectUnauthorized =
+    dbEngine === 'postgres'
+      ? readBoolean(
+          config,
+          'DB_SSL_REJECT_UNAUTHORIZED',
+          typedNodeEnv === 'production',
+        )
+      : false;
+  const dbSslCa =
+    dbEngine === 'postgres' ? readOptionalString(config, 'DB_SSL_CA') : '';
+  const dbSslCaPath =
+    dbEngine === 'postgres' ? readOptionalString(config, 'DB_SSL_CA_PATH') : '';
+
+  if (dbSslCa && dbSslCaPath) {
+    throw new Error(
+      'Configure only one of DB_SSL_CA or DB_SSL_CA_PATH, not both.',
+    );
+  }
+  if (dbIamAuth && !dbSslRejectUnauthorized) {
+    throw new Error(
+      'DB_SSL_REJECT_UNAUTHORIZED must be true when DB_IAM_AUTH is enabled.',
+    );
+  }
+  if (
+    typedNodeEnv === 'production' &&
+    dbEngine === 'postgres' &&
+    (!dbSsl || !dbSslRejectUnauthorized)
+  ) {
+    throw new Error(
+      'Production PostgreSQL requires DB_SSL=true and DB_SSL_REJECT_UNAUTHORIZED=true.',
+    );
+  }
 
   const postgresDefaults =
     typedNodeEnv === 'production'
@@ -336,13 +465,29 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
           passwordFallback: 'postgres',
         };
 
-  if (
-    typedNodeEnv === 'production' &&
-    isLikelyPlaceholderEncryptionKey(encryptionKey)
-  ) {
-    throw new Error(
-      'Environment variable ENCRYPTION_KEY must be a secure 64-character hex value in production.',
-    );
+  if (typedNodeEnv === 'production') {
+    if (
+      !hasConfiguredKeyring &&
+      isLikelyPlaceholderEncryptionKey(encryptionKey)
+    ) {
+      throw new Error(
+        'Environment variable ENCRYPTION_KEY must be a secure 64-character hex value in production.',
+      );
+    }
+
+    const insecureKeyIds = Object.entries(encryptionKeys)
+      .filter(([, value]) => isLikelyPlaceholderEncryptionKey(value))
+      .map(([kid]) => kid);
+    if (insecureKeyIds.length > 0) {
+      throw new Error(
+        `Environment variable ENCRYPTION_KEYS must contain secure 64-character hex values in production (invalid: ${insecureKeyIds.join(', ')}).`,
+      );
+    }
+    if (encryptionKey && isLikelyPlaceholderEncryptionKey(encryptionKey)) {
+      throw new Error(
+        'Environment variable ENCRYPTION_KEY legacy fallback must be a secure 64-character hex value in production.',
+      );
+    }
   }
 
   if (typedNodeEnv === 'production' && !authEnabled) {
@@ -400,18 +545,10 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
         ? readString(config, 'DB_PASSWORD', postgresDefaults.passwordFallback)
         : '',
     DB_IAM_AUTH: dbIamAuth,
-    DB_SSL:
-      dbEngine === 'postgres'
-        ? readBoolean(config, 'DB_SSL', typedNodeEnv === 'production')
-        : false,
-    DB_SSL_REJECT_UNAUTHORIZED:
-      dbEngine === 'postgres'
-        ? readBoolean(
-            config,
-            'DB_SSL_REJECT_UNAUTHORIZED',
-            typedNodeEnv === 'production',
-          )
-        : false,
+    DB_SSL: dbSsl,
+    DB_SSL_REJECT_UNAUTHORIZED: dbSslRejectUnauthorized,
+    DB_SSL_CA: dbSslCa,
+    DB_SSL_CA_PATH: dbSslCaPath,
     DB_POOL_MAX:
       dbEngine === 'postgres' ? readNumber(config, 'DB_POOL_MAX', 10) : 0,
     DB_CONNECTION_TIMEOUT_MS:
@@ -427,6 +564,8 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
         ? readNumber(config, 'DB_STATEMENT_TIMEOUT_MS', 15000)
         : 0,
     ENCRYPTION_KEY: encryptionKey,
+    ENCRYPTION_KEYS: encryptionKeys,
+    ENCRYPTION_ACTIVE_KID: encryptionActiveKid,
     AWS_REGION: readString(config, 'AWS_REGION', 'ap-northeast-2'),
     AWS_PROFILE: readString(config, 'AWS_PROFILE', 'default'),
     AWS_TRANSCRIBE_JOB_PREFIX: readString(
@@ -522,6 +661,11 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
         min: 1,
         max: 8,
       },
+    ),
+    PLAYWRIGHT_PDF_RENDER_TIMEOUT_MS: readNumber(
+      config,
+      'PLAYWRIGHT_PDF_RENDER_TIMEOUT_MS',
+      60_000,
     ),
     LOG_LEVEL: readString(config, 'LOG_LEVEL', 'info'),
     CORS_ORIGIN: corsOrigin,

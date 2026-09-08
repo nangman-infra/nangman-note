@@ -39,11 +39,6 @@ export function createWsCorsOriginHandler(): (
       allowWithoutOrigin: false,
     });
 
-    if (allowed) {
-      callback(null, true);
-      return;
-    }
-
-    callback(new Error('Origin is not allowed'));
+    callback(null, allowed);
   };
 }

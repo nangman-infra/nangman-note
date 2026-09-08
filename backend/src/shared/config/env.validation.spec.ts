@@ -256,6 +256,84 @@ describe('validateEnv', () => {
     );
   });
 
+  it('parses a versioned encryption keyring and active key ID', () => {
+    const oldKey = 'a'.repeat(64);
+    const currentKey = 'b'.repeat(64);
+    const env = validateEnv({
+      NODE_ENV: 'development',
+      ENCRYPTION_KEYS: JSON.stringify({ old: oldKey, current: currentKey }),
+      ENCRYPTION_ACTIVE_KID: 'current',
+    });
+
+    expect(env.ENCRYPTION_KEYS).toEqual({ old: oldKey, current: currentKey });
+    expect(env.ENCRYPTION_ACTIVE_KID).toBe('current');
+    expect(env.ENCRYPTION_KEY).toBe('');
+  });
+
+  it('rejects an encryption active key ID that is missing from the keyring', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'development',
+        ENCRYPTION_KEYS: JSON.stringify({ old: 'a'.repeat(64) }),
+        ENCRYPTION_ACTIVE_KID: 'current',
+      }),
+    ).toThrow(/references unknown key ID: current/u);
+  });
+
+  it('accepts one DB CA source and rejects ambiguous inline/path CA config', () => {
+    const base = {
+      NODE_ENV: 'development',
+      DB_ENGINE: 'postgres',
+      DB_HOST: 'db.example.local',
+      DB_NAME: 'nangman_note',
+      DB_USER: 'app_user',
+      DB_PASSWORD: 'password',
+      DB_SSL: 'true',
+      DB_SSL_REJECT_UNAUTHORIZED: 'true',
+    };
+
+    expect(validateEnv({ ...base, DB_SSL_CA: 'pem' }).DB_SSL_CA).toBe('pem');
+    expect(() =>
+      validateEnv({
+        ...base,
+        DB_SSL_CA: 'pem',
+        DB_SSL_CA_PATH: '/run/secrets/rds-ca.pem',
+      }),
+    ).toThrow(/only one of DB_SSL_CA or DB_SSL_CA_PATH/u);
+  });
+
+  it('rejects unverified TLS for production postgres and IAM auth', () => {
+    const production = {
+      NODE_ENV: 'production',
+      ENCRYPTION_KEY: 'a'.repeat(64),
+      DB_HOST: 'db.example.local',
+      DB_NAME: 'nangman_note',
+      DB_USER: 'app_user',
+      DB_PASSWORD: 'password',
+      AUTH_OIDC_ISSUER: 'https://auth.example.com/application/o/transnote/',
+      AUTH_OIDC_AUDIENCE: 'transnote-api',
+    };
+
+    expect(() =>
+      validateEnv({
+        ...production,
+        DB_SSL: 'true',
+        DB_SSL_REJECT_UNAUTHORIZED: 'false',
+      }),
+    ).toThrow(/Production PostgreSQL requires/u);
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'development',
+        DB_ENGINE: 'postgres',
+        DB_HOST: 'db.example.local',
+        DB_NAME: 'nangman_note',
+        DB_USER: 'iam_user',
+        DB_IAM_AUTH: 'true',
+        DB_SSL_REJECT_UNAUTHORIZED: 'false',
+      }),
+    ).toThrow(/must be true when DB_IAM_AUTH is enabled/u);
+  });
+
   describe('AUTH_OIDC_ALGORITHMS', () => {
     const base = {
       NODE_ENV: 'development',

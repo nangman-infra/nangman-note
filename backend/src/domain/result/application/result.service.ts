@@ -195,66 +195,67 @@ export class ResultService {
     dto: RegenerateResultDto,
     ownerSub?: string,
   ): Promise<void> {
-    const meeting = await this.meetingService.findById(meetingId, ownerSub);
-
-    // 중복 재생성 방지 — DB phase 기반 (다중 인스턴스 대응).
-    // 단, phase가 REGENERATING인 채 오래 방치된 경우(서버 재시작으로 락 유실)는
-    // 고착으로 간주하고 새 재생성을 허용한다.
-    const REGENERATION_STALE_MS = 15 * 60 * 1000;
-    const isPhaseRegenerating =
-      meeting.processingPhase === MeetingProcessingPhase.REGENERATING &&
-      Date.now() - meeting.updatedAt.getTime() < REGENERATION_STALE_MS;
-    if (this.regeneratingMeetings.has(meetingId) || isPhaseRegenerating) {
+    // 같은 프로세스의 동시 요청은 첫 await 전에 직렬화한다.
+    if (this.regeneratingMeetings.has(meetingId)) {
       throw new BadRequestException(
         `Meeting ${meetingId} is already being regenerated`,
       );
     }
-
-    // 프롬프트 존재 확인 + 변경 (동기) — 실패 시 롤백을 위해 원본 보관
-    const originalPromptId = meeting.promptId;
-    await this.promptService.ensureExists(dto.promptId, ownerSub);
-    await this.meetingService.updatePrompt(
-      meetingId,
-      { promptId: dto.promptId },
-      ownerSub,
-    );
-
-    // 기존 result 존재 확인 (동기)
-    await this.findByMeetingId(meetingId, ownerSub);
-
-    // 중복 방지 잠금 + started 이벤트
     this.regeneratingMeetings.add(meetingId);
+
     try {
+      const meeting = await this.meetingService.findById(meetingId, ownerSub);
+
+      // DB phase 기반 다중 인스턴스 중복 방지. 오래 방치된 phase는 recovery를 허용한다.
+      const REGENERATION_STALE_MS = 15 * 60 * 1000;
+      const isPhaseRegenerating =
+        meeting.processingPhase === MeetingProcessingPhase.REGENERATING &&
+        Date.now() - meeting.updatedAt.getTime() < REGENERATION_STALE_MS;
+      if (isPhaseRegenerating) {
+        throw new BadRequestException(
+          `Meeting ${meetingId} is already being regenerated`,
+        );
+      }
+
+      // 프롬프트 존재 확인 + 변경 (동기) — 실패 시 background compensation을
+      // 시작하기 전이므로 인메모리 lock만 해제하고 오류를 전파한다.
+      const originalPromptId = meeting.promptId;
+      await this.promptService.ensureExists(dto.promptId, ownerSub);
+      await this.meetingService.updatePrompt(
+        meetingId,
+        { promptId: dto.promptId },
+        ownerSub,
+      );
+      await this.findByMeetingId(meetingId, ownerSub);
       await this.meetingService.updateProcessingPhase(
         meetingId,
         MeetingProcessingPhase.REGENERATING,
         ownerSub,
         { status: MeetingStatus.COMPLETED },
       );
+
+      this.logger.log('result.regeneration.started', {
+        meetingId,
+        promptId: dto.promptId,
+        ownerSub,
+      });
+      this.eventEmitter.emit(
+        ResultRegenerateEvent.EVENT_NAME,
+        new ResultRegenerateEvent(meetingId, 'started', ownerSub),
+      );
+
+      // background의 finally가 성공/실패 후 lock을 해제한다.
+      this.executeRegenerateInBackground(
+        meetingId,
+        dto.promptId,
+        originalPromptId,
+        ownerSub,
+        getRequestContext(),
+      );
     } catch (error) {
-      // phase 기록 실패 시 인메모리 락을 반드시 해제한다.
-      // (해제하지 않으면 서버 재시작 전까지 재생성이 영구 400으로 막힌다)
       this.regeneratingMeetings.delete(meetingId);
       throw error;
     }
-    this.logger.log('result.regeneration.started', {
-      meetingId,
-      promptId: dto.promptId,
-      ownerSub,
-    });
-    this.eventEmitter.emit(
-      ResultRegenerateEvent.EVENT_NAME,
-      new ResultRegenerateEvent(meetingId, 'started', ownerSub),
-    );
-
-    // 백그라운드 실행 (fire-and-forget)
-    void this.executeRegenerateInBackground(
-      meetingId,
-      dto.promptId,
-      originalPromptId,
-      ownerSub,
-      getRequestContext(),
-    );
   }
 
   private executeRegenerateInBackground(

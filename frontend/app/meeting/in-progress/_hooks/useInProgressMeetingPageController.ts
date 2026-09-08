@@ -104,6 +104,7 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
   const [micBannerDismissed, setMicBannerDismissed] = useState(false);
   const [wasFallenBack, setWasFallenBack] = useState(false);
   const fallbackHandledRef = useRef(false);
+  const activeStreamingStreamRef = useRef<MediaStream | null>(null);
 
   const navigateHome = useCallback(() => {
     setIsLeavingPage(true);
@@ -356,7 +357,7 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
     : 0;
 
   useEffect(() => {
-    if (!meetingId || permission !== 'prompt') return;
+    if (!currentMeeting || !meetingId || permission !== 'prompt') return;
 
     const init = async () => {
       const captureResult = await requestPermission();
@@ -370,26 +371,61 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
     };
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meetingId]);
+  }, [currentMeeting?.id, meetingId]);
 
   useEffect(() => {
-    if (!stream || !meetingId) return;
+    if (!isRealtimeMode) {
+      activeStreamingStreamRef.current = null;
+      return;
+    }
+    if (
+      !stream &&
+      activeStreamingStreamRef.current &&
+      (audioStreamingState === 'streaming' ||
+        audioStreamingState === 'stopping')
+    ) {
+      activeStreamingStreamRef.current = null;
+      stopStreaming();
+    }
+  }, [stream, isRealtimeMode, audioStreamingState, stopStreaming]);
+
+  useEffect(() => {
+    // query의 meetingId만 먼저 읽힌 reload 구간에는 persisted mode를 아직 모른다.
+    // currentMeeting 복구 전 기본 BATCH로 MediaRecorder를 기동하지 않는다.
+    if (!currentMeeting || !stream || !meetingId) return;
     if (isEnding) return;
 
     if (isRealtimeMode) {
+      // 자동 마이크 복구는 새 MediaStream 객체를 만든다. 기존 AudioWorklet이
+      // 죽은 스트림에 붙어 있으면 먼저 teardown하고 다음 render에서 재시작한다.
+      if (
+        activeStreamingStreamRef.current &&
+        activeStreamingStreamRef.current !== stream
+      ) {
+        activeStreamingStreamRef.current = null;
+        stopStreaming();
+        return;
+      }
+      if (activeStreamingStreamRef.current === stream) {
+        return;
+      }
+
       if (
         (audioStreamingState === 'idle' || audioStreamingState === 'stopped') &&
         isConnected &&
         transcriptionSocketRef.current?.connected
       ) {
+        activeStreamingStreamRef.current = stream;
         void startStreaming(stream, transcriptionSocketRef.current, {
           onFallbackToBatch: handleRealtimeFallbackToBatch,
         });
       }
     } else if (recorderState === 'idle') {
+      activeStreamingStreamRef.current = null;
       startRecording(stream, meetingId);
     }
   }, [
+    currentMeeting,
     stream,
     meetingId,
     isEnding,
@@ -399,6 +435,7 @@ export function useInProgressMeetingPageController(): InProgressMeetingPageState
     audioStreamingState,
     startRecording,
     startStreaming,
+    stopStreaming,
     transcriptionSocketRef,
     handleRealtimeFallbackToBatch,
   ]);

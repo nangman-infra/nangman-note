@@ -136,10 +136,20 @@ export class OidcTokenVerifierService implements OnModuleInit {
   }
 
   private async getJoseModule(): Promise<JoseModule> {
-    if (!this.joseModulePromise) {
-      this.joseModulePromise = this.joseLoader();
+    if (this.joseModulePromise) {
+      return this.joseModulePromise;
     }
-    return this.joseModulePromise;
+
+    const pending = this.joseLoader();
+    this.joseModulePromise = pending;
+    try {
+      return await pending;
+    } catch (error) {
+      if (this.joseModulePromise === pending) {
+        this.joseModulePromise = undefined;
+      }
+      throw error;
+    }
   }
 
   /**

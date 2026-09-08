@@ -55,11 +55,15 @@ Required/used variables:
 - `DB_PASSWORD`
 - `DB_SSL` (`true` | `false`)
 - `DB_SSL_REJECT_UNAUTHORIZED` (`true` | `false`)
+- `DB_SSL_CA` (optional inline CA PEM; literal `\\n` is expanded)
+- `DB_SSL_CA_PATH` (optional CA PEM file path; configure only one CA source)
 - `DB_POOL_MAX` (default: `10`)
 - `DB_CONNECTION_TIMEOUT_MS` (default: `5000`)
 - `DB_IDLE_TIMEOUT_MS` (default: `30000`)
 - `DB_STATEMENT_TIMEOUT_MS` (default: `15000`)
-- `ENCRYPTION_KEY`
+- `ENCRYPTION_KEYS` (recommended JSON keyring, e.g. `{"2026-09":"<64-hex>"}`)
+- `ENCRYPTION_ACTIVE_KID` (key ID used for new ciphertext)
+- `ENCRYPTION_KEY` (legacy single-key fallback; retain during migration if old ciphertext exists)
 - `AWS_REGION`
 - `AWS_PROFILE`
 - `AWS_TRANSCRIBE_JOB_PREFIX`
@@ -92,8 +96,15 @@ Recommended mode:
 
 Operational BP (PostgreSQL):
 
-- Keep `DB_SSL=true` and `DB_SSL_REJECT_UNAUTHORIZED=true` in production.
+- Keep `DB_SSL=true` and `DB_SSL_REJECT_UNAUTHORIZED=true` in production. Production and IAM DB auth fail startup if certificate verification is disabled.
+- Mount the RDS trust bundle with `DB_SSL_CA_PATH`, or supply `DB_SSL_CA`; never configure both.
 - Tune connection pool/timeouts via DB_* timeout variables before scaling app instances.
+
+Encryption and migration policy:
+
+- New ciphertext uses a versioned `kid` envelope and entity-field + stable meeting-row AAD. Keep retired keys in `ENCRYPTION_KEYS` until all data has been re-encrypted.
+- Secrets Manager key rotation is **restart-required**: update the keyring, then perform a rolling restart. The process never replaces encryption keys through a `process.env` hot reload.
+- TypeORM migration CLI SQL bypasses entity subscribers. Migrations must not `INSERT`/`UPDATE` encryptable columns (`note.content`, `meeting_result.content`, transcript text, or sensitive search projection fields). Rebuild through application services/subscribers instead; the migration policy test enforces this.
 
 ## Run
 

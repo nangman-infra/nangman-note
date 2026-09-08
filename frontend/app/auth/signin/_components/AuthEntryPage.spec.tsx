@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { signIn } from 'next-auth/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthEntryPage } from './AuthEntryPage';
 
@@ -37,6 +38,7 @@ function authenticate(overrides: Partial<NonNullable<typeof sessionData>> = {}) 
 describe('AuthEntryPage', () => {
   beforeEach(() => {
     replaceMock.mockClear();
+    vi.mocked(signIn).mockClear();
     sessionStatus = 'unauthenticated';
     sessionData = null;
     searchParams = new URLSearchParams();
@@ -46,12 +48,18 @@ describe('AuthEntryPage', () => {
     cleanup();
   });
 
-  it('renders the sign-in form when unauthenticated and does not redirect', () => {
+  it('renders only the configured Authentik sign-in action', () => {
     render(<AuthEntryPage mode="signin" />);
 
-    expect(
-      screen.getByRole('button', { name: /낭만 계정으로 로그인/ }),
-    ).toBeInTheDocument();
+    const ssoButton = screen.getByRole('button', {
+      name: /낭만 계정으로 로그인/,
+    });
+    expect(ssoButton).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /이메일/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/매직 링크/)).not.toBeInTheDocument();
+
+    fireEvent.click(ssoButton);
+    expect(signIn).toHaveBeenCalledWith('authentik', { callbackUrl: '/' });
     expect(replaceMock).not.toHaveBeenCalled();
   });
 

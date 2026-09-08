@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../config/env.validation';
 import {
   buildAcceptedIssuers,
+  type JoseLoader,
   OidcTokenVerifierService,
 } from './oidc-token-verifier.service';
 
@@ -192,6 +193,30 @@ describe('OidcTokenVerifierService', () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(jose.createRemoteJWKSet).toHaveBeenCalledWith(new URL(JWKS_URI));
+  });
+
+  it('retries the jose module import after a rejected load instead of caching it forever', async () => {
+    jest.useFakeTimers({ now: 2_000_000 });
+    const jose = createFakeJose();
+    jose.jwtVerify.mockResolvedValue({ payload: { sub: 'user-1' } });
+    const loader = jest
+      .fn<ReturnType<JoseLoader>, Parameters<JoseLoader>>()
+      .mockRejectedValueOnce(new Error('temporary ESM loader failure'))
+      .mockResolvedValue(jose.module);
+    const service = new OidcTokenVerifierService(
+      createConfig({ AUTH_OIDC_JWKS_URI: JWKS_URI }),
+      loader,
+    );
+
+    await expect(service.verifyAccessToken('a')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+
+    jest.setSystemTime(2_006_000);
+    await expect(service.verifyAccessToken('b')).resolves.toMatchObject({
+      sub: 'user-1',
+    });
+    expect(loader).toHaveBeenCalledTimes(2);
   });
 
   it('fails closed when the discovery document has no jwks_uri', async () => {

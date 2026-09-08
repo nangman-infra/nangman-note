@@ -4,6 +4,7 @@ import { MeetingTranscriptionMode } from '../../domain/meeting-transcription-mod
 export class UpdateMeetingDto {
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   title?: string;
 
   @IsOptional()

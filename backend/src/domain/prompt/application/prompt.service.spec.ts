@@ -1,9 +1,14 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { DEFAULT_PROMPTS } from '../domain/default-prompts';
 import { PromptDocumentType } from '../domain/prompt-document-type.enum';
 import { PromptEntity } from '../domain/prompt.entity';
 import { UserSettingsEntity } from '../../user-settings/domain/user-settings.entity';
+import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 import { PromptService } from './prompt.service';
 
 describe('PromptService', () => {
@@ -17,6 +22,7 @@ describe('PromptService', () => {
   let userSettingsRepository: jest.Mocked<
     Pick<Repository<UserSettingsEntity>, 'update'>
   >;
+  let meetingRepository: jest.Mocked<Pick<Repository<MeetingEntity>, 'count'>>;
 
   const buildPrompt = (overrides: Partial<PromptEntity> = {}): PromptEntity =>
     ({
@@ -42,10 +48,14 @@ describe('PromptService', () => {
     userSettingsRepository = {
       update: jest.fn(),
     };
+    meetingRepository = {
+      count: jest.fn().mockResolvedValue(0),
+    };
 
     service = new PromptService(
       promptRepository as unknown as Repository<PromptEntity>,
       userSettingsRepository as unknown as Repository<UserSettingsEntity>,
+      meetingRepository as unknown as Repository<MeetingEntity>,
     );
   });
 
@@ -159,6 +169,23 @@ describe('PromptService', () => {
     await expect(
       service.remove('prompt_default_meeting'),
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(promptRepository.delete).not.toHaveBeenCalled();
+  });
+
+  it('remove rejects prompts referenced by meetings with a conflict', async () => {
+    promptRepository.findOne.mockResolvedValue(
+      buildPrompt({ id: 'prompt_user_referenced', isDefault: false }),
+    );
+    meetingRepository.count.mockResolvedValue(1);
+
+    await expect(
+      service.remove('prompt_user_referenced'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(meetingRepository.count).toHaveBeenCalledWith({
+      where: { promptId: 'prompt_user_referenced' },
+      withDeleted: true,
+    });
     expect(promptRepository.delete).not.toHaveBeenCalled();
   });
 

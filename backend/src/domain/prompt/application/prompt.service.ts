@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   OnModuleInit,
@@ -12,6 +13,7 @@ import { CreatePromptDto } from './dto/create-prompt.dto';
 import { UpdatePromptDto } from './dto/update-prompt.dto';
 import { DEFAULT_PROMPTS } from '../domain/default-prompts';
 import { PromptEntity } from '../domain/prompt.entity';
+import { MeetingEntity } from '../../meeting/domain/meeting.entity';
 
 const ANONYMOUS_OWNER_SUB = '__anonymous__';
 
@@ -22,6 +24,8 @@ export class PromptService implements OnModuleInit {
     private readonly promptRepository: Repository<PromptEntity>,
     @InjectRepository(UserSettingsEntity)
     private readonly userSettingsRepository: Repository<UserSettingsEntity>,
+    @InjectRepository(MeetingEntity)
+    private readonly meetingRepository: Repository<MeetingEntity>,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -126,7 +130,34 @@ export class PromptService implements OnModuleInit {
       throw new BadRequestException('Default prompts cannot be deleted');
     }
 
-    await this.promptRepository.delete(ownerSub ? { id, ownerSub } : { id });
+    const referencedMeetingCount = await this.meetingRepository.count({
+      where: { promptId: id },
+      withDeleted: true,
+    });
+    if (referencedMeetingCount > 0) {
+      throw new ConflictException(
+        'Prompt cannot be deleted while it is referenced by meetings',
+      );
+    }
+
+    try {
+      await this.promptRepository.delete(ownerSub ? { id, ownerSub } : { id });
+    } catch (error) {
+      const driverError = (error as { driverError?: unknown }).driverError;
+      const driverCode =
+        typeof driverError === 'object' &&
+        driverError !== null &&
+        'code' in driverError
+          ? String(driverError.code)
+          : undefined;
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (driverCode === '23503' || message.includes('foreign key')) {
+        throw new ConflictException(
+          'Prompt cannot be deleted while it is referenced by meetings',
+        );
+      }
+      throw error;
+    }
     await this.userSettingsRepository.update(
       {
         ownerSub: ownerSub?.trim() || ANONYMOUS_OWNER_SUB,

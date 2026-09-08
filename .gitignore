@@ -7,6 +7,9 @@ infra/
 
 # Scripts (local deployment/utility scripts)
 scripts/
+# Frontend architecture checker is a required CI source file, not a local utility.
+!frontend/scripts/
+!frontend/scripts/check-architecture.mjs
 
 # Dependencies
 node_modules/

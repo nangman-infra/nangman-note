@@ -44,6 +44,7 @@ export function useTranscription(
   const fallbackCallbackRef = useRef(options?.onFallbackToBatch);
   const authRecoveryPendingRef = useRef(false);
   const isRecoveringAuthRef = useRef(false);
+  const resyncGenerationRef = useRef(0);
 
   useEffect(() => {
     fallbackCallbackRef.current = fallbackHandler;
@@ -110,10 +111,18 @@ export function useTranscription(
       setError,
       handlePayload,
       onReconnected: () => {
-        // 단절 중 놓친 final 세그먼트를 DB에서 재동기화
+        // 단절 중 놓친 final 세그먼트를 DB에서 재동기화. 빠른 재연결이
+        // 겹치거나 회의가 바뀌면 마지막 요청만 store에 반영한다.
+        const resyncGeneration = ++resyncGenerationRef.current;
         void transcriptionApi
           .list(meetingId)
           .then((serverSegments) => {
+            if (
+              resyncGeneration !== resyncGenerationRef.current ||
+              socketRef.current !== socket
+            ) {
+              return;
+            }
             syncSegmentsFromServer(serverSegments);
           })
           .catch(() => {
@@ -124,6 +133,7 @@ export function useTranscription(
 
     // Cleanup
     return () => {
+      resyncGenerationRef.current += 1;
       socketRef.current?.disconnect();
       socketRef.current = null;
       authRecoveryPendingRef.current = false;

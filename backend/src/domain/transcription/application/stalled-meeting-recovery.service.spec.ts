@@ -34,7 +34,9 @@ describe('StalledMeetingRecoveryService', () => {
   let transcriptionResultCollectorService: jest.Mocked<
     Pick<
       TranscriptionResultCollectorService,
-      'recoverMissingBatchJob' | 'recoverStalledBatchJob'
+      | 'recoverMissingBatchJob'
+      | 'recoverStalledBatchJob'
+      | 'retriggerGenerationIfStuck'
     >
   >;
   let dataSource: jest.Mocked<
@@ -117,6 +119,7 @@ describe('StalledMeetingRecoveryService', () => {
     transcriptionResultCollectorService = {
       recoverMissingBatchJob: jest.fn(),
       recoverStalledBatchJob: jest.fn(),
+      retriggerGenerationIfStuck: jest.fn(),
     };
     queryRunner = {
       connect: jest.fn(),
@@ -303,6 +306,23 @@ describe('StalledMeetingRecoveryService', () => {
     expect(
       transcriptionResultCollectorService.recoverStalledBatchJob,
     ).toHaveBeenNthCalledWith(2, 'meeting-1', 'job-newer', 'user-1');
+  });
+
+  it('retriggers generation when all batch jobs were already collected', async () => {
+    meetingRepository.find.mockResolvedValue([buildMeeting()]);
+    resultRepository.findOne.mockResolvedValue(null);
+    transcriptionJobRepository.find.mockResolvedValue([
+      buildJob({
+        status: TranscriptionJobStatus.COMPLETED,
+        collectedAt: new Date('2026-03-13T11:00:00.000Z'),
+      }),
+    ]);
+
+    await (service as any).recoverStalledMeetings();
+
+    expect(
+      transcriptionResultCollectorService.retriggerGenerationIfStuck,
+    ).toHaveBeenCalledWith('meeting-1', 'user-1');
   });
 
   it('uses a Postgres advisory lock when available', async () => {

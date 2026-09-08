@@ -14,6 +14,7 @@ import {
   unsettledTranscriptionJobWhere,
 } from '../domain/transcription-job.constants';
 import { TranscriptionUploadEntity } from '../domain/transcription-upload.entity';
+import { TranscriptionUploadStatus } from '../domain/transcription-upload-status.enum';
 import { TranscriptionResultCollectorService } from './transcription-result-collector.service';
 
 describe('TranscriptionResultCollectorService', () => {
@@ -21,7 +22,7 @@ describe('TranscriptionResultCollectorService', () => {
   let jobRepository: jest.Mocked<
     Pick<
       Repository<TranscriptionJobEntity>,
-      'find' | 'findOne' | 'save' | 'count'
+      'find' | 'findOne' | 'save' | 'update' | 'count'
     >
   >;
   let segmentRepository: jest.Mocked<
@@ -72,6 +73,9 @@ describe('TranscriptionResultCollectorService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       save: jest.fn(),
+      update: jest
+        .fn()
+        .mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] }),
       count: jest.fn().mockResolvedValue(0),
     };
     segmentRepository = {
@@ -96,6 +100,7 @@ describe('TranscriptionResultCollectorService', () => {
       findById: jest.fn().mockResolvedValue({
         id: 'meeting-1',
         ownerSub: 'user-1',
+        status: MeetingStatus.PROCESSING,
       } as never),
       updateStatus: jest.fn(),
       updateProcessingPhase: jest.fn().mockResolvedValue({
@@ -235,9 +240,6 @@ describe('TranscriptionResultCollectorService', () => {
       'meeting-1',
       MeetingProcessingPhase.GENERATING,
       'user-1',
-      expect.objectContaining({
-        status: MeetingStatus.PROCESSING,
-      }),
     );
   });
 
@@ -382,9 +384,6 @@ describe('TranscriptionResultCollectorService', () => {
       'meeting-1',
       MeetingProcessingPhase.GENERATING,
       'user-1',
-      expect.objectContaining({
-        status: MeetingStatus.PROCESSING,
-      }),
     );
   });
 
@@ -459,9 +458,6 @@ describe('TranscriptionResultCollectorService', () => {
       'meeting-1',
       MeetingProcessingPhase.GENERATING,
       'user-1',
-      expect.objectContaining({
-        status: MeetingStatus.PROCESSING,
-      }),
     );
   });
 
@@ -487,12 +483,10 @@ describe('TranscriptionResultCollectorService', () => {
     );
 
     expect(result).toEqual({ success: false, segmentCount: 0 });
-    expect(jobRepository.save).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        status: TranscriptionJobStatus.FAILED,
-        errorMessage: 'Batch transcription did not finish within 6h',
-      }),
-    );
+    expect(jobRepository.update).toHaveBeenCalledWith('job-1', {
+      status: TranscriptionJobStatus.FAILED,
+      errorMessage: 'Batch transcription did not finish within 6h',
+    });
     // 최종 실패여도 원본 오디오는 보존
     expect(s3AudioService.deleteAudioFile).not.toHaveBeenCalled();
     expect(meetingService.markNeedsAttention).toHaveBeenCalledWith(
@@ -503,9 +497,6 @@ describe('TranscriptionResultCollectorService', () => {
       'meeting-1',
       MeetingProcessingPhase.GENERATING,
       'user-1',
-      expect.objectContaining({
-        status: MeetingStatus.PROCESSING,
-      }),
     );
   });
 
@@ -542,7 +533,7 @@ describe('TranscriptionResultCollectorService', () => {
     expect(s3AudioService.deleteAudioFile).not.toHaveBeenCalled();
   });
 
-  it('still marks meeting completed when result generation fails on generating phase', async () => {
+  it('marks the completed meeting as needing attention when result generation fails', async () => {
     resultService.generateForPipeline.mockRejectedValue(
       new Error('generation failed'),
     );
@@ -558,5 +549,148 @@ describe('TranscriptionResultCollectorService', () => {
       'meeting-1',
       MeetingStatus.COMPLETED,
     );
+    expect(meetingService.markNeedsAttention).toHaveBeenCalledWith('meeting-1');
+  });
+
+  it('marks attention even when completing the failed generation also fails', async () => {
+    resultService.generateForPipeline.mockRejectedValue(
+      new Error('generation failed'),
+    );
+    meetingService.updateStatus.mockRejectedValue(new Error('status failed'));
+
+    await service.handleGeneratingPhase({
+      meetingId: 'meeting-1',
+      status: MeetingStatus.PROCESSING,
+      phase: MeetingProcessingPhase.GENERATING,
+    } as never);
+
+    expect(meetingService.markNeedsAttention).toHaveBeenCalledWith('meeting-1');
+  });
+
+  it('retriggers generation on boot for collected jobs', async () => {
+    jobRepository.find.mockResolvedValue([
+      buildJob({
+        status: TranscriptionJobStatus.COMPLETED,
+        collectedAt: new Date('2026-03-01T00:05:00.000Z'),
+      }),
+    ]);
+    const retriggerSpy = jest
+      .spyOn(service, 'retriggerGenerationIfStuck')
+      .mockResolvedValue(undefined);
+
+    await service.onModuleInit();
+
+    expect(retriggerSpy).toHaveBeenCalledWith('meeting-1');
+  });
+
+  it('deduplicates concurrent polling loops for the same job id', async () => {
+    const job = buildJob();
+    let resolveStatus!: (value: {
+      status: TranscriptionJobStatus;
+      transcriptUri: string;
+    }) => void;
+    const statusRequest = new Promise<{
+      status: TranscriptionJobStatus;
+      transcriptUri: string;
+    }>((resolve) => {
+      resolveStatus = resolve;
+    });
+    jobRepository.findOne.mockResolvedValue(job);
+    jobRepository.save.mockImplementation((entity) =>
+      Promise.resolve(entity as TranscriptionJobEntity),
+    );
+    batchProvider.getJobStatus.mockReturnValue(statusRequest);
+    s3AudioService.getObjectAsStringFromBucket.mockResolvedValue(
+      JSON.stringify({ results: { items: [] } }),
+    );
+
+    const first = service.pollAndCollect('meeting-1', 'job-1');
+    const second = service.pollAndCollect('meeting-1', 'job-1');
+    resolveStatus({
+      status: TranscriptionJobStatus.COMPLETED,
+      transcriptUri: 's3://transcript-bucket/result.json',
+    });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { success: true, segmentCount: 0 },
+      { success: true, segmentCount: 0 },
+    ]);
+    expect(batchProvider.getJobStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not regress a completed meeting back into generating', async () => {
+    meetingService.findById.mockResolvedValue({
+      id: 'meeting-1',
+      ownerSub: 'user-1',
+      status: MeetingStatus.COMPLETED,
+    } as never);
+
+    const emitGeneratingPhaseIfAllJobsSettled = Reflect.get(
+      service,
+      'emitGeneratingPhaseIfAllJobsSettled',
+    ) as (meetingId: string, ownerSub?: string) => Promise<void>;
+    await emitGeneratingPhaseIfAllJobsSettled.call(
+      service,
+      'meeting-1',
+      'user-1',
+    );
+
+    expect(meetingService.updateProcessingPhase).not.toHaveBeenCalled();
+  });
+
+  it('does not let an expired issued upload block generation', async () => {
+    meetingService.findById.mockResolvedValue({
+      id: 'meeting-1',
+      ownerSub: 'user-1',
+      status: MeetingStatus.PROCESSING,
+    } as never);
+    uploadRepository.find.mockResolvedValue([
+      {
+        id: 'upload-expired',
+        meetingId: 'meeting-1',
+        status: TranscriptionUploadStatus.ISSUED,
+        expiresAt: new Date(Date.now() - 1),
+        createdAt: new Date(Date.now() - 1_000),
+      } as TranscriptionUploadEntity,
+    ]);
+
+    const emitGeneratingPhaseIfAllJobsSettled = Reflect.get(
+      service,
+      'emitGeneratingPhaseIfAllJobsSettled',
+    ) as (meetingId: string, ownerSub?: string) => Promise<void>;
+    await emitGeneratingPhaseIfAllJobsSettled.call(
+      service,
+      'meeting-1',
+      'user-1',
+    );
+
+    expect(meetingService.updateProcessingPhase).toHaveBeenCalledWith(
+      'meeting-1',
+      MeetingProcessingPhase.GENERATING,
+      'user-1',
+    );
+  });
+
+  it('releases the QueryRunner when advisory lock acquisition throws', async () => {
+    const queryRunner = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      query: jest.fn().mockRejectedValue(new Error('lock failed')),
+      release: jest.fn().mockResolvedValue(undefined),
+    };
+    Object.assign(dataSource, {
+      options: { type: 'postgres' },
+      createQueryRunner: jest.fn().mockReturnValue(queryRunner),
+    });
+
+    const withJobCollectionLock = Reflect.get(
+      service,
+      'withJobCollectionLock',
+    ) as (jobId: string, task: () => Promise<unknown>) => Promise<unknown>;
+    await expect(
+      withJobCollectionLock.call(service, 'job-1', jest.fn()),
+    ).rejects.toThrow('lock failed');
+
+    expect(queryRunner.release).toHaveBeenCalledTimes(1);
+    expect(queryRunner.query).toHaveBeenCalledTimes(1);
   });
 });

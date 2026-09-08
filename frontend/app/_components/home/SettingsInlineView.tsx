@@ -212,7 +212,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
                 id="inline-translate-lang"
                 value={defaultTranslateTargetLanguage || ''}
                 onChange={async (e) => {
-                  const ok = await updateSettings({ defaultTranslateTargetLanguage: e.target.value || undefined });
+                  const ok = await updateSettings({ defaultTranslateTargetLanguage: e.target.value });
                   pushToast({ title: ok ? '번역 설정 변경됨' : '변경 실패', variant: ok ? 'success' : 'error' });
                 }}
                 className="input-shell w-full text-sm"

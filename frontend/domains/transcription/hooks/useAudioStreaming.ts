@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import {
   cleanupAudioStreamingRuntime,
@@ -35,6 +35,8 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
   const [state, setState] = useState<AudioStreamingState>('idle');
   const [error, setError] = useState<string | null>(null);
   const refs = useAudioStreamingRuntimeRefs();
+  const startingRef = useRef(false);
+  const startGenerationRef = useRef(0);
 
   const notifyFallbackToBatch = useCallback((reason?: string) => {
     notifyAudioStreamingFallback(refs, reason);
@@ -112,6 +114,10 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
       socket: Socket,
       options?: StartStreamingOptions,
     ) => {
+      if (startingRef.current || refs.audioContextRef.current) return;
+
+      const generation = ++startGenerationRef.current;
+      startingRef.current = true;
       setError(null);
 
       try {
@@ -122,8 +128,13 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
           refs,
           handleChunk,
         });
+        if (generation !== startGenerationRef.current) {
+          cleanup();
+          return;
+        }
         setState('streaming');
       } catch (err) {
+        if (generation !== startGenerationRef.current) return;
         const message =
           err instanceof Error
             ? err.message
@@ -131,12 +142,18 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
         setError(message);
         setState('error');
         cleanup();
+      } finally {
+        if (generation === startGenerationRef.current) {
+          startingRef.current = false;
+        }
       }
     },
     [cleanup, handleChunk, refs],
   );
 
   const stopStreaming = useCallback(() => {
+    startGenerationRef.current += 1;
+    startingRef.current = false;
     setState('stopping');
     requestSessionStop();
     cleanup();
@@ -149,6 +166,8 @@ export function useAudioStreaming(): UseAudioStreamingReturn {
 
   useEffect(() => {
     return () => {
+      startGenerationRef.current += 1;
+      startingRef.current = false;
       cleanup();
     };
   }, [cleanup]);

@@ -44,6 +44,17 @@ export interface MeetingPromptFilterOption {
   name: string;
 }
 
+export function filterMeetingsByPrompt<T extends { promptId: string }>(
+  meetings: T[],
+  tagFilter: string | null,
+  isSearchApplied: boolean,
+): T[] {
+  if (!tagFilter || isSearchApplied) {
+    return meetings;
+  }
+  return meetings.filter((meeting) => meeting.promptId === tagFilter);
+}
+
 export function useMeetingListController({
   variant = 'dashboard',
   initialShowTrash = false,
@@ -272,14 +283,17 @@ export function useMeetingListController({
       result = result.filter((meeting) => new Date(meeting.startedAt) >= weekAgo);
     }
 
-    if (tagFilter) {
-      result = result.filter((meeting) => meeting.promptId === tagFilter);
-    }
+    result = filterMeetingsByPrompt(
+      result,
+      tagFilter,
+      search.isSearchApplied,
+    );
 
     return result;
   }, [
     activeFilter,
     meetings,
+    search.isSearchApplied,
     showTrash,
     tagFilter,
     timeFilter,

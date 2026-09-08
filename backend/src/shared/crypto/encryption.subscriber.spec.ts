@@ -4,7 +4,10 @@ import { ResultEntity } from '../../domain/result/domain/result.entity';
 import { TranscriptSegmentEntity } from '../../domain/transcription/domain/transcript-segment.entity';
 import { MeetingSearchDocumentEntity } from '../../domain/meeting/domain/meeting-search-document.entity';
 import { EncryptionSubscriber } from './encryption.subscriber';
-import type { EncryptionService } from './encryption.service';
+import {
+  EncryptionDecryptionError,
+  type EncryptionService,
+} from './encryption.service';
 
 type EncryptableEntity =
   | NoteEntity
@@ -76,6 +79,7 @@ describe('EncryptionSubscriber', () => {
 
   it('encrypts sensitive search projection fields before persistence', () => {
     const entity = new MeetingSearchDocumentEntity();
+    entity.meetingId = 'meeting-1';
     entity.title = '공개 제목';
     entity.noteContent = '민감한 노트';
     entity.resultContent = '민감한 결과';
@@ -98,17 +102,55 @@ describe('EncryptionSubscriber', () => {
     expect(JSON.stringify(entity)).not.toContain(
       '"transcriptContent":"민감한 전사"',
     );
+    expect(encryptionService.encrypt).toHaveBeenCalledWith(
+      '민감한 노트',
+      'MeetingSearchDocumentEntity.noteContent|meetingId=meeting-1',
+    );
+  });
+
+  it('isolates a corrupt search projection field without aborting other fields', () => {
+    const entity = new MeetingSearchDocumentEntity();
+    entity.meetingId = 'meeting-1';
+    entity.title = '제목';
+    entity.noteContent = 'enc:corrupt';
+    entity.resultContent = 'enc:정상 결과';
+    entity.transcriptContent = '전사';
+    encryptionService.decrypt.mockImplementation((value: string) => {
+      if (value === 'enc:corrupt') {
+        throw new EncryptionDecryptionError('AUTHENTICATION_FAILED');
+      }
+      return value.startsWith('enc:') ? value.slice(4) : value;
+    });
+
+    expect(() => subscriber.afterLoad(entity)).not.toThrow();
+
+    expect(entity.noteContent).toBe('');
+    expect(entity.resultContent).toBe('정상 결과');
+    expect(entity.transcriptContent).toBe('전사');
+  });
+
+  it('propagates typed decryption failures for primary source entities', () => {
+    const entity = buildNoteEntity('enc:corrupt');
+    encryptionService.decrypt.mockImplementation(() => {
+      throw new EncryptionDecryptionError('AUTHENTICATION_FAILED');
+    });
+
+    expect(() => subscriber.afterLoad(entity)).toThrow(
+      EncryptionDecryptionError,
+    );
   });
 });
 
 function buildNoteEntity(content: string): NoteEntity {
   const entity = new NoteEntity();
+  entity.meetingId = 'meeting-1';
   entity.content = content;
   return entity;
 }
 
 function buildResultEntity(content: string): ResultEntity {
   const entity = new ResultEntity();
+  entity.meetingId = 'meeting-1';
   entity.content = content;
   return entity;
 }
@@ -118,6 +160,7 @@ function buildTranscriptEntity(
   translatedText?: string,
 ): TranscriptSegmentEntity {
   const entity = new TranscriptSegmentEntity();
+  entity.meetingId = 'meeting-1';
   entity.text = text;
   entity.translatedText = translatedText;
   return entity;

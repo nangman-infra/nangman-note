@@ -69,4 +69,58 @@ describe('useTranscriptionStore', () => {
     expect(state.segments).toHaveLength(1);
     expect(state.segments[0]?.text).toBe('OK OK 좋아요좋아요');
   });
+
+  it('preserves provider result identity so post-resync translations still apply', () => {
+    useTranscriptionStore.getState().syncSegmentsFromServer([
+      {
+        id: 'db-segment-1',
+        providerResultId: 'provider-result-1',
+        text: '안녕하세요',
+        startTime: 0,
+        endTime: 1.2,
+      },
+    ]);
+
+    useTranscriptionStore.getState().handlePayload({
+      type: 'translation',
+      resultId: 'provider-result-1',
+      translatedText: 'hello',
+    });
+
+    expect(useTranscriptionStore.getState().segments).toEqual([
+      expect.objectContaining({
+        resultId: 'provider-result-1',
+        translatedText: 'hello',
+        translationStatus: 'done',
+      }),
+    ]);
+  });
+
+  it('deduplicates legacy server rows against matching live segments', () => {
+    useTranscriptionStore.getState().handlePayload({
+      type: 'final',
+      resultId: 'live-result-1',
+      text: '  같은   문장 ',
+      startTime: 10,
+      endTime: 11.2,
+      translationPending: true,
+    });
+
+    useTranscriptionStore.getState().syncSegmentsFromServer([
+      {
+        id: 'legacy-db-segment',
+        text: '같은 문장',
+        startTime: 10.1,
+        endTime: 11.3,
+      },
+    ]);
+
+    expect(useTranscriptionStore.getState().segments).toEqual([
+      expect.objectContaining({
+        resultId: 'live-result-1',
+        text: '같은 문장',
+        translationStatus: 'pending',
+      }),
+    ]);
+  });
 });
