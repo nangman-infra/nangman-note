@@ -67,9 +67,15 @@ pnpm dev                # http://localhost:3000
 ## Deployment
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 docker compose logs -f
 ```
+
+OAuth 운영 배포에서는 루트 `.env`의 `NEXTAUTH_URL`을 브라우저가 접속하는 canonical HTTPS
+origin 하나(예: `https://app.example.com`)로 반드시 지정합니다. Nginx Proxy Manager는
+`Host`, `X-Forwarded-Host`, `X-Forwarded-Proto`를 덮어써야 하며, www/non-www 같은 별칭은
+앱에 도달하기 전에 `NEXTAUTH_URL` host로 redirect해야 합니다. Authentik Provider의 Redirect URI도
+정확히 `{NEXTAUTH_URL}/api/auth/callback/authentik`이어야 합니다.
 
 IAM Roles Anywhere credential endpoint(`http://127.0.0.1:9912`) 접근을 위해
 Linux 호스트와 `network_mode: host`가 필요합니다.

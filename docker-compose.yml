@@ -108,9 +108,12 @@ services:
       NEXT_PUBLIC_ANALYTICS_SITE_ID: ${NEXT_PUBLIC_ANALYTICS_SITE_ID:-}
 
       # ─── Auth.js + Authentik ───
-      # NEXTAUTH_URL 은 반드시 단일 URL(브라우저가 접속하는 공개 origin). 세션 쿠키 이름(__Secure- 접두)과
-      # OAuth redirect_uri({NEXTAUTH_URL}/api/auth/callback/authentik) 산출에 쓰인다.
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-${CORS_ORIGIN}}
+      # CORS_ORIGIN fallback 금지: 브라우저가 실제 접속하는 canonical HTTPS origin 하나만 지정한다.
+      # 이 값, NPM의 공개 host, Authentik redirect URI가 정확히 같아야 state/PKCE 쿠키가 callback에 온다.
+      NEXTAUTH_URL: "${NEXTAUTH_URL:?NEXTAUTH_URL must be set to the public app origin}"
+      # NPM이 외부 요청의 Host/X-Forwarded-Host/X-Forwarded-Proto를 덮어쓰는 trusted proxy인 경우만 사용.
+      # NextAuth 4.24가 TLS 종료 전의 공개 origin으로 redirect_uri를 만들도록 한다.
+      AUTH_TRUST_HOST: "true"
       AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER_FE}
       AUTHENTIK_CLIENT_ID: ${AUTH_OIDC_AUDIENCE}
       # NEXTAUTH_SECRET / AUTHENTIK_CLIENT_SECRET 은 SECRET_AUTH_ID 시크릿(JSON)에서 부팅 시 로딩.

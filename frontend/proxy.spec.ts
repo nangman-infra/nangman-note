@@ -17,11 +17,57 @@ describe('proxy', () => {
   beforeEach(() => {
     getTokenMock.mockReset();
     process.env.BACKEND_URL = 'http://localhost:9999';
+    process.env.NEXTAUTH_URL = 'https://app.example.com';
     process.env.NEXTAUTH_SECRET = 'test-secret';
   });
 
   afterEach(() => {
     delete process.env.BACKEND_URL;
+    delete process.env.NEXTAUTH_URL;
+  });
+
+  describe('canonical auth origin', () => {
+    it('redirects an alias host before an OAuth state cookie can be created', async () => {
+      const response = await proxy(
+        request('/auth/signin?callbackUrl=%2F', {
+          'x-forwarded-host': 'www.app.example.com',
+          'x-forwarded-proto': 'https',
+        }),
+      );
+
+      expect(response.status).toBe(308);
+      expect(response.headers.get('location')).toBe(
+        'https://app.example.com/auth/signin?callbackUrl=%2F',
+      );
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(getTokenMock).not.toHaveBeenCalled();
+    });
+
+    it('accepts the canonical origin forwarded by NPM', async () => {
+      const forwardedRequest = new NextRequest(
+        'http://127.0.0.1:3002/api/auth/session',
+        {
+          headers: {
+            host: '127.0.0.1:3002',
+            'x-forwarded-host': 'app.example.com',
+            'x-forwarded-proto': 'https',
+          },
+        },
+      );
+
+      const response = await proxy(forwardedRequest);
+
+      expect(response.headers.get('x-middleware-next')).toBe('1');
+      expect(getTokenMock).not.toHaveBeenCalled();
+    });
+
+    it('does not redirect the internal health check to the public origin', async () => {
+      const healthRequest = new NextRequest('http://127.0.0.1:3002/api/health');
+
+      const response = await proxy(healthRequest);
+
+      expect(response.headers.get('x-middleware-next')).toBe('1');
+    });
   });
 
   describe('protected pages', () => {

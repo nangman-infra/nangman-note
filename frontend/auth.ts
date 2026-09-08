@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import AuthentikProvider from 'next-auth/providers/authentik';
+import { getAuthPublicUrl } from '@/lib/auth/auth-origin';
 import { getServerRuntimeVar } from '@/lib/config/env';
 
 interface AuthRuntimeConfig {
@@ -272,8 +273,12 @@ export function shouldRefreshAccessToken(
 
 export function createAuthOptions(): NextAuthOptions {
   const authConfig = readAuthRuntimeConfig();
+  const authPublicUrl = getAuthPublicUrl();
 
   return {
+    // AUTH_TRUST_HOST가 켜져 있어도 NPM 헤더 변화로 state/PKCE 쿠키 이름이
+    // 요청마다 바뀌지 않도록 canonical 공개 URL 기준으로 고정한다.
+    useSecureCookies: authPublicUrl.protocol === 'https:',
     pages: {
       signIn: '/auth/signin',
     },
@@ -329,6 +334,7 @@ let cachedAuthOptions: { key: string; options: NextAuthOptions } | undefined;
  */
 export function getAuthOptions(): NextAuthOptions {
   const key = [
+    getServerRuntimeVar('NEXTAUTH_URL'),
     getServerRuntimeVar('AUTHENTIK_ISSUER'),
     getServerRuntimeVar('AUTHENTIK_CLIENT_ID'),
     getServerRuntimeVar('AUTHENTIK_CLIENT_SECRET'),

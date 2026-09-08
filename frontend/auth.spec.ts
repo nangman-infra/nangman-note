@@ -38,6 +38,7 @@ describe('auth.ts', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
+    process.env.NEXTAUTH_URL = 'https://app.example.com';
     process.env.AUTHENTIK_ISSUER = ISSUER;
     process.env.AUTHENTIK_CLIENT_ID = 'client-id';
     process.env.AUTHENTIK_CLIENT_SECRET = 'client-secret';
@@ -261,8 +262,22 @@ describe('auth.ts', () => {
   });
 
   describe('getAuthOptions', () => {
+    it('pins secure OAuth cookies to the canonical HTTPS origin', () => {
+      expect(getAuthOptions().useSecureCookies).toBe(true);
+    });
+
     it('reuses the same options object across calls', () => {
       expect(getAuthOptions()).toBe(getAuthOptions());
+    });
+
+    it('rebuilds options when the canonical auth origin changes', () => {
+      const before = getAuthOptions();
+      process.env.NEXTAUTH_URL = 'http://localhost:3000';
+
+      const after = getAuthOptions();
+
+      expect(after).not.toBe(before);
+      expect(after.useSecureCookies).toBe(false);
     });
 
     it('rebuilds options when the runtime secret changes', () => {

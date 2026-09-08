@@ -28,7 +28,8 @@ Optional keys:
 
 Auth (NextAuth v4 + Authentik):
 
-- `NEXTAUTH_URL` — single public origin of the app (used for the OAuth redirect URI and cookie flags)
+- `NEXTAUTH_URL` — single canonical HTTPS origin of the app; do not reuse a comma-separated `CORS_ORIGIN`
+- `AUTH_TRUST_HOST=true` — required behind the trusted TLS-terminating reverse proxy; the proxy must overwrite `Host`, `X-Forwarded-Host`, and `X-Forwarded-Proto`
 - `NEXTAUTH_SECRET` — session cookie (JWE) key. In production it is loaded once at boot from Secrets Manager (`SECRET_AUTH_ID`); rotating it requires a restart, otherwise every logged-in session would be invalidated instantly
 - `AUTHENTIK_ISSUER`, `AUTHENTIK_CLIENT_ID`, `AUTHENTIK_CLIENT_SECRET`
 

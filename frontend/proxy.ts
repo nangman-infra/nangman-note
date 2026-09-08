@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { getAuthPublicUrl, getExternalRequestOrigin } from '@/lib/auth/auth-origin';
 import {
+  isAuthPath,
   isBackendProxyPath,
   isHealthPath,
   isNextAuthPath,
@@ -59,6 +61,27 @@ function redirectToSignIn(request: NextRequest): NextResponse {
 }
 
 /**
+ * state 쿠키는 OAuth 시작 응답의 host에만 귀속된다. www/non-www 또는 http/https가
+ * callback의 canonical origin과 다르면 복구할 수 없으므로 state 생성 전에 먼저 이동한다.
+ */
+function redirectToCanonicalAuthOrigin(
+  request: NextRequest,
+): NextResponse | null {
+  const canonicalUrl = getAuthPublicUrl();
+  if (getExternalRequestOrigin(request) === canonicalUrl.origin) {
+    return null;
+  }
+
+  const destination = new URL(
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    canonicalUrl,
+  );
+  const response = NextResponse.redirect(destination, 308);
+  response.headers.set('cache-control', 'no-store');
+  return response;
+}
+
+/**
  * Next.js Proxy
  *
  * 1. 보호 페이지(/, /meeting/*, /settings/*): NextAuth 세션 쿠키가 없으면 로그인 페이지로.
@@ -73,6 +96,17 @@ function redirectToSignIn(request: NextRequest): NextResponse {
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const secret = process.env.NEXTAUTH_SECRET;
+
+  if (
+    isProtectedPath(pathname) ||
+    isAuthPath(pathname) ||
+    isNextAuthPath(pathname)
+  ) {
+    const canonicalRedirect = redirectToCanonicalAuthOrigin(request);
+    if (canonicalRedirect) {
+      return canonicalRedirect;
+    }
+  }
 
   if (isProtectedPath(pathname)) {
     const token = await getToken({ req: request, secret });
@@ -116,6 +150,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/',
+    '/auth/:path*',
     '/meeting/:path*',
     '/settings/:path*',
     '/api/:path*',
