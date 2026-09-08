@@ -1,76 +1,87 @@
-/* ─── Column controls: buttons, inputs, labels, focus ──────────────────
+/* ─── n8n controls: buttons, inputs, labels, focus ─────────────────────
    Rules of the system:
-   • Every interactive surface is 8px radius. 9999px is for tags only.
-   • Primary = Indigo Navy fill. Secondary = navy outline. Never two fills
-     side by side.
-   • Signal Orange (.btn-accent) is rare — at most one surface per page.
+   • Ember gradient is ONLY for the primary CTA. Never decorative.
+   • Electric Current gradient marks interactivity: focus rings, link
+     underlines, active indicators.
+   • Buttons / inputs 8px. Pills 9999px are for tags and status only.
+   • Weights 300 / 400 / 500 only.
    ──────────────────────────────────────────────────────────────────── */
 @layer components {
-  /* Neutral ghost/outlined control (toolbar buttons, tertiary actions) */
+  /* Frosted ghost — tertiary actions over dark panels */
   .btn-neo {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     border-radius: var(--radius-button);
-    border: 1px solid var(--line-soft);
-    background: var(--bg-card);
+    border: 1px solid var(--line-inset);
+    background: var(--surface-frosted);
     padding: 0.5rem 0.875rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.25rem;
     color: var(--ink-subtle);
-    box-shadow: var(--elevation-sm);
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: var(--elevation-halo);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
   .btn-neo:hover {
+    background: var(--surface-container);
     border-color: var(--line-strong);
     color: var(--ink-strong);
-    background: var(--surface-container-low);
   }
 
-  /* Primary filled — Indigo Navy */
+  /* Primary — Ember gradient CTA */
   .btn-primary {
+    position: relative;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     border-radius: var(--radius-button);
     border: none;
-    padding: 0.75rem 1.25rem;
+    padding: 0.75rem 1.5rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.25rem;
-    background: var(--brand);
-    color: var(--on-brand);
+    background-image: var(--gradient-ember);
+    color: #ffffff;
     box-shadow: var(--elevation-button);
-    transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    transition: filter 0.15s ease, transform 0.15s ease;
   }
   .btn-primary:hover {
-    background: var(--brand-strong);
+    filter: brightness(1.08) saturate(1.1);
   }
   .btn-primary:active {
     transform: translateY(1px);
   }
+  .btn-primary:disabled {
+    filter: saturate(0.4);
+  }
 
-  /* Secondary outlined — navy hairline */
+  /* Secondary — ghost outline, Silver Rail hairline */
   .btn-secondary {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: var(--radius-button);
-    border: 1px solid var(--brand);
-    padding: 0.625rem 1rem;
+    border-radius: 6px;
+    border: 1px solid var(--outline-variant);
+    padding: 0.75rem 1.5rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.25rem;
-    color: var(--brand);
+    color: var(--ink-strong);
     background: transparent;
-    transition: background-color 0.15s ease, color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
   }
   .btn-secondary:hover {
-    background: rgba(17, 26, 74, 0.06);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--color-silver-rail);
+  }
+  [data-theme='light'] .btn-secondary:hover {
+    background: rgba(14, 9, 24, 0.05);
   }
 
-  /* Data / AI action — Seafoam 700 */
+  /* Electric — data / AI action */
   .btn-ai {
     align-items: center;
     justify-content: center;
@@ -79,57 +90,57 @@
     border: none;
     padding: 0.625rem 1rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.25rem;
-    background: var(--tertiary);
-    color: var(--on-tertiary);
+    background-image: var(--gradient-electric);
+    color: #ffffff;
     box-shadow: var(--elevation-button);
-    transition: background-color 0.15s ease;
+    transition: filter 0.15s ease;
   }
   .btn-ai:hover {
-    background: var(--tertiary-container);
+    filter: brightness(1.1);
   }
 
-  /* Accent — Signal Orange. One per page. */
+  /* Accent — alias of primary (kept for compatibility) */
   .btn-accent {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     border-radius: var(--radius-button);
     border: none;
-    padding: 0.75rem 1.25rem;
+    padding: 0.75rem 1.5rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.25rem;
-    background: var(--accent);
+    background-image: var(--gradient-ember);
     color: #ffffff;
     box-shadow: var(--elevation-button);
-    transition: filter 0.15s ease;
-  }
-  .btn-accent:hover {
-    filter: brightness(0.94);
   }
 
-  /* Destructive — muted institutional red */
+  /* Destructive — scorch fill */
   .btn-danger {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     border-radius: var(--radius-button);
-    border: none;
+    border: 1px solid rgba(255, 73, 44, 0.4);
     padding: 0.625rem 1rem;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.25rem;
-    background: var(--danger);
-    color: #ffffff;
-    transition: filter 0.15s ease;
+    background: rgba(255, 73, 44, 0.16);
+    color: #ff8a75;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
   .btn-danger:hover {
-    filter: brightness(0.92);
+    background: var(--color-ember-scorch);
+    color: #ffffff;
+  }
+  [data-theme='light'] .btn-danger {
+    color: #c9301a;
   }
 
-  /* Icon-only ghost button (nav actions, dismiss) */
+  /* Icon-only ghost */
   .btn-icon {
     align-items: center;
     justify-content: center;
@@ -157,7 +168,7 @@
   color: #ffffff !important;
 }
 
-/* ─── Focus — navy ring, always visible for keyboard ─────────────────── */
+/* ─── Focus — Electric Current ring ──────────────────────────────────── */
 .btn-neo:focus-visible,
 .btn-primary:focus-visible,
 .btn-secondary:focus-visible,
@@ -171,30 +182,24 @@ a:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 input:focus-visible {
-  outline: 2px solid rgba(17, 26, 74, 0.55);
+  outline: 2px solid var(--color-electric-current);
   outline-offset: 2px;
 }
-[data-theme='dark'] .btn-neo:focus-visible,
-[data-theme='dark'] button:focus-visible,
-[data-theme='dark'] a:focus-visible,
-[data-theme='dark'] select:focus-visible,
-[data-theme='dark'] textarea:focus-visible,
-[data-theme='dark'] input:focus-visible {
-  outline-color: rgba(185, 193, 236, 0.7);
-}
 
-/* ─── Inputs — white field, Silver Lining hairline, navy focus ─────────── */
+/* ─── Inputs — void field, inset hairline, electric focus ───────────── */
 .input-shell {
   width: 100%;
   border-radius: var(--radius-input);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-card);
+  border: 1px solid var(--line-inset);
+  background: var(--bg-root);
   padding: 0.625rem 0.875rem;
   font-size: 0.9375rem;
   line-height: 1.5;
   color: var(--ink-strong);
-  box-shadow: rgba(18, 22, 30, 0.02) 0px 1px 2px 0px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+[data-theme='light'] .input-shell {
+  background: var(--bg-card);
 }
 .input-shell::placeholder {
   color: var(--ink-faint);
@@ -204,11 +209,22 @@ input:focus-visible {
 }
 .input-shell:focus {
   outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(17, 26, 74, 0.12);
+  border-color: var(--color-electric-current);
+  box-shadow: 0 0 0 3px rgba(7, 122, 199, 0.28);
 }
-[data-theme='dark'] .input-shell:focus {
-  box-shadow: 0 0 0 3px rgba(185, 193, 236, 0.22);
+
+/* ─── Links — Electric underline ─────────────────────────────────────── */
+.link-electric {
+  color: var(--ink-strong);
+  text-decoration: none;
+  background-image: var(--gradient-electric);
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  transition: background-size 0.2s ease;
+}
+.link-electric:hover {
+  background-size: 100% 1px;
 }
 
 /* ─── Tags & labels ──────────────────────────────────────────────────── */
@@ -217,42 +233,45 @@ input:focus-visible {
   padding: 0.25rem 0.625rem;
   font-size: 0.6875rem;
   line-height: 1;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-/* Tag with dot — category label, no rounding */
+/* Tag with dot — section label; dot carries the Electric gradient */
 .tag-dot {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--brand);
+  color: var(--ink-muted);
 }
 .tag-dot::before {
   content: '';
   width: 6px;
   height: 6px;
   border-radius: 9999px;
-  background: var(--tertiary-fixed-dim);
+  background-image: var(--gradient-electric);
   flex-shrink: 0;
 }
-.tag-dot--navy::before {
-  background: var(--brand);
+.tag-dot--navy::before,
+.tag-dot--white::before {
+  background-image: none;
+  background-color: var(--ink-strong);
 }
-.tag-dot--orange::before {
-  background: var(--accent);
+.tag-dot--orange::before,
+.tag-dot--ember::before {
+  background-image: var(--gradient-ember);
 }
 
-/* Small technical label — mono, uppercase, steel */
+/* Small technical label — mono, uppercase, fog */
 .label-sm {
   font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.5;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -263,20 +282,31 @@ input:focus-visible {
 .data-mono {
   font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'cv11', 'salt' 2;
 }
 
-/* Editorial heading treatment — tight tracking scales with size */
-.font-headline {
-  font-family: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+/* Hiring-style badge — white pill on dark */
+.badge-white {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-badge);
+  background: #ffffff;
+  color: var(--color-steel-muted);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 400;
 }
-.font-headline.text-5xl,
-.font-headline.text-6xl,
-.font-headline.lg\:text-5xl,
-.font-headline.lg\:text-6xl {
-  letter-spacing: -0.03em;
+
+/* Display treatment — light weight, compressed stack */
+.font-headline {
+  font-family: var(--font-geo), 'DM Sans', 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.018em;
+}
+.font-display {
+  font-family: var(--font-geo), 'DM Sans', 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
 }
 
 /* ─── Scrollbars ─────────────────────────────────────────────────────── */

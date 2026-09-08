@@ -238,7 +238,7 @@ export function ResultViewer({
   };
 
   return (
-    <div className="scroll-muted flex h-full flex-col overflow-y-auto bg-white">
+    <div className="scroll-muted flex h-full flex-col overflow-y-auto">
       <ResultViewerHeader
         result={result}
         isEditing={isEditing}
@@ -287,7 +287,7 @@ export function ResultViewer({
       </section>
 
       {!isEditing && activeTab === 'result' && (
-        <footer className="border-t border-[var(--line-soft)] bg-[var(--surface-container-low)] px-6 py-5">
+        <footer className="border-t border-[var(--line-soft)] bg-[var(--bg-card)] px-6 py-5">
           <div className="mx-auto w-full max-w-[880px] sm:px-2 lg:px-4">
           <ResultRegeneratePanel
             isOpen={showRegenerate}

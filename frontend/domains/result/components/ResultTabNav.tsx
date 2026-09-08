@@ -31,7 +31,7 @@ export function ResultTabNav({ activeTab, onTabChange }: ResultTabNavProps) {
   };
 
   return (
-    <div className="sticky top-0 z-20 border-b border-[var(--line-soft)] bg-white/90 backdrop-blur-xl">
+    <div className="sticky top-0 z-20 border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] backdrop-blur-xl">
       <div role="tablist" aria-label="회의 문서 보기" className="mx-auto flex w-full max-w-[880px] gap-6 px-6 sm:px-8 lg:px-10">
         {RESULT_TABS.map((tab, index) => (
           <button
@@ -45,10 +45,10 @@ export function ResultTabNav({ activeTab, onTabChange }: ResultTabNavProps) {
             tabIndex={activeTab === tab.key ? 0 : -1}
             onClick={() => onTabChange(tab.key)}
             onKeyDown={(event) => handleKeyDown(event, index)}
-            className={`-mb-px py-3.5 text-sm transition ${
+            className={`relative -mb-px py-3.5 text-sm transition ${
               activeTab === tab.key
-                ? 'border-b-2 border-brand font-medium text-brand'
-                : 'border-b-2 border-transparent font-normal text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
+                ? 'text-[var(--ink-strong)] after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-electric-gradient after:content-[\'\']'
+                : 'text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
             }`}
           >
             {tab.label}

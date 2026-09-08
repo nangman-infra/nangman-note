@@ -63,12 +63,12 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
       <div className="h-dvh bg-[var(--bg-root)] p-3 lg:hidden">
         {/* Mobile top bar */}
         <header className="mb-3 flex items-center justify-between rounded-lg bg-slate-50/80 px-4 py-2.5 shadow-sm backdrop-blur-xl motion-rise">
-          <span className="font-headline text-sm font-semibold tracking-tighter text-indigo-700">TransNote</span>
+          <span className="font-headline text-sm font-medium tracking-tighter text-indigo-700">TransNote</span>
           <div className="inline-flex rounded-lg bg-[var(--surface-container-low)] p-1">
             <button
               type="button"
               onClick={() => setActiveColumn('sidebar')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 activeColumn === 'sidebar' ? 'bg-brand-gradient text-white shadow-sm' : 'text-slate-500'
               }`}
             >
@@ -78,7 +78,7 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
             <button
               type="button"
               onClick={() => setActiveColumn('list')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 activeColumn === 'list' ? 'bg-brand-gradient text-white shadow-sm' : 'text-slate-500'
               }`}
             >
@@ -88,7 +88,7 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
             <button
               type="button"
               onClick={() => setActiveColumn('viewer')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
                 activeColumn === 'viewer' ? 'bg-brand-gradient text-white shadow-sm' : 'text-slate-500'
               }`}
             >

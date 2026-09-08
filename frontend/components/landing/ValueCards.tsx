@@ -29,7 +29,7 @@ export function ValueCards() {
     <section className="py-16 sm:py-24">
       <div className="mx-auto max-w-6xl px-5">
         <ScrollReveal>
-          <p className="text-center text-xs font-semibold tracking-widest text-muted">
+          <p className="text-center text-xs font-medium tracking-widest text-muted">
             CORE VALUE
           </p>
           <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
@@ -44,7 +44,7 @@ export function ValueCards() {
                 <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${v.color}`}>
                   <v.icon className="h-5 w-5" />
                 </div>
-                <h3 className="mt-4 text-lg font-semibold">{v.title}</h3>
+                <h3 className="mt-4 text-lg font-medium">{v.title}</h3>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-muted">
                   {v.description}
                 </p>

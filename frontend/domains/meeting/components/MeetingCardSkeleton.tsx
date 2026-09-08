@@ -7,7 +7,7 @@
  * 발생하지 않도록 한다.
  *
  * Stitch 사양:
- * - No-Line Rule: border 금지, 배경 톤으로 구획 (bg-white 기본)
+ * - No-Line Rule: border 금지, 배경 톤으로 구획 (bg-card 기본)
  * - rounded-lg (12px) + p-5 로 실제 카드 footprint 일치
  * - Skeleton 자체에는 shadow 없음 (실제 카드는 hover/active 시에만 shadow)
  * - Placeholder bar는 surface-container-high 톤으로 뚜렷하게 표시
@@ -15,7 +15,7 @@
 export function MeetingCardSkeleton() {
   return (
     <div
-      className="w-full rounded-lg border border-[var(--line-soft)] bg-white px-4 py-3"
+      className="w-full rounded-[12px] bg-card px-4 py-3 shadow-[var(--elevation-sm)]"
       aria-hidden="true"
     >
       <div className="flex items-center gap-3">

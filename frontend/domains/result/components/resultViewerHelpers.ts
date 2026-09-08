@@ -1,11 +1,11 @@
 const SECONDS_PER_MINUTE = 60;
 
-/** Column speaker palette — navy, seafoam, ocean depth, signal orange. */
+/** Column speaker palette — navy, electric, ocean depth, ember orange. */
 export const RESULT_SPEAKER_PALETTE = [
-  'bg-navy',
-  'bg-seafoam-deep',
-  'bg-[#0c6997]',
-  'bg-signal',
+  'bg-electric-deep',
+  'bg-electric-violet',
+  'bg-success',
+  'bg-ember',
 ];
 
 export function formatSegmentTime(seconds: number): string {

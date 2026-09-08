@@ -66,9 +66,9 @@ export function FeatureTab() {
             aria-selected={active === tab.id}
             aria-controls={`tabpanel-${tab.id}`}
             onClick={() => setActive(tab.id)}
-            className={`flex flex-1 items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold transition ${
+            className={`flex flex-1 items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition ${
               active === tab.id
-                ? 'border-b-2 border-brand text-brand'
+                ? 'border-b-2 border-electric-deep text-electric'
                 : 'text-muted hover:text-foreground'
             }`}
           >
@@ -87,7 +87,7 @@ export function FeatureTab() {
       >
         <div key={current.id} className="landing-tab-fade">
           <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${current.color}`}>
+            <span className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${current.color}`}>
               <current.icon className="h-3.5 w-3.5" />
               {current.label} 문서
             </span>
@@ -98,13 +98,13 @@ export function FeatureTab() {
           </p>
 
           <div className="mt-5">
-            <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted">
+            <p className="mb-2 text-[11px] font-medium tracking-wide text-muted">
               문서 구조
             </p>
             <ol className="space-y-1.5">
               {current.structure.map((item, i) => (
                 <li key={item} className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-brand/10 text-[10px] font-medium text-brand">
+                  <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-[var(--surface-container)] text-[10px] font-medium text-electric">
                     {i + 1}
                   </span>
                   {item}

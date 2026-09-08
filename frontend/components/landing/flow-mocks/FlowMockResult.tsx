@@ -10,7 +10,7 @@ import { ChevronDown, Copy, Download, Edit3, Sparkles } from 'lucide-react';
  *   + Manrope 대형 헤드라인(축소 스케일) + 참가자 아바타 스택(-space-x)
  * - 액션 줄: Export 드롭다운(btn-primary, ChevronDown) + 편집 + 복사
  *   (보조 버튼은 btn-secondary 룩)
- * - 탭 바: 활성 탭 `border-b-2 border-brand text-slate-900`,
+ * - 탭 바: 활성 탭 `border-b-2 border-electric-deep text-slate-900`,
  *   비활성 탭 `text-[var(--ink-muted)]`
  * - 본문 (AI Summary 탭): 8/4 grid
  *   - 좌측: `ai-card-accent` 축소판 (4px tertiary 좌측 바 + surface-container-highest,
@@ -35,20 +35,20 @@ export function FlowMockResult() {
         </div>
 
         {/* Manrope 축소판 헤드라인 */}
-        <h2 className="font-headline text-[15px] font-semibold leading-tight tracking-tight text-slate-900">
+        <h2 className="font-headline text-[15px] font-medium leading-tight tracking-tight text-slate-900">
           주간 정기회의
         </h2>
 
         {/* 참가자 아바타 스택 */}
         <div className="flex items-center gap-1.5">
           <div className="flex -space-x-1.5" aria-label="참가자 3명">
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[7px] font-medium text-white ring-1 ring-white">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[7px] font-medium text-white ring-1 ring-[var(--bg-card)]">
               S1
             </span>
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[7px] font-medium text-white ring-1 ring-white">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-[7px] font-medium text-white ring-1 ring-[var(--bg-card)]">
               S2
             </span>
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[7px] font-medium text-white ring-1 ring-white">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[7px] font-medium text-white ring-1 ring-[var(--bg-card)]">
               S3
             </span>
           </div>
@@ -60,18 +60,18 @@ export function FlowMockResult() {
         {/* 액션 줄: Export 드롭다운 + 편집 + 복사 */}
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           {/* Export — btn-primary 축소판 */}
-          <span className="inline-flex items-center gap-1 rounded-md bg-brand px-2 py-1 text-[9px] font-medium text-white shadow-sm">
+          <span className="inline-flex items-center gap-1 rounded-md bg-[var(--surface-container)] px-2 py-1 text-[9px] font-medium text-white shadow-sm">
             <Download className="h-2.5 w-2.5" aria-hidden="true" />
             Export
             <ChevronDown className="h-2.5 w-2.5" aria-hidden="true" />
           </span>
           {/* 편집 — btn-secondary 룩 */}
-          <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 text-[9px] font-semibold text-brand">
+          <span className="inline-flex items-center gap-1 rounded-md bg-card/70 px-2 py-1 text-[9px] font-medium text-electric">
             <Edit3 className="h-2.5 w-2.5" aria-hidden="true" />
             편집
           </span>
           {/* 복사 — btn-secondary 룩 */}
-          <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-2 py-1 text-[9px] font-semibold text-brand">
+          <span className="inline-flex items-center gap-1 rounded-md bg-card/70 px-2 py-1 text-[9px] font-medium text-electric">
             <Copy className="h-2.5 w-2.5" aria-hidden="true" />
             복사
           </span>
@@ -80,7 +80,7 @@ export function FlowMockResult() {
 
       {/* ── 탭 바 (No-Line: 배경 톤으로 구획, 활성 탭만 2px brand bar) ── */}
       <div className="flex gap-4 bg-[var(--surface-container-low)] px-3">
-        <span className="border-b-2 border-brand py-1.5 text-[9px] font-medium tracking-wide text-slate-900">
+        <span className="border-b-2 border-electric-deep py-1.5 text-[9px] font-medium tracking-wide text-slate-900">
           AI Summary
         </span>
         <span className="border-b-2 border-transparent py-1.5 text-[9px] font-medium tracking-wide text-[var(--ink-muted)]">
@@ -118,20 +118,20 @@ export function FlowMockResult() {
 
         {/* 우측(4): 생성 정보 메타 카드 */}
         <aside className="col-span-4">
-          <div className="rounded-lg bg-white p-2 shadow-sm">
+          <div className="rounded-lg bg-card p-2 shadow-sm">
             <h3 className="mb-1 text-[8px] font-medium uppercase tracking-wider text-[var(--ink-muted)]">
               생성 정보
             </h3>
             <dl className="space-y-1">
               <div className="flex items-baseline justify-between gap-1.5">
                 <dt className="text-[8px] text-[var(--ink-muted)]">단어</dt>
-                <dd className="font-mono text-[8px] font-semibold text-slate-900">
+                <dd className="font-mono text-[8px] font-medium text-slate-900">
                   4,238
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-1.5">
                 <dt className="text-[8px] text-[var(--ink-muted)]">노트</dt>
-                <dd className="font-mono text-[8px] font-semibold text-slate-900">
+                <dd className="font-mono text-[8px] font-medium text-slate-900">
                   312자
                 </dd>
               </div>

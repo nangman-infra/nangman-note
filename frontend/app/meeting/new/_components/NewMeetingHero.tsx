@@ -19,14 +19,14 @@ export function NewMeetingHero({ onBack }: NewMeetingHeroProps) {
       </button>
 
       <span className="tag-dot">
-        <Sparkles className="h-3.5 w-3.5 text-seafoam-deep" strokeWidth={1.75} />
+        <Sparkles className="h-3.5 w-3.5 text-electric" strokeWidth={1.5} />
         Start session
       </span>
 
-      <h1 className="font-headline mt-5 text-[40px] leading-[1.05] text-[var(--ink-strong)] sm:text-[48px]">
+      <h1 className="font-display mt-6 text-[44px] text-[var(--ink-strong)] sm:text-[48px]">
         회의를 시작하고
         <br />
-        <span className="text-brand">노트를 바로 작성하세요</span>
+        <span className="text-electric-gradient">노트를 바로 작성하세요</span>
       </h1>
 
       <p className="mt-5 max-w-md text-base leading-relaxed text-[var(--ink-muted)]">
@@ -66,7 +66,7 @@ function FeatureCard({
 }) {
   return (
     <article className="surface-card p-4">
-      <div className="mb-3 inline-flex rounded-lg border border-[var(--line-soft)] bg-[var(--surface-container-low)] p-2 text-brand">
+      <div className="mb-3 inline-flex rounded-[10px] bg-[var(--surface-container)] p-2 text-electric shadow-[var(--elevation-sm)]">
         <Icon className="h-4 w-4" strokeWidth={1.75} />
       </div>
       <h3 className="text-sm font-medium text-[var(--ink-strong)]">

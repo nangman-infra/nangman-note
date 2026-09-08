@@ -8,12 +8,12 @@ export function formatSegmentTime(seconds: number): string {
 
 /** 화자 라벨별 뱃지 색상 팔레트 (다크 패널용) */
 const SPEAKER_BADGE_CLASSES = [
-  'bg-[#b9c1ec]/20 text-[#d1d7f5]',
-  'bg-seafoam/20 text-seafoam-bright',
-  'bg-skywash/20 text-skywash',
-  'bg-peach/20 text-peach',
+  'bg-electric-deep/25 text-electric',
+  'bg-electric-violet/25 text-electric-bright',
+  'bg-success/20 text-success',
+  'bg-ember/20 text-ember-text',
   'bg-white/10 text-white/80',
-  'bg-[#f08b80]/20 text-[#f08b80]',
+  'bg-scorch/20 text-danger',
 ] as const;
 
 /** 'spk_0' → '화자 1' 형태의 표시 이름 */

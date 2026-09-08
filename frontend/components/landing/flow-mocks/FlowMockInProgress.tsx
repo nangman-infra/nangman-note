@@ -18,14 +18,14 @@ export function FlowMockInProgress() {
       {/* ── Stitch TopBar ── */}
       <header className="flex items-center justify-between bg-slate-50/80 px-3 py-2 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="font-headline text-[11px] font-semibold tracking-tighter text-indigo-700">
+          <span className="font-headline text-[11px] font-medium tracking-tighter text-indigo-700">
             TransNote
           </span>
           <nav
             aria-label="Breadcrumb"
             className="flex min-w-0 items-center gap-1 text-[9px] font-medium text-slate-400"
           >
-            <span className="font-semibold text-indigo-700">대시보드</span>
+            <span className="font-medium text-indigo-700">대시보드</span>
             <span aria-hidden="true">›</span>
             <span className="truncate font-medium text-slate-900">주간 정기회의</span>
           </nav>
@@ -56,7 +56,7 @@ export function FlowMockInProgress() {
           <div className="flex-1 space-y-1.5 overflow-hidden px-2 py-2 text-[9px] leading-snug">
             <div>
               <div className="flex items-center gap-1">
-                <span className="rounded bg-teal-400/20 px-1 text-[8px] font-semibold text-teal-300">
+                <span className="rounded bg-teal-400/20 px-1 text-[8px] font-medium text-teal-300">
                   화자 1
                 </span>
                 <span className="text-[8px] text-slate-500">00:12</span>
@@ -65,7 +65,7 @@ export function FlowMockInProgress() {
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <span className="rounded bg-amber-400/20 px-1 text-[8px] font-semibold text-amber-300">
+                <span className="rounded bg-amber-400/20 px-1 text-[8px] font-medium text-amber-300">
                   화자 2
                 </span>
                 <span className="text-[8px] text-slate-500">00:28</span>
@@ -74,7 +74,7 @@ export function FlowMockInProgress() {
             </div>
             <div>
               <div className="flex items-center gap-1">
-                <span className="rounded bg-teal-400/20 px-1 text-[8px] font-semibold text-teal-300">
+                <span className="rounded bg-teal-400/20 px-1 text-[8px] font-medium text-teal-300">
                   화자 1
                 </span>
                 <span className="text-[8px] text-slate-500">01:05</span>
@@ -109,7 +109,7 @@ export function FlowMockInProgress() {
           <div className="mt-0.5 space-y-0.5 text-[9px] leading-relaxed text-muted">
             <p>- 캐시 레이어 도입 논의</p>
           </div>
-          <p className="mt-2 text-[8px] italic text-brand/60">마크다운으로 자유롭게 작성…</p>
+          <p className="mt-2 text-[8px] italic text-electric/60">마크다운으로 자유롭게 작성…</p>
         </section>
       </div>
     </div>

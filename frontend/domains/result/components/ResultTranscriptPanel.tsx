@@ -35,14 +35,14 @@ export function ResultTranscriptPanel({
 
   return (
     <div className="surface-card overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[var(--line-soft)] bg-[var(--surface-container-low)] px-5 py-3">
+      <div className="flex items-center justify-between border-b border-[var(--line-soft)] px-5 py-3">
         <span className="tag-dot">Transcript</span>
         <span className="data-mono text-[11px] text-[var(--ink-muted)]">{transcripts.length} segments</span>
       </div>
       <div className="divide-y divide-[var(--line-soft)]">
         {transcripts.map((segment) => (
           <div key={segment.id} className="flex gap-4 px-5 py-3 text-sm">
-            <span className="data-mono shrink-0 pt-0.5 text-[11px] text-seafoam-deep">
+            <span className="data-mono shrink-0 pt-0.5 text-[11px] text-electric">
               {formatSegmentTime(segment.startTime)}
             </span>
             {segment.speakerLabel ? (
@@ -61,10 +61,10 @@ export function ResultTranscriptPanel({
 }
 
 const RESULT_SPEAKER_BADGE_CLASSES = [
-  'bg-[var(--brand-fixed)] text-brand',
+  'bg-[var(--tertiary-fixed)] text-electric',
   'bg-[var(--tertiary-fixed)] text-[var(--tertiary)]',
   'bg-[var(--info-soft)] text-[var(--info)]',
-  'bg-[var(--accent-soft)] text-[#a4431a]',
+  'bg-[var(--accent-soft)] text-[var(--accent-text)]',
   'bg-[var(--surface-container)] text-[var(--ink-subtle)]',
   'bg-[var(--danger-soft)] text-[var(--danger)]',
 ] as const;

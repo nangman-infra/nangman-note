@@ -275,7 +275,7 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
       aria-busy={isBusy}
       onKeyDown={handleDialogKeyDown}
     >
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 id="upload-audio-dialog-title" className="font-headline text-lg font-medium text-slate-900">
             오디오 파일 업로드
@@ -305,7 +305,7 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
           >
             <FileAudio className="h-7 w-7 text-indigo-500" />
             {file ? (
-              <span className="text-sm font-semibold text-slate-800">
+              <span className="text-sm font-medium text-slate-800">
                 {file.name}
                 <span className="ml-1 font-normal text-slate-400">
                   ({(file.size / (1024 * 1024)).toFixed(1)}MB)
@@ -330,7 +330,7 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
 
           {/* 제목 */}
           <div>
-            <label htmlFor="upload-audio-title" className="mb-1 block text-xs font-semibold text-slate-600">
+            <label htmlFor="upload-audio-title" className="mb-1 block text-xs font-medium text-slate-600">
               회의 제목
             </label>
             <input

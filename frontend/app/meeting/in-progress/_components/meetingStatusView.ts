@@ -28,12 +28,12 @@ export function getConnectionBadge({
   hasActiveSession: boolean;
 }): MeetingStatusBadge {
   if (!meetingId) return { label: '대기', className: '' };
-  if (permission === 'denied') return { label: '노트 전용', className: '!bg-[var(--accent-soft)] !text-[#a4431a]' };
-  if (wasFallenBack) return { label: '배치로 전환됨', className: '!bg-[var(--accent-soft)] !text-[#a4431a]' };
+  if (permission === 'denied') return { label: '노트 전용', className: '!bg-[var(--accent-soft)] !text-[var(--accent-text)]' };
+  if (wasFallenBack) return { label: '배치로 전환됨', className: '!bg-[var(--accent-soft)] !text-[var(--accent-text)]' };
   if (!isRealtimeMode) return { label: '배치 전사 모드', className: '' };
   if (isConnected && hasActiveSession) return { label: '실시간 전사 중', className: '!bg-[var(--success-soft)] !text-[var(--success)]' };
   if (isConnected) return { label: '실시간 연결됨', className: '!bg-[var(--info-soft)] !text-[var(--info)]' };
-  return { label: '실시간 연결중', className: '!bg-[var(--accent-soft)] !text-[#a4431a]' };
+  return { label: '실시간 연결중', className: '!bg-[var(--accent-soft)] !text-[var(--accent-text)]' };
 }
 
 export function getRecordingBadge(

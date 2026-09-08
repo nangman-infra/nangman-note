@@ -22,7 +22,7 @@ export function FeatureSection({
     <div className={`flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12 ${reverse ? 'lg:flex-row-reverse' : ''}`}>
       <div className="min-w-0 flex-1">
         <ScrollReveal>
-          <span className="inline-block rounded-full border border-[var(--line-soft)] bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wide text-brand">
+          <span className="inline-block rounded-full border border-[var(--line-soft)] bg-card/70 px-3 py-1 text-[11px] font-medium tracking-wide text-electric">
             {badge}
           </span>
           <h3 className="mt-3 text-xl font-medium sm:text-2xl">{title}</h3>

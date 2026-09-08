@@ -35,7 +35,7 @@ export function StepFlow() {
     <section className="py-16 sm:py-24">
       <div className="mx-auto max-w-6xl px-5">
         <ScrollReveal>
-          <p className="text-center text-xs font-semibold tracking-widest text-muted">
+          <p className="text-center text-xs font-medium tracking-widest text-muted">
             HOW IT WORKS
           </p>
           <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
@@ -56,7 +56,7 @@ export function StepFlow() {
                 <span className="mt-3 text-[11px] font-medium tracking-widest text-muted">
                   STEP {step.num}
                 </span>
-                <h3 className="mt-1 text-lg font-semibold">{step.title}</h3>
+                <h3 className="mt-1 text-lg font-medium">{step.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
                   {step.description}
                 </p>
@@ -66,9 +66,9 @@ export function StepFlow() {
         </div>
 
         <ScrollReveal delay={400}>
-          <div className="mx-auto mt-10 max-w-2xl rounded-lg border border-[var(--line-soft)] bg-white/60 p-5 text-center">
+          <div className="mx-auto mt-10 max-w-2xl rounded-lg border border-[var(--line-soft)] bg-card/60 p-5 text-center">
             <p className="text-sm text-muted">
-              💡 문서의 기본 구조는 유지하면서, <span className="font-semibold text-foreground">어떤 부분을 강조할지 직접 조정</span>할 수 있습니다.
+              💡 문서의 기본 구조는 유지하면서, <span className="font-medium text-foreground">어떤 부분을 강조할지 직접 조정</span>할 수 있습니다.
               같은 회의를 다른 관점으로 다시 정리하는 것도 가능합니다.
             </p>
           </div>

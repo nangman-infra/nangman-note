@@ -47,7 +47,7 @@ export function InProgressWorkspace({
   return (
     <>
       <main className="flex-1 flex overflow-hidden">
-        <section className={`surface-deep hidden w-2/5 flex-col !rounded-none border-r border-white/5 lg:flex ${mobilePanel === 'transcript' ? '!flex w-full' : ''}`}>
+        <section className={`hidden w-2/5 flex-col border-r border-[var(--line-soft)] bg-[var(--surface-container-low)] lg:flex ${mobilePanel === 'transcript' ? '!flex w-full' : ''}`}>
           <ErrorBoundary>
             <div className="flex min-h-0 flex-1 flex-col">
               <TranscriptPanel
@@ -84,8 +84,8 @@ export function InProgressWorkspace({
           onClick={() => onMobilePanelChange('note')}
           className={`flex-1 rounded-[6px] px-3 py-2 text-xs transition-colors ${
             mobilePanel === 'note'
-              ? 'bg-brand font-medium text-white shadow-[var(--elevation-button)]'
-              : 'font-normal text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
+              ? 'bg-[var(--surface-container-high)] text-white'
+              : 'text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
           }`}
         >
           노트
@@ -95,8 +95,8 @@ export function InProgressWorkspace({
           onClick={() => onMobilePanelChange('transcript')}
           className={`flex-1 rounded-[6px] px-3 py-2 text-xs transition-colors ${
             mobilePanel === 'transcript'
-              ? 'bg-brand font-medium text-white shadow-[var(--elevation-button)]'
-              : 'font-normal text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
+              ? 'bg-[var(--surface-container-high)] text-white'
+              : 'text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
           }`}
         >
           전사

@@ -88,7 +88,7 @@ export default function NewMeetingPage() {
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-[var(--bg-root)]">
-      <div aria-hidden className="halftone-field opacity-30" />
+      <div aria-hidden className="glow-field glow-field--hero" />
 
       <div className="relative mx-auto flex min-h-dvh max-w-6xl items-center px-6 py-12 sm:px-8 lg:px-10">
         <div className="grid w-full grid-cols-1 items-start gap-10 lg:grid-cols-12 lg:gap-16">

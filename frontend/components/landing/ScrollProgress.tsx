@@ -17,7 +17,7 @@ export function ScrollProgress() {
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-[60] h-0.5 origin-left bg-brand transition-transform duration-150"
+      className="fixed inset-x-0 top-0 z-[60] h-0.5 origin-left bg-[var(--surface-container)] transition-transform duration-150"
       style={{ transform: `scaleX(${progress / 100})` }}
       role="progressbar"
       aria-valuenow={Math.round(progress)}

@@ -85,7 +85,7 @@ export function NotificationBell({ onSelectMeeting }: NotificationBellProps) {
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg bg-white p-2 shadow-xl ring-1 ring-black/5">
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg bg-card p-2 shadow-xl ring-1 ring-black/5">
           <div className="flex items-center justify-between px-2 py-1.5">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
               알림
@@ -122,7 +122,7 @@ export function NotificationBell({ onSelectMeeting }: NotificationBellProps) {
                     }}
                     className="block w-full rounded-lg px-2 py-2 text-left transition hover:bg-indigo-50/60"
                   >
-                    <p className="text-xs font-semibold text-slate-800">
+                    <p className="text-xs font-medium text-slate-800">
                       {notification.title}
                     </p>
                     <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">

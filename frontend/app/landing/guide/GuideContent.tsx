@@ -110,14 +110,14 @@ export function GuideContent() {
                   <p className="label-sm text-[var(--ink-muted)]">
                     GUIDE
                   </p>
-                  <h1 className="mt-2 font-headline text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+                  <h1 className="mt-2 font-headline text-3xl font-medium tracking-tight text-slate-950 sm:text-4xl">
                     사용 가이드
                   </h1>
                   <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
                     회의 시작부터 결과 확인까지, 7단계로 TransNote의 모든 기능을 안내합니다.
                   </p>
                 </div>
-                <div className="grid grid-cols-7 gap-1.5 rounded-lg bg-white/70 p-2 shadow-sm">
+                <div className="grid grid-cols-7 gap-1.5 rounded-lg bg-card/70 p-2 shadow-sm">
                   {flowSteps.map((step) => (
                     <span
                       key={step.num}
@@ -146,7 +146,7 @@ export function GuideContent() {
                       <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--surface-container-low)] text-[11px] font-medium text-[var(--ink-muted)]">
                         {step.num}
                       </span>
-                      <span className="truncate font-semibold text-[var(--ink-subtle)]">
+                      <span className="truncate font-medium text-[var(--ink-subtle)]">
                         {step.title}
                       </span>
                     </div>
@@ -159,7 +159,7 @@ export function GuideContent() {
           <div className="space-y-4">
             {flowSteps.map((step, i) => (
               <ScrollReveal key={step.num} delay={i * 60}>
-                <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-[var(--line-soft)]">
+                <section className="overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-[var(--line-soft)]">
                   <div className="grid gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
                     <div className="flex flex-col p-5 sm:p-6">
                       <div className="flex items-center gap-3">
@@ -211,14 +211,14 @@ export function GuideContent() {
 function EditExportMock() {
   return (
     <div className="surface-card overflow-hidden text-[11px]">
-      <div className="border-b border-[var(--line-soft)] bg-white/40 px-4 py-2.5">
-        <span className="font-semibold">편집 모드</span>
+      <div className="border-b border-[var(--line-soft)] bg-card/40 px-4 py-2.5">
+        <span className="font-medium">편집 모드</span>
       </div>
       <div className="p-4">
         {/* 툴바 */}
         <div className="mb-3 flex flex-wrap gap-1 rounded-lg bg-[var(--surface-container-low)] px-2 py-1.5">
           {['H', 'B', 'I', 'S', '—', '❝', '•', '1.', '☑', '⊞', '🔗', '</>'].map((btn) => (
-            <span key={btn} className="rounded px-1.5 py-0.5 text-[10px] text-muted hover:bg-white/80">
+            <span key={btn} className="rounded px-1.5 py-0.5 text-[10px] text-muted hover:bg-card/80">
               {btn}
             </span>
           ))}
@@ -228,14 +228,14 @@ function EditExportMock() {
         <div className="space-y-1.5 text-[10px]">
           <p className="font-medium">## 배포 일정 확인</p>
           <p>3/15 스테이징, 3/18 프로덕션 배포 확정</p>
-          <p className="rounded bg-brand/5 px-2 py-1 text-brand">← 여기를 직접 수정할 수 있습니다</p>
+          <p className="rounded bg-[var(--surface-container)] px-2 py-1 text-electric">← 여기를 직접 수정할 수 있습니다</p>
         </div>
 
         {/* 내보내기 버튼들 */}
         <div className="mt-4 flex gap-2">
-          <span className="rounded-lg bg-brand/10 px-3 py-1.5 text-[10px] font-semibold text-brand">PDF 내보내기</span>
-          <span className="rounded-lg bg-brand/10 px-3 py-1.5 text-[10px] font-semibold text-brand">DOCX 내보내기</span>
-          <span className="rounded-lg bg-white/60 px-3 py-1.5 text-[10px] font-medium text-muted">Markdown 복사</span>
+          <span className="rounded-lg bg-[var(--surface-container)] px-3 py-1.5 text-[10px] font-medium text-electric">PDF 내보내기</span>
+          <span className="rounded-lg bg-[var(--surface-container)] px-3 py-1.5 text-[10px] font-medium text-electric">DOCX 내보내기</span>
+          <span className="rounded-lg bg-card/60 px-3 py-1.5 text-[10px] font-medium text-muted">Markdown 복사</span>
         </div>
       </div>
     </div>

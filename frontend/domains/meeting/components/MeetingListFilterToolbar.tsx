@@ -65,8 +65,8 @@ export function MeetingListFilterToolbar({
           disabled={showTrash}
           className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
             hasAdvancedFilter && !showTrash
-              ? 'border-brand bg-brand text-white'
-              : 'border-[var(--line-soft)] bg-white text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
+              ? 'border-[var(--outline-variant)] bg-[var(--surface-container)] text-white'
+              : 'border-[var(--line-inset)] bg-[var(--surface-frosted)] text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
           } disabled:cursor-not-allowed disabled:opacity-50`}
           aria-expanded={shouldShowAdvancedFilter}
           aria-controls="meeting-advanced-filters"
@@ -83,8 +83,8 @@ export function MeetingListFilterToolbar({
               disabled={showTrash}
               className={`h-8 whitespace-nowrap rounded-lg border px-3.5 text-xs font-medium transition ${
                 activeFilter === filter.key && !showTrash
-                  ? 'border-brand bg-brand text-white'
-                  : 'border-[var(--line-soft)] bg-white text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
+                  ? 'border-[var(--outline-variant)] bg-[var(--surface-container)] text-white'
+                  : 'border-[var(--line-inset)] bg-[var(--surface-frosted)] text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {filter.label}
@@ -96,7 +96,7 @@ export function MeetingListFilterToolbar({
       {shouldShowAdvancedFilter && !showTrash ? (
         <div
           id="meeting-advanced-filters"
-          className="grid gap-3 rounded-lg border border-[var(--line-soft)] bg-[var(--surface-container-low)] p-3 md:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] md:items-end"
+          className="grid gap-3 rounded-[12px] bg-[var(--surface-container-low)] p-3 shadow-[var(--elevation-sm)] md:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] md:items-end"
         >
           <div>
             <p className="label-sm mb-2 text-[var(--ink-muted)]">기간</p>
@@ -108,8 +108,8 @@ export function MeetingListFilterToolbar({
                   onClick={() => onTimeFilterChange(filter.key)}
                   className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                     timeFilter === filter.key
-                      ? 'border-brand bg-white text-brand'
-                      : 'border-transparent text-[var(--ink-subtle)] hover:bg-white'
+                      ? 'border-[var(--outline-variant)] bg-[var(--surface-container)] text-white'
+                      : 'border-transparent text-[var(--ink-subtle)] hover:bg-[var(--surface-container)]'
                   }`}
                 >
                   {filter.label}
@@ -138,7 +138,7 @@ export function MeetingListFilterToolbar({
       ) : null}
 
       {!showTrash && hasAppliedFilter ? (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-[var(--line-soft)] bg-[var(--surface-container-low)] px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-[12px] bg-[var(--surface-container-low)] px-3 py-2 shadow-[var(--elevation-sm)]">
           <span className="label-sm">Applied</span>
           <AppliedFilterChip
             visible={activeFilter !== 'all'}
@@ -172,7 +172,7 @@ export function MeetingListFilterToolbar({
             <button
               type="button"
               onClick={onResetFilters}
-              className="ml-auto rounded-lg px-2.5 py-1 text-[11px] font-medium text-muted transition hover:bg-white hover:text-brand"
+              className="ml-auto rounded-lg px-2.5 py-1 text-[11px] font-medium text-muted transition hover:bg-card hover:text-electric"
             >
               필터 초기화
             </button>
@@ -199,15 +199,15 @@ function AppliedFilterChip({
   if (!visible) return null;
 
   const toneClassName = {
-    amber: 'text-[#a4431a] before:bg-[var(--accent)]',
-    indigo: 'text-brand before:bg-brand',
-    teal: 'text-[var(--tertiary)] before:bg-[var(--tertiary-fixed-dim)]',
-    violet: 'text-[var(--ink-subtle)] before:bg-[var(--ink-faint)]',
+    amber: 'text-[var(--accent-text)] before:bg-[var(--accent)]',
+    indigo: 'text-electric before:bg-[var(--tertiary-fixed-dim)]',
+    teal: 'text-[var(--success)] before:bg-[var(--success)]',
+    violet: 'text-electric-bright before:bg-[var(--color-electric-violet)]',
   }[tone];
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white px-2.5 py-1 text-[11px] font-medium before:h-1.5 before:w-1.5 before:rounded-full before:content-[''] ${toneClassName}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--line-inset)] bg-[var(--surface-container)] px-2.5 py-1 text-[11px] before:h-1.5 before:w-1.5 before:rounded-full before:content-[''] ${toneClassName}`}
     >
       {label}
       <button

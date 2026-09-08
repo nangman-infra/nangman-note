@@ -14,10 +14,8 @@
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  /* Column: faint halftone dot field instead of a ruled grid */
-  background-image: radial-gradient(circle, rgba(17, 26, 74, 0.16) 1px, transparent 1.2px);
-  background-size: 12px 12px;
-  mask-image: radial-gradient(ellipse at 50% 20%, #000 20%, transparent 70%);
+  /* n8n: atmospheric ember glow, subliminal */
+  background-image: var(--gradient-atmosphere-ember);
 }
 
 /* 헤드라인 orphan 방지 */
@@ -27,13 +25,12 @@
   text-wrap: balance;
 }
 
-/* 강조 텍스트 — Column은 UI 요소에 그라데이션을 쓰지 않는다.
-   Indigo Navy 본문 + Seafoam 하이라이트 밑줄로 강조한다. */
+/* 강조 텍스트 — Electric Current 그라데이션 (연결/흐름의 신호) */
 .landing-gradient-text {
-  color: var(--brand);
-  background-image: linear-gradient(transparent 78%, rgba(68, 180, 139, 0.35) 78%);
-  background-repeat: no-repeat;
-  padding: 0 0.08em;
+  background-image: var(--gradient-electric);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* 섹션 구분선 */

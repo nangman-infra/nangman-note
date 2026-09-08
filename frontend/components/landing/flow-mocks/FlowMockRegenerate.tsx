@@ -6,8 +6,8 @@ import { ChevronDown, RefreshCw } from 'lucide-react';
 export function FlowMockRegenerate() {
   return (
     <div className="surface-card overflow-hidden text-[11px]">
-      <div className="border-b border-[var(--line-soft)] bg-white/40 px-4 py-2.5">
-        <span className="font-semibold">프롬프트 변경 후 재생성</span>
+      <div className="border-b border-[var(--line-soft)] bg-card/40 px-4 py-2.5">
+        <span className="font-medium">프롬프트 변경 후 재생성</span>
       </div>
 
       <div className="space-y-3 p-4">
@@ -16,20 +16,20 @@ export function FlowMockRegenerate() {
         </p>
 
         {/* 현재 프롬프트 */}
-        <div className="rounded-lg border border-[var(--line-soft)] bg-white/50 px-3 py-2">
+        <div className="rounded-lg border border-[var(--line-soft)] bg-card/50 px-3 py-2">
           <span className="text-[9px] text-muted">현재</span>
           <div className="mt-0.5 flex items-center gap-1.5">
-            <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[9px] font-semibold text-teal-700">회의</span>
+            <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[9px] font-medium text-teal-700">회의</span>
             <span className="font-medium">회의록 (기본)</span>
           </div>
         </div>
 
         {/* 변경할 프롬프트 */}
-        <div className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-2">
-          <span className="text-[9px] text-brand">변경</span>
+        <div className="rounded-lg border border-electric-deep bg-[var(--surface-container)] px-3 py-2">
+          <span className="text-[9px] text-electric">변경</span>
           <div className="mt-0.5 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">강의</span>
+              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700">강의</span>
               <span className="font-medium">강의노트 (기본)</span>
             </div>
             <ChevronDown className="h-3 w-3 text-muted" />
@@ -37,7 +37,7 @@ export function FlowMockRegenerate() {
         </div>
 
         {/* 재생성 버튼 */}
-        <div className="flex items-center justify-center gap-2 rounded-lg bg-brand py-2.5 font-semibold text-white">
+        <div className="flex items-center justify-center gap-2 rounded-lg bg-[var(--surface-container)] py-2.5 font-medium text-white">
           <RefreshCw className="h-3.5 w-3.5" />
           이 프롬프트로 재생성
         </div>

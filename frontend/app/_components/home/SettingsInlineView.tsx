@@ -152,7 +152,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
     <div className="mx-auto w-full max-w-4xl space-y-6 p-6 lg:p-8">
       {/* Transcription Defaults */}
       <ErrorBoundary>
-        <section className="rounded-lg bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-card p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">전사</p>
           <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">기본 전사 설정</h2>
           <div className="space-y-4">
@@ -230,7 +230,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Theme */}
       <ErrorBoundary>
-        <section className="rounded-lg bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-card p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">화면</p>
           <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">테마</h2>
           <div className="flex items-center justify-between">
@@ -248,7 +248,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
                 themeMode === 'dark' ? 'bg-indigo-600' : 'bg-slate-300'
               }`}
             >
-              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-4 w-4 rounded-full bg-card transition-transform ${
                 themeMode === 'dark' ? 'translate-x-6' : 'translate-x-1'
               }`} />
             </button>
@@ -258,7 +258,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Notifications */}
       <ErrorBoundary>
-        <section className="rounded-lg bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-card p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">알림</p>
           <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">알림</h2>
           <div className="flex items-center justify-between">
@@ -276,7 +276,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
                 notificationsEnabled ? 'bg-indigo-600' : 'bg-slate-300'
               }`}
             >
-              <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+              <span className={`inline-block h-4 w-4 rounded-full bg-card transition-transform ${
                 notificationsEnabled ? 'translate-x-6' : 'translate-x-1'
               }`} />
             </button>
@@ -286,7 +286,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Data */}
       <ErrorBoundary>
-        <section className="rounded-lg bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-card p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">데이터</p>
           <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">데이터</h2>
           <div className="flex items-center justify-between">
@@ -313,7 +313,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Account */}
       <ErrorBoundary>
-        <section className="rounded-lg bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-card p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">계정</p>
           <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">계정</h2>
           <div className="space-y-4">
@@ -324,7 +324,7 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
             <button
               type="button"
               onClick={() => void signOut({ callbackUrl: '/auth/signin' })}
-              className="inline-flex items-center gap-2 rounded-lg bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+              className="inline-flex items-center gap-2 rounded-lg bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-100"
             >
               <LogOut className="h-4 w-4" />
               로그아웃

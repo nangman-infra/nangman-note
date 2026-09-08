@@ -28,7 +28,7 @@ export function StartContent() {
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <Link
                   href="/auth/signin"
-                  className="btn-neo inline-flex border-transparent bg-brand px-6 py-3.5 text-sm text-white hover:bg-brand-strong hover:text-white"
+                  className="btn-neo inline-flex border-transparent bg-[var(--surface-container)] px-6 py-3.5 text-sm text-white hover:bg-[var(--surface-container-high)] hover:text-white"
                   style={{ color: '#ffffff' }}
                 >
                   <Lock className="h-4 w-4" style={{ color: '#ffffff' }} />

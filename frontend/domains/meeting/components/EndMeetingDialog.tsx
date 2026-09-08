@@ -77,7 +77,7 @@ export function EndMeetingDialog({
           )}
         </div>
 
-        <h2 className="text-lg font-semibold">회의를 종료하시겠습니까?</h2>
+        <h2 className="text-lg font-medium">회의를 종료하시겠습니까?</h2>
         <p className="mt-2 text-sm text-muted">
           녹음이 중지되고, 수집된 오디오를 서버로 전송하여 전사를 시작합니다.
           작성하신 노트는 이미 자동 저장되어 있습니다.
@@ -86,10 +86,10 @@ export function EndMeetingDialog({
         {(recordingTime || (noteLength !== undefined && noteLength > 0)) && (
           <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
             {recordingTime && (
-              <p>🎙️ 녹음 시간: <span className="font-semibold">{recordingTime}</span></p>
+              <p>🎙️ 녹음 시간: <span className="font-medium">{recordingTime}</span></p>
             )}
             {noteLength !== undefined && noteLength > 0 && (
-              <p className={recordingTime ? 'mt-1' : ''}>📝 노트 길이: <span className="font-semibold">{noteLength.toLocaleString()}자</span></p>
+              <p className={recordingTime ? 'mt-1' : ''}>📝 노트 길이: <span className="font-medium">{noteLength.toLocaleString()}자</span></p>
             )}
           </div>
         )}

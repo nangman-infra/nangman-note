@@ -33,9 +33,9 @@ export function SocialProof() {
           <div className="grid grid-cols-3 gap-4">
             {stats.map((s) => (
               <div key={s.desc} className="surface-card p-5 text-center">
-                <p className="text-3xl font-medium text-brand sm:text-4xl">
+                <p className="text-3xl font-medium text-electric sm:text-4xl">
                   <CountUp target={s.value} />
-                  <span className="ml-0.5 text-base font-semibold">{s.unit}</span>
+                  <span className="ml-0.5 text-base font-medium">{s.unit}</span>
                 </p>
                 <p className="mt-1 text-xs text-muted">{s.desc}</p>
               </div>
@@ -51,7 +51,7 @@ export function SocialProof() {
                 <p className="text-sm leading-relaxed text-muted">
                   &ldquo;{t.quote}&rdquo;
                 </p>
-                <p className="mt-4 text-xs font-semibold">— {t.role}</p>
+                <p className="mt-4 text-xs font-medium">— {t.role}</p>
               </div>
             </ScrollReveal>
           ))}

@@ -299,14 +299,14 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
               <p className="mt-1 text-xs text-[var(--ink-muted)]">위 에디터에서 새 프롬프트를 만들어보세요.</p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg bg-white">
+            <div className="overflow-hidden rounded-lg bg-card">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--line-soft)] bg-[var(--surface-container-low)]">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ink-muted)]">이름</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ink-muted)]">타입</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--ink-muted)]">수정일</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--ink-muted)]">작업</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ink-muted)]">이름</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ink-muted)]">타입</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ink-muted)]">수정일</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ink-muted)]">작업</th>
                   </tr>
                 </thead>
                 <tbody>

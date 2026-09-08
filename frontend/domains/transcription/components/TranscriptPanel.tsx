@@ -51,7 +51,7 @@ export function TranscriptPanel({
         title="노트 전용 모드"
         meetingId={meetingId}
         statusLabel="마이크 비활성"
-        statusClassName="bg-white/10 text-white/70"
+        statusClassName="bg-[var(--surface-container)] text-[var(--ink-subtle)]"
       >
         <TranscriptPanelEmptyState variant="mic-disabled" />
       </TranscriptPanelFrame>
@@ -64,7 +64,7 @@ export function TranscriptPanel({
         title="배치 전사 대기"
         meetingId={meetingId}
         statusLabel="배치 모드"
-        statusClassName="bg-white/10 text-white/70"
+        statusClassName="bg-[var(--surface-container)] text-[var(--ink-subtle)]"
       >
         <TranscriptPanelEmptyState variant="batch" />
       </TranscriptPanelFrame>
@@ -90,15 +90,15 @@ export function TranscriptPanel({
         partial={partial}
         scrollRef={scrollRef}
       />
-      <div className="border-t border-white/[0.06] bg-black/20 px-3 py-2">
+      <div className="border-t border-[var(--line-soft)] px-3 py-2">
         <div className="data-mono flex items-center justify-between gap-2 text-[11px]">
           <button
             type="button"
             onClick={toggleFollowLive}
             className={`rounded-[6px] border px-2 py-1 transition ${
               followLive
-                ? 'border-seafoam/40 bg-seafoam/15 text-seafoam-bright'
-                : 'border-white/10 bg-white/5 text-white/60'
+                ? 'border-[rgba(7,122,199,0.5)] bg-[var(--tertiary-fixed)] text-electric'
+                : 'border-[var(--line-inset)] bg-[var(--surface-frosted)] text-[var(--ink-muted)]'
             }`}
           >
             자동 스크롤 {followLive ? 'ON' : 'OFF'}
@@ -108,13 +108,13 @@ export function TranscriptPanel({
             <button
               type="button"
               onClick={() => scrollToBottom({ forceFollow: true })}
-              className="inline-flex items-center gap-1 rounded-[6px] border border-white/10 bg-white/5 px-2 py-1 text-white/80 transition hover:bg-white/10"
+              className="inline-flex items-center gap-1 rounded-[6px] border border-[var(--line-inset)] bg-[var(--surface-frosted)] px-2 py-1 text-[var(--ink-subtle)] transition hover:bg-[var(--surface-container)]"
             >
               <ArrowDown className="h-3.5 w-3.5" />
               최신으로 이동
             </button>
           ) : (
-            <span className="text-white/40">최신 전사 위치</span>
+            <span className="text-[var(--ink-faint)]">최신 전사 위치</span>
           )}
         </div>
       </div>
@@ -141,7 +141,7 @@ function getRealtimeStatusClassName({
   isConnected: boolean;
   hasActiveSession: boolean;
 }): string {
-  if (!isConnected) return 'bg-[#f2936b]/20 text-[#f2936b]';
-  if (hasActiveSession) return 'bg-seafoam/20 text-seafoam-bright animate-pulse';
-  return 'bg-white/10 text-white/70';
+  if (!isConnected) return 'bg-ember/20 text-ember-text';
+  if (hasActiveSession) return 'bg-success/20 text-success animate-pulse';
+  return 'bg-[var(--surface-container)] text-[var(--ink-subtle)]';
 }

@@ -30,7 +30,7 @@ export function FaqAccordion() {
     <section className="py-16 sm:py-24">
       <div className="mx-auto max-w-2xl px-5">
         <ScrollReveal>
-          <p className="text-center text-xs font-semibold tracking-widest text-muted">
+          <p className="text-center text-xs font-medium tracking-widest text-muted">
             FAQ
           </p>
           <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
@@ -47,7 +47,7 @@ export function FaqAccordion() {
                   <button
                     type="button"
                     onClick={() => setOpenIndex(isOpen ? null : i)}
-                    className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold transition hover:bg-white/40"
+                    className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-medium transition hover:bg-card/40"
                     aria-expanded={isOpen}
                     aria-controls={`faq-answer-${i}`}
                     id={`faq-question-${i}`}

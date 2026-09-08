@@ -19,9 +19,9 @@ export function ResultRegenerateConfirmDialog({
     <dialog
       ref={dialogRef}
       onClose={onClose}
-      className="fixed inset-0 m-auto rounded-lg border border-[var(--line-soft)] bg-white p-6 shadow-xl backdrop:bg-black/40"
+      className="fixed inset-0 m-auto rounded-lg border border-[var(--line-soft)] bg-card p-6 shadow-xl backdrop:bg-black/40"
     >
-      <h3 className="text-base font-semibold">재생성 확인</h3>
+      <h3 className="text-base font-medium">재생성 확인</h3>
       <p className="mt-2 text-sm text-muted">
         현재 회의록이 새 결과로 대체됩니다. 계속하시겠습니까?
       </p>
@@ -36,7 +36,7 @@ export function ResultRegenerateConfirmDialog({
         <button
           type="button"
           onClick={onConfirm}
-          className="btn-neo inline-flex border-transparent bg-brand px-4 py-2 text-sm text-white hover:bg-brand-strong hover:text-white"
+          className="btn-neo inline-flex border-transparent bg-[var(--surface-container)] px-4 py-2 text-sm text-white hover:bg-[var(--surface-container-high)] hover:text-white"
         >
           계속
         </button>

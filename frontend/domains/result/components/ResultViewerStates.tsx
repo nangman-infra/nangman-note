@@ -2,7 +2,7 @@ export function ResultViewerLoadingState() {
   return (
     <div role="status" aria-live="polite" aria-busy="true" className="flex h-full items-center justify-center p-6">
       <div className="surface-card w-full max-w-xl p-8 text-center">
-        <p className="text-sm font-semibold">회의록을 불러오는 중입니다</p>
+        <p className="text-sm font-medium">회의록을 불러오는 중입니다</p>
         <p className="mt-1 text-xs text-muted">AI 정리 결과를 준비하고 있어요.</p>
       </div>
     </div>
@@ -21,7 +21,7 @@ export function ResultViewerEmptyState({
   return (
     <div className="flex h-full items-center justify-center p-6">
       <div className="surface-card w-full max-w-xl p-8 text-center">
-        <p className="text-sm font-semibold">{copy.title}</p>
+        <p className="text-sm font-medium">{copy.title}</p>
         <p className="mt-1 text-xs text-muted">{copy.description}</p>
       </div>
     </div>

@@ -92,10 +92,10 @@ export function MeetingListHeader({
   onRunSearch,
 }: MeetingListHeaderProps) {
   return (
-    <header className="space-y-3 border-b border-[var(--line-soft)] bg-white px-5 py-4 lg:px-6">
+    <header className="space-y-3 border-b border-[var(--line-soft)] px-5 py-4 lg:px-6">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <span className={`tag-dot ${showTrash ? 'tag-dot--orange' : ''}`}>{showTrash ? 'Trash' : 'Archive'}</span>
+          <span className={`tag-dot ${showTrash ? 'tag-dot--ember' : ''}`}>{showTrash ? 'Trash' : 'Archive'}</span>
           <h2 className="font-headline mt-1.5 truncate text-xl text-[var(--ink-strong)]">
             {showTrash ? '회의 휴지통' : '회의 아카이브'}
           </h2>
@@ -106,7 +106,7 @@ export function MeetingListHeader({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="data-mono rounded-full border border-[var(--line-soft)] bg-[var(--surface-container-low)] px-3 py-1 text-xs font-medium text-[var(--ink-subtle)]">
+          <span className="badge-white data-mono">
             {meetingCount}
           </span>
           {allowTrashViewToggle && showTrash ? (
@@ -132,7 +132,7 @@ export function MeetingListHeader({
               type="button"
               onClick={onToggleSelectionMode}
               className={`btn-icon inline-flex ${
-                selectionMode ? '!bg-[var(--brand-fixed)] !text-brand' : ''
+                selectionMode ? '!bg-[var(--surface-container)] !text-white' : ''
               }`}
               title={selectionMode ? '선택 취소' : '선택'}
               aria-label={selectionMode ? '선택 모드 닫기' : '회의 선택 모드'}
@@ -174,13 +174,13 @@ export function MeetingListHeader({
         />
 
         {!showTrash ? (
-          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--line-soft)] bg-white px-3 text-xs text-[var(--ink-subtle)]">
+          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--line-inset)] bg-[var(--surface-frosted)] px-3 text-xs text-[var(--ink-subtle)]">
             <span className="label-sm">Sort</span>
             <select
               id="meeting-sort"
               value={sortBy}
               onChange={(event) => onSortChange(event.target.value as MeetingSortKey)}
-              className="cursor-pointer appearance-none border-none bg-transparent text-xs font-medium text-brand focus:outline-none"
+              className="cursor-pointer appearance-none border-none bg-transparent text-xs text-[var(--ink-strong)] focus:outline-none"
               aria-label="회의 정렬"
             >
               <option value="newest">최근 순</option>

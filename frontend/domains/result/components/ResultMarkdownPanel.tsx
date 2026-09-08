@@ -20,10 +20,10 @@ export function ResultMarkdownPanel({
     <div className="grid gap-6 lg:grid-cols-12">
       <div className="lg:col-span-8">
         <div className="mb-3 flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-seafoam-deep" strokeWidth={1.75} />
+          <Sparkles className="h-3.5 w-3.5 text-electric" strokeWidth={1.5} />
           <span className="tag-dot">AI summary</span>
         </div>
-        <article className="result-markdown surface-card p-6 sm:p-8">
+        <article className="result-markdown surface-card p-6 sm:p-10">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
         </article>
       </div>
@@ -48,13 +48,13 @@ export function ResultMarkdownPanel({
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-xs text-[var(--ink-muted)]">전사 단어 수</dt>
-              <dd className="data-mono text-xs font-medium text-seafoam-deep">
+              <dd className="data-mono text-xs text-electric">
                 {result.metadata.transcriptWordCount.toLocaleString()}
               </dd>
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-xs text-[var(--ink-muted)]">노트 길이</dt>
-              <dd className="data-mono text-xs font-medium text-seafoam-deep">
+              <dd className="data-mono text-xs text-electric">
                 {result.metadata.noteLength.toLocaleString()}자
               </dd>
             </div>
@@ -62,7 +62,7 @@ export function ResultMarkdownPanel({
         </div>
 
         {result.promptId ? (
-          <div className="surface-tonal border border-[var(--line-soft)] p-5">
+          <div className="surface-glow p-5 !rounded-[16px]">
             <h3 className="label-sm mb-2">Prompt</h3>
             <p className="text-sm font-medium text-[var(--ink-strong)]">
               {selectedPrompt?.name ?? result.promptId}

@@ -1,48 +1,93 @@
-/* ─── Markdown WYSIWYG Editor ─── */
+/* ─── Markdown WYSIWYG Editor — n8n skin over Toast UI ─── */
 .markdown-wysiwyg .toastui-editor-defaultUI {
   border: none;
   background: transparent;
 }
 
-.markdown-wysiwyg .toastui-editor-toolbar {
+.markdown-wysiwyg .toastui-editor-toolbar,
+.markdown-wysiwyg .toastui-editor-defaultUI-toolbar {
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--surface-container-low);
   border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+.markdown-wysiwyg .toastui-editor-defaultUI-toolbar button {
+  border-color: transparent;
+}
+.markdown-wysiwyg .toastui-editor-toolbar-icons {
+  border-radius: 6px;
+}
+.markdown-wysiwyg .toastui-editor-toolbar-icons:hover,
+.markdown-wysiwyg .toastui-editor-toolbar-icons.active {
+  background-color: var(--surface-container);
+}
+.markdown-wysiwyg .toastui-editor-toolbar-divider {
+  background-color: var(--line-soft);
+}
+
+.markdown-wysiwyg .toastui-editor-main,
+.markdown-wysiwyg .toastui-editor-ww-container,
+.markdown-wysiwyg .toastui-editor-ww-container > .toastui-editor {
+  background: var(--bg-card);
 }
 
 .markdown-wysiwyg .toastui-editor-contents {
-  color: var(--ink-strong);
-  font-family: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
+  color: var(--ink-subtle);
+  font-family: var(--font-geo), 'DM Sans', 'Pretendard', 'Noto Sans KR', sans-serif;
   font-size: 0.96rem;
   line-height: 1.7;
 }
-
 .markdown-wysiwyg .toastui-editor-contents p,
 .markdown-wysiwyg .toastui-editor-contents li,
 .markdown-wysiwyg .toastui-editor-contents blockquote {
   margin: 0.4em 0;
-}
-
-.markdown-wysiwyg .toastui-editor-md-tab-container {
-  display: none;
-}
-
-.markdown-wysiwyg .toastui-editor-toolbar-icons {
-  border-radius: 6px;
+  color: var(--ink-subtle);
 }
 .markdown-wysiwyg .toastui-editor-contents h1,
 .markdown-wysiwyg .toastui-editor-contents h2,
-.markdown-wysiwyg .toastui-editor-contents h3 {
+.markdown-wysiwyg .toastui-editor-contents h3,
+.markdown-wysiwyg .toastui-editor-contents h4 {
   color: var(--ink-strong);
   border-bottom: none;
-  letter-spacing: -0.02em;
-  font-weight: 600;
+  letter-spacing: -0.018em;
+  font-weight: 400;
+}
+.markdown-wysiwyg .toastui-editor-contents strong {
+  color: var(--ink-strong);
+  font-weight: 500;
 }
 .markdown-wysiwyg .toastui-editor-contents code {
   color: var(--tertiary);
   background: var(--tertiary-fixed);
   font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
 }
-[data-theme='dark'] .markdown-wysiwyg .toastui-editor-toolbar {
-  background: rgba(15, 27, 36, 0.85);
+.markdown-wysiwyg .toastui-editor-contents pre {
+  background: var(--surface-deep);
+}
+.markdown-wysiwyg .toastui-editor-contents blockquote {
+  border-left: 2px solid var(--tertiary-fixed-dim);
+}
+.markdown-wysiwyg .toastui-editor-contents a {
+  color: var(--tertiary);
+}
+.markdown-wysiwyg .toastui-editor-contents table,
+.markdown-wysiwyg .toastui-editor-contents th,
+.markdown-wysiwyg .toastui-editor-contents td {
+  border-color: var(--line-soft);
+}
+.markdown-wysiwyg .toastui-editor-contents th {
+  background: var(--surface-container-low);
+}
+.markdown-wysiwyg .toastui-editor-contents .placeholder {
+  color: var(--ink-faint);
+}
+
+.markdown-wysiwyg .toastui-editor-md-tab-container {
+  display: none;
+}
+
+.markdown-wysiwyg .toastui-editor-popup {
+  background: var(--surface-container-low);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-node);
+  color: var(--ink-subtle);
 }

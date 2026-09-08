@@ -48,8 +48,8 @@ export function Sidebar({
         <Link href="/" className="flex items-center gap-3 rounded-lg" aria-label="TransNote 홈">
           <BrandMark />
           <div>
-            <h1 className="font-headline text-[17px] leading-none text-brand">TransNote</h1>
-            <p className="label-sm mt-1.5">AI meeting ledger</p>
+            <h1 className="font-headline text-[17px] leading-none text-foreground">TransNote</h1>
+            <p className="label-sm mt-1.5">Meeting automation</p>
           </div>
         </Link>
       </header>
@@ -64,16 +64,22 @@ export function Sidebar({
               key={item.key}
               type="button"
               onClick={() => onViewChange?.(item.key)}
-              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
+              className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
                 isActive
-                  ? 'bg-brand font-medium text-white shadow-[var(--elevation-button)]'
-                  : 'font-normal text-[var(--ink-subtle)] hover:bg-[var(--surface-container-low)] hover:text-[var(--ink-strong)]'
+                  ? 'bg-[var(--surface-container)] text-white shadow-[var(--elevation-sm)]'
+                  : 'text-[var(--ink-subtle)] hover:bg-[var(--surface-container-low)] hover:text-[var(--ink-strong)]'
               }`}
               aria-current={isActive ? 'page' : undefined}
             >
+              {isActive ? (
+                <span
+                  aria-hidden="true"
+                  className="bg-electric-gradient absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full"
+                />
+              ) : null}
               <item.icon
                 className={`h-[18px] w-[18px] ${isActive ? 'text-white' : 'text-[var(--ink-muted)] group-hover:text-[var(--ink-strong)]'}`}
-                strokeWidth={1.75}
+                strokeWidth={1.5}
               />
               <span>{item.label}</span>
             </button>
@@ -97,16 +103,17 @@ export function Sidebar({
   );
 }
 
-/** Indigo Navy square with a seafoam data-point — the "bank built by engineers" mark. */
+/** Workflow-node mark: three connected nodes, the last one lit ember. */
 function BrandMark() {
   return (
     <span
-      className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand shadow-[var(--elevation-button)]"
+      className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-[var(--surface-container)] shadow-[var(--elevation-sm)]"
       aria-hidden="true"
     >
-      <span className="absolute left-[9px] top-[9px] h-[18px] w-[3px] rounded-sm bg-white" />
-      <span className="absolute left-[15px] top-[15px] h-[12px] w-[3px] rounded-sm bg-white/70" />
-      <span className="absolute left-[21px] top-[21px] h-[6px] w-[6px] rounded-full bg-seafoam" />
+      <span className="bg-electric-gradient absolute left-[8px] top-[17px] h-[2px] w-[20px] rounded-full opacity-80" />
+      <span className="absolute left-[7px] top-[14px] h-2 w-2 rounded-full bg-electric-deep" />
+      <span className="absolute left-[15px] top-[14px] h-2 w-2 rounded-full bg-electric-violet" />
+      <span className="bg-brand-gradient absolute left-[23px] top-[14px] h-2 w-2 rounded-full shadow-[0_0_8px_rgba(253,137,37,0.8)]" />
     </span>
   );
 }
@@ -118,7 +125,7 @@ function UserInfo() {
   return (
     <div className="surface-card flex items-center justify-between px-3 py-2.5">
       <div className="flex items-center gap-2.5 overflow-hidden">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--brand-fixed)] text-brand">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--surface-container)] text-[var(--ink-subtle)]">
           <User className="h-4 w-4" strokeWidth={1.75} />
         </div>
         <div className="min-w-0">

@@ -5,11 +5,11 @@ import type { Meeting } from '../types/meeting.types';
 const statusConfig = {
   recording: {
     label: '진행 중',
-    colorClass: '!bg-[var(--brand-fixed)] !text-brand',
+    colorClass: '!bg-[var(--tertiary-fixed)] !text-electric',
   },
   processing: {
     label: '정리 중',
-    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
+    colorClass: '!bg-[var(--accent-soft)] !text-[var(--accent-text)]',
   },
   completed: {
     label: '완료',
@@ -24,15 +24,15 @@ const processingPhaseConfig = {
   },
   [MeetingProcessingPhase.TRANSCRIBING]: {
     label: '전사 중',
-    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
+    colorClass: '!bg-[var(--accent-soft)] !text-[var(--accent-text)]',
   },
   [MeetingProcessingPhase.GENERATING]: {
     label: '정리 중',
-    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
+    colorClass: '!bg-[var(--accent-soft)] !text-[var(--accent-text)]',
   },
   [MeetingProcessingPhase.REGENERATING]: {
     label: '재생성 중',
-    colorClass: '!bg-[var(--brand-fixed)] !text-brand',
+    colorClass: '!bg-[var(--tertiary-fixed)] !text-electric',
   },
 } as const;
 
@@ -43,7 +43,7 @@ const completionStateConfig = {
   },
   [MeetingCompletionState.PARTIAL]: {
     label: '부분 완료',
-    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
+    colorClass: '!bg-[var(--accent-soft)] !text-[var(--accent-text)]',
   },
   [MeetingCompletionState.ATTENTION_REQUIRED]: {
     label: '확인 필요',
@@ -93,14 +93,14 @@ export function getCardSelectionClassName({
   isSelected: boolean;
   isActive?: boolean;
 }): string {
-  if (isSelected) return '!border-brand !bg-[var(--brand-fixed)]';
-  if (isActive) return '!border-brand shadow-[var(--elevation-md)]';
-  return 'hover:border-[var(--line-strong)] hover:shadow-[var(--elevation-sm)]';
+  if (isSelected) return '!shadow-[inset_0_0_0_1px_var(--color-electric-current)] !bg-[var(--tertiary-fixed)]';
+  if (isActive) return '!shadow-[inset_0_0_0_1px_rgba(7,122,199,0.6),0_0_12px_rgba(7,122,199,0.18)]';
+  return 'hover:!bg-[var(--surface-container)]';
 }
 
 export function getProcessingBannerClassName(needsAttention?: boolean): string {
   if (needsAttention) return 'bg-[var(--danger-soft)] text-[var(--danger)]';
-  return 'bg-[var(--accent-soft)] text-[#a4431a]';
+  return 'bg-[var(--accent-soft)] text-[var(--accent-text)]';
 }
 
 export function getProcessingBannerMessage(meeting: Meeting): string {

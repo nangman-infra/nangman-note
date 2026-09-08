@@ -59,10 +59,10 @@ export const MeetingCard = memo(
 
     return (
       <article
-        className={`group relative w-full rounded-lg border px-4 py-3 transition-all ${
+        className={`group relative w-full rounded-[12px] border px-4 py-3 transition-all ${
           isRecording
-            ? 'border-[var(--line-soft)] bg-white shadow-[inset_3px_0_0_0_var(--tertiary)]'
-            : 'border-[var(--line-soft)] bg-white'
+            ? 'border-transparent bg-card shadow-[var(--elevation-glow)]'
+            : 'border-transparent bg-card shadow-[var(--elevation-sm)]'
         } ${cardSelectionClassName} ${selectionMode ? 'cursor-pointer' : ''}`}
         onClick={selectionMode ? handleCardClick : undefined}
         onKeyDown={selectionMode ? (event) => {
@@ -81,8 +81,8 @@ export const MeetingCard = memo(
             <span
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border transition ${
                 isSelected
-                  ? 'border-brand bg-brand text-white'
-                  : 'border-[var(--line-strong)] bg-white hover:border-brand'
+                  ? 'border-electric-deep bg-[var(--surface-container)] text-white'
+                  : 'border-[var(--line-strong)] bg-card hover:border-electric-deep'
               }`}
               aria-hidden="true"
             >
@@ -91,10 +91,10 @@ export const MeetingCard = memo(
           ) : null}
 
           <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--line-soft)] transition ${
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition ${
               isRecording
-                ? 'bg-[var(--tertiary-fixed)] text-[var(--tertiary)]'
-                : 'bg-[var(--surface-container-low)] text-[var(--ink-muted)] group-hover:text-brand'
+                ? 'bg-[var(--accent-soft)] text-ember-text'
+                : 'bg-[var(--surface-container)] text-[var(--ink-muted)] group-hover:text-[var(--ink-strong)]'
             }`}
             aria-hidden="true"
           >
@@ -110,12 +110,12 @@ export const MeetingCard = memo(
               disabled={mode === 'trash' || selectionMode}
               aria-current={isActive ? 'true' : undefined}
             >
-              <h3 className="line-clamp-1 text-sm font-medium text-[var(--ink-strong)] transition-colors group-hover:text-brand">
+              <h3 className="line-clamp-1 text-sm text-[var(--ink-strong)]">
                 {meeting.title || '제목 없는 회의'}
               </h3>
               {meeting.searchSnippet && meeting.searchMatchedIn ? (
                 <p className="mt-1 line-clamp-2 text-xs text-[var(--ink-muted)]">
-                  <span className="label-sm mr-1.5 inline-flex items-center rounded-[4px] bg-[var(--brand-fixed)] px-1.5 py-0.5 !text-[10px] !text-brand">
+                  <span className="label-sm mr-1.5 inline-flex items-center rounded-[4px] bg-[var(--tertiary-fixed)] px-1.5 py-0.5 !text-[10px] !text-electric">
                     {getSearchMatchLabel(meeting.searchMatchedIn)}
                   </span>
                   {meeting.searchSnippet}
@@ -147,7 +147,7 @@ export const MeetingCard = memo(
 
             {meeting.status === 'completed' &&
             meeting.processingPhase === MeetingProcessingPhase.REGENERATING ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-brand">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-electric">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 재생성 중
               </span>

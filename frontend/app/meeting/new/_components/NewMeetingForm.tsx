@@ -51,7 +51,7 @@ export function NewMeetingForm({
           if (!isLoading) onStart();
         }}
         aria-busy={isLoading}
-        className="surface-product p-8 sm:p-10"
+        className="surface-card !rounded-[24px] p-8 sm:p-10"
       >
         <div className="mb-7">
           <p className="label-sm">New meeting</p>
@@ -111,7 +111,7 @@ export function NewMeetingForm({
             </p>
           </div>
 
-          <div className="surface-tonal border border-[var(--line-soft)] px-4 py-3.5">
+          <div className="surface-tonal px-4 py-3.5 shadow-[var(--elevation-sm)]">
             <div className="flex items-start gap-2.5">
               <Settings2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-muted)]" />
               <div className="min-w-0 flex-1">
@@ -136,7 +136,7 @@ export function NewMeetingForm({
                 <button
                   type="button"
                   onClick={onOpenSettings}
-                  className="mt-1.5 text-[11px] font-medium text-brand hover:underline"
+                  className="link-electric mt-1.5 text-[11px] text-[var(--ink-strong)]"
                 >
                   설정에서 변경
                 </button>

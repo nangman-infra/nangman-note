@@ -46,7 +46,7 @@ const privacySections: LegalDocumentSection[] = [
           </thead>
           <tbody className="divide-y divide-[var(--line-soft)]">
             <tr>
-              <td className="px-4 py-3 font-semibold text-[var(--ink-strong)]">
+              <td className="px-4 py-3 font-medium text-[var(--ink-strong)]">
                 로그인
               </td>
               <td className="px-4 py-3">
@@ -54,7 +54,7 @@ const privacySections: LegalDocumentSection[] = [
               </td>
             </tr>
             <tr>
-              <td className="px-4 py-3 font-semibold text-[var(--ink-strong)]">
+              <td className="px-4 py-3 font-medium text-[var(--ink-strong)]">
                 조직 계정 로그인
               </td>
               <td className="px-4 py-3">
@@ -63,7 +63,7 @@ const privacySections: LegalDocumentSection[] = [
               </td>
             </tr>
             <tr>
-              <td className="px-4 py-3 font-semibold text-[var(--ink-strong)]">
+              <td className="px-4 py-3 font-medium text-[var(--ink-strong)]">
                 회의 기록
               </td>
               <td className="px-4 py-3">
@@ -72,7 +72,7 @@ const privacySections: LegalDocumentSection[] = [
               </td>
             </tr>
             <tr>
-              <td className="px-4 py-3 font-semibold text-[var(--ink-strong)]">
+              <td className="px-4 py-3 font-medium text-[var(--ink-strong)]">
                 작업 결과
               </td>
               <td className="px-4 py-3">
@@ -81,7 +81,7 @@ const privacySections: LegalDocumentSection[] = [
               </td>
             </tr>
             <tr>
-              <td className="px-4 py-3 font-semibold text-[var(--ink-strong)]">
+              <td className="px-4 py-3 font-medium text-[var(--ink-strong)]">
                 서비스 운영
               </td>
               <td className="px-4 py-3">

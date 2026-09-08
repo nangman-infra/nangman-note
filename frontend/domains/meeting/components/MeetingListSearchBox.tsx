@@ -106,10 +106,10 @@ export function MeetingListSearchBox({
             id="meeting-search-listbox"
             role="listbox"
             aria-label="추천 검색어"
-            className="surface-card absolute z-30 mt-2 w-full overflow-hidden bg-white p-1.5 !shadow-[var(--elevation-md)]"
+            className="absolute z-30 mt-2 w-full overflow-hidden rounded-[12px] bg-[var(--surface-container-low)] p-1.5 shadow-[var(--elevation-md)]"
           >
             <div className="mb-1 flex items-center justify-between px-2 py-1">
-              <p className="text-[11px] font-semibold tracking-wide text-muted">
+              <p className="text-[11px] font-medium tracking-wide text-muted">
                 추천 검색어
               </p>
               {recentSearches.length > 0 ? (
@@ -138,14 +138,14 @@ export function MeetingListSearchBox({
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => onRunSearch(suggestion)}
-                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition hover:bg-brand/10 ${
-                        isActive ? 'bg-brand/10' : ''
+                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition hover:bg-[var(--surface-container)] ${
+                        isActive ? 'bg-[var(--surface-container)]' : ''
                       }`}
                     >
                       {isRecent ? (
                         <History className="h-3.5 w-3.5 text-muted" />
                       ) : (
-                        <Sparkles className="h-3.5 w-3.5 text-brand" />
+                        <Sparkles className="h-3.5 w-3.5 text-electric" />
                       )}
                       <span className="truncate">{suggestion}</span>
                     </button>

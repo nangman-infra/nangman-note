@@ -18,7 +18,7 @@ export default function TwitterImage() {
           position: 'relative',
           overflow: 'hidden',
           background:
-            'linear-gradient(180deg, #111a4a 0%, #0b1238 100%)',
+            'radial-gradient(circle at 85% 20%, rgba(253,137,37,0.35), transparent 40%), radial-gradient(circle at 10% 90%, rgba(7,122,199,0.3), transparent 45%), #0e0918',
           color: '#f8fafc',
           fontFamily: 'Inter, system-ui, sans-serif',
         }}
@@ -76,12 +76,12 @@ export default function TwitterImage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '760px' }}>
-            <span style={{ fontSize: '22px', fontWeight: 600, color: '#94efb7' }}>
+            <span style={{ fontSize: '22px', fontWeight: 300, color: '#fd8925' }}>
               AI Meeting Notes Workspace
             </span>
             <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.05 }}>
-              <span style={{ fontSize: '60px', fontWeight: 600 }}>Realtime Transcript,</span>
-              <span style={{ fontSize: '60px', fontWeight: 600 }}>Note-first Workflow</span>
+              <span style={{ fontSize: '60px', fontWeight: 300 }}>Realtime Transcript,</span>
+              <span style={{ fontSize: '60px', fontWeight: 300 }}>Note-first Workflow</span>
             </div>
             <span style={{ fontSize: '24px', color: 'rgba(226,232,240,0.82)' }}>
               Capture meetings. Refine notes. Regenerate outcomes.

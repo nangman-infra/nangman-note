@@ -34,7 +34,7 @@ function TranscriptSegmentItem({ segment }: { segment: FinalSegment }) {
   return (
     <div className="group">
       <div className="flex items-start gap-2">
-        <span className="data-mono mt-0.5 shrink-0 rounded-[4px] px-1 py-0.5 text-[10px] text-seafoam">
+        <span className="data-mono mt-0.5 shrink-0 rounded-[4px] px-1 py-0.5 text-[10px] text-electric">
           {formatSegmentTime(segment.startTime)}
         </span>
         {segment.speakerLabel ? (
@@ -54,15 +54,15 @@ function TranscriptSegmentItem({ segment }: { segment: FinalSegment }) {
 function SegmentText({ segment }: { segment: FinalSegment }) {
   return (
     <div className="min-w-0 flex-1">
-      <p className="text-sm leading-relaxed text-white/90">{segment.text}</p>
+      <p className="text-sm leading-relaxed text-[var(--ink-subtle)]">{segment.text}</p>
       {segment.translatedText ? (
-        <p className="mt-0.5 text-sm leading-relaxed text-skywash">
+        <p className="mt-0.5 text-sm leading-relaxed text-electric">
           <Languages className="mr-1 inline-block h-3 w-3" />
           {segment.translatedText}
         </p>
       ) : null}
       {!segment.translatedText && segment.translationStatus === 'pending' ? (
-        <p className="mt-0.5 text-xs leading-relaxed text-white/45">
+        <p className="mt-0.5 text-xs leading-relaxed text-[var(--ink-faint)]">
           번역 중...
         </p>
       ) : null}
@@ -74,10 +74,10 @@ function PartialTranscriptSegment({ partial }: { partial: PartialSegment }) {
   return (
     <div className="group opacity-80">
       <div className="flex items-start gap-2">
-        <span className="data-mono mt-0.5 shrink-0 rounded-[4px] bg-peach/10 px-1.5 py-0.5 text-[10px] text-peach">
+        <span className="data-mono mt-0.5 shrink-0 rounded-[4px] bg-ember-text/10 px-1.5 py-0.5 text-[10px] text-ember-text">
           {formatSegmentTime(partial.startTime)}
         </span>
-        <p className="min-w-0 flex-1 text-sm italic leading-relaxed text-white/55">
+        <p className="min-w-0 flex-1 text-sm italic leading-relaxed text-[var(--ink-muted)]">
           {partial.text}
         </p>
       </div>

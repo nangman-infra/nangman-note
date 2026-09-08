@@ -70,16 +70,16 @@ describe('TranscriptAudioVisualizer', () => {
     expect(source).toContain('prefers-reduced-motion: reduce');
   });
 
-  it('uses the Column deep-surface bottom-bar skin (h-16, translucent black on Midnight Ink)', async () => {
+  it('uses the n8n deep-panel bottom-bar skin (h-16, translucent black over the panel)', async () => {
     const source = await loadSource();
     expect(source).toContain('h-16');
     expect(source).toContain('bg-black/30');
   });
 
-  it('uses seafoam data tones for active / resting bars', async () => {
+  it('uses Electric Current tones for active / resting bars', async () => {
     const source = await loadSource();
-    expect(source).toContain('bg-seafoam opacity-90');
-    expect(source).toContain('bg-seafoam/30');
+    expect(source).toContain('bg-electric-gradient opacity-90');
+    expect(source).toContain('bg-electric-deep/30');
   });
 
   it('hides the visualizer from assistive tech (decorative element)', async () => {

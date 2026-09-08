@@ -1,8 +1,9 @@
-/* ─── Result Markdown — editorial document register ─── */
+/* ─── Result Markdown — reading register on dark panels ─── */
 .result-markdown {
   color: var(--ink-subtle);
   line-height: 1.7;
   font-size: 0.9375rem;
+  font-weight: 300;
 }
 
 .result-markdown h1,
@@ -13,8 +14,8 @@
   margin-top: 1.4em;
   margin-bottom: 0.5em;
   line-height: 1.25;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  letter-spacing: -0.018em;
 }
 .result-markdown > :first-child {
   margin-top: 0;
@@ -38,32 +39,32 @@
 
 .result-markdown strong {
   color: var(--ink-strong);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .result-markdown a {
-  color: var(--brand);
+  color: var(--tertiary);
   text-decoration: underline;
-  text-decoration-color: var(--line-strong);
+  text-decoration-color: rgba(7, 122, 199, 0.5);
   text-underline-offset: 2px;
 }
 
 .result-markdown blockquote {
   margin: 1em 0;
   padding: 0.25rem 0 0.25rem 1rem;
-  border-left: 2px solid var(--brand);
+  border-left: 2px solid var(--tertiary-fixed-dim);
   color: var(--ink-muted);
 }
 
-/* Tables — ledger register: hairline rules, mono numerals */
+/* Tables — panel-in-panel: inset hairline, mono numerals */
 .result-markdown table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.875rem;
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-node);
   overflow: hidden;
-  background: var(--bg-card);
+  background: var(--surface-container-low);
   box-shadow: var(--elevation-sm);
 }
 
@@ -80,7 +81,7 @@
   background: var(--surface-container-low);
   color: var(--ink-muted);
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -89,7 +90,7 @@
   border-bottom: none;
 }
 
-/* Code — seafoam-tinted monospace signals "data, not prose" */
+/* Code — electric-tinted monospace signals "data, not prose" */
 .result-markdown code {
   border-radius: 4px;
   background: var(--tertiary-fixed);
@@ -97,14 +98,14 @@
   padding: 0.1rem 0.4rem;
   font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.8125em;
-  font-feature-settings: 'cv11', 'salt' 2;
+  font-weight: 400;
 }
 
 .result-markdown pre {
   overflow-x: auto;
-  border-radius: var(--radius-card);
-  background: var(--bg-card);
-  color: var(--color-charcoal);
+  border-radius: var(--radius-node);
+  background: var(--surface-deep);
+  color: var(--ink-subtle);
   padding: 1.25rem 1.5rem;
   box-shadow: var(--elevation-sm);
   font-size: 0.75rem;
@@ -115,7 +116,4 @@
   color: var(--tertiary);
   padding: 0;
   font-size: inherit;
-}
-[data-theme='dark'] .result-markdown pre {
-  color: #e9ecf1;
 }

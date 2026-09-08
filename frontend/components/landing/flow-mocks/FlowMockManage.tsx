@@ -21,7 +21,7 @@ export function FlowMockManage() {
         <p className="text-[8px] font-medium uppercase tracking-widest text-[var(--ink-muted)]">
           Prompt Management
         </p>
-        <h2 className="mt-0.5 font-headline text-[14px] font-semibold leading-tight tracking-tight text-slate-900">
+        <h2 className="mt-0.5 font-headline text-[14px] font-medium leading-tight tracking-tight text-slate-900">
           프롬프트 관리
         </h2>
       </header>
@@ -32,7 +32,7 @@ export function FlowMockManage() {
           <p className="text-[8px] font-medium uppercase tracking-wider text-[var(--ink-muted)]">
             System Library
           </p>
-          <span className="text-[8px] font-semibold text-[var(--ink-muted)]">
+          <span className="text-[8px] font-medium text-[var(--ink-muted)]">
             3개 템플릿
           </span>
         </div>
@@ -99,7 +99,7 @@ function TemplateMiniCard({
   typeLabel: string;
 }) {
   return (
-    <li className="flex flex-col rounded-lg bg-white/80 p-2 shadow-sm">
+    <li className="flex flex-col rounded-lg bg-card/80 p-2 shadow-sm">
       <span
         className={`inline-flex h-5 w-5 items-center justify-center rounded-md ${tone}`}
         aria-hidden="true"
@@ -113,10 +113,10 @@ function TemplateMiniCard({
         {description}
       </p>
       <div className="mt-auto flex items-center justify-between pt-1.5">
-        <span className="text-[7px] font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
+        <span className="text-[7px] font-medium uppercase tracking-widest text-[var(--ink-muted)]">
           {typeLabel}
         </span>
-        <span className="inline-flex items-center gap-0.5 text-[8px] font-medium text-brand">
+        <span className="inline-flex items-center gap-0.5 text-[8px] font-medium text-electric">
           <Edit3 className="h-2 w-2" aria-hidden="true" />
           Edit
         </span>
@@ -132,10 +132,10 @@ function TemplateMiniCard({
 function DefaultFormRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[9px] font-semibold text-[var(--ink-subtle)]">
+      <span className="text-[9px] font-medium text-[var(--ink-subtle)]">
         {label}
       </span>
-      <span className="inline-flex min-w-[110px] items-center justify-between gap-1 rounded-md bg-white px-1.5 py-0.5 text-[8px] font-medium text-slate-900 shadow-sm">
+      <span className="inline-flex min-w-[110px] items-center justify-between gap-1 rounded-md bg-card px-1.5 py-0.5 text-[8px] font-medium text-slate-900 shadow-sm">
         <span className="truncate">{value}</span>
         <span aria-hidden="true" className="text-[var(--ink-muted)]">
           ▾

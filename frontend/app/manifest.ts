@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: '실시간 전사와 노트 중심 워크플로우를 결합한 회의 기록 워크스페이스',
     start_url: '/',
     display: 'standalone',
-    background_color: '#f6f6f8',
-    theme_color: '#111a4a',
+    background_color: '#0e0918',
+    theme_color: '#0e0918',
     lang: 'ko',
     categories: ['business', 'productivity', 'utilities'],
     icons: [

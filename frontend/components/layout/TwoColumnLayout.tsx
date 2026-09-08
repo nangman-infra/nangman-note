@@ -63,10 +63,10 @@ export function TwoColumnLayout({
       {/* ── Mobile (< lg) ── */}
       <div className="flex h-dvh flex-col bg-[var(--bg-root)] lg:hidden">
         {/* Mobile top bar */}
-        <header className="border-b border-[var(--line-soft)] bg-white/90 px-4 py-2 backdrop-blur-xl">
+        <header className="border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] px-4 py-2 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="font-headline text-sm text-brand">TransNote</span>
+              <span className="font-headline text-sm text-foreground">TransNote</span>
               {breadcrumb ? (
                 <div className="min-w-0 flex-1 truncate text-xs text-[var(--ink-muted)]">{breadcrumb}</div>
               ) : null}
@@ -76,7 +76,7 @@ export function TwoColumnLayout({
                 type="button"
                 onClick={() => setActiveView('dashboard')}
                 className={`inline-flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-medium transition ${
-                  mobileResolvedView === 'dashboard' ? 'bg-brand text-white shadow-[var(--elevation-button)]' : 'text-[var(--ink-muted)]'
+                  mobileResolvedView === 'dashboard' ? 'bg-[var(--surface-container-high)] text-white' : 'text-[var(--ink-muted)]'
                 }`}
               >
                 <Columns3 className="h-3.5 w-3.5" />
@@ -87,7 +87,7 @@ export function TwoColumnLayout({
                 onClick={() => setActiveView('viewer')}
                 disabled={!showViewer}
                 className={`inline-flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-medium transition ${
-                  mobileResolvedView === 'viewer' ? 'bg-brand text-white shadow-[var(--elevation-button)]' : 'text-[var(--ink-muted)]'
+                  mobileResolvedView === 'viewer' ? 'bg-[var(--surface-container-high)] text-white' : 'text-[var(--ink-muted)]'
                 } disabled:cursor-not-allowed disabled:opacity-40`}
               >
                 <FileText className="h-3.5 w-3.5" />
@@ -113,8 +113,8 @@ export function TwoColumnLayout({
 
       {/* ── Desktop (≥ lg): Fixed sidebar + Main content ── */}
       <div className="hidden h-dvh lg:flex">
-        {/* Fixed Sidebar — white rail, Silver Lining hairline */}
-        <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-[var(--line-soft)] bg-[var(--bg-card)]">
+        {/* Fixed Sidebar — void rail, Border Smoke hairline */}
+        <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-[var(--line-soft)] bg-[var(--bg-root)]">
           <ErrorBoundary>{sidebar}</ErrorBoundary>
         </aside>
 

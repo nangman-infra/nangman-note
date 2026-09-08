@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
  * Live microphone audio level bars for the Live Meeting Room transcript panel.
  *
  * Design spec (stitch-redesign Phase 3, task 3.4):
- * - Lives INSIDE the dark Transcript aside as a bottom bar (`h-16 bg-black/30` on the Midnight Ink surface).
+ * - Lives INSIDE the dark Transcript aside as a bottom bar (`h-16 bg-black/30` over the deep panel).
  * - Renders a horizontal row of ~24 bars that pulse with frequency data from the
  *   active microphone MediaStream.
  * - Uses an AudioContext + AnalyserNode fed by requestAnimationFrame to update
@@ -174,7 +174,7 @@ export function TranscriptAudioVisualizer({
     <div
       role="presentation"
       aria-hidden="true"
-      className={`relative flex h-16 items-end justify-center gap-1 border-t border-white/[0.06] bg-black/30 px-4 py-3 ${
+      className={`relative flex h-16 items-end justify-center gap-1 border-t border-[var(--line-soft)] bg-black/30 px-4 py-3 ${
         className ?? ''
       }`}
       data-testid="transcript-audio-visualizer"
@@ -187,7 +187,7 @@ export function TranscriptAudioVisualizer({
             barRefs.current[index] = el;
           }}
           className={`w-1 rounded-full transition-opacity duration-300 ${
-            isActive ? 'bg-seafoam opacity-90' : 'bg-seafoam/30 opacity-70'
+            isActive ? 'bg-electric-gradient opacity-90' : 'bg-electric-deep/30 opacity-70'
           }`}
           style={{ height: `${MIN_HEIGHT_PERCENT}%` }}
         />

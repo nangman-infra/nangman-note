@@ -30,7 +30,7 @@ export function MeetingListLoadMoreFooter({
   }
 
   return (
-    <div className="shrink-0 border-t border-[var(--line-soft)] bg-white px-4 py-3">
+    <div className="shrink-0 border-t border-[var(--line-soft)] px-4 py-3">
       {showClientExpand ? (
         <>
           <button

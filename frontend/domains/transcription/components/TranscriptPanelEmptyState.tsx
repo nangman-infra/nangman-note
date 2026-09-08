@@ -14,19 +14,19 @@ const EMPTY_STATE_COPY: Record<
     icon: MicOff,
     title: '마이크 접근이 차단되어 전사가 비활성화되었습니다.',
     description: '노트 작성에 집중해주세요.',
-    iconClassName: 'text-white/30',
+    iconClassName: 'text-[var(--ink-faint)]',
   },
   batch: {
     icon: Mic,
     title: '현재 배치 전사 모드입니다.',
     description: '회의 종료 후 수집된 오디오가 AWS 배치 전사로 처리됩니다.',
-    iconClassName: 'text-white/30',
+    iconClassName: 'text-[var(--ink-faint)]',
   },
   empty: {
     icon: Languages,
     title: '음성을 기다리고 있습니다...',
     description: '말씀하시면 실시간으로 텍스트가 표시됩니다.',
-    iconClassName: 'text-white/30',
+    iconClassName: 'text-[var(--ink-faint)]',
   },
 };
 
@@ -37,7 +37,7 @@ export function TranscriptPanelEmptyState({
   const Icon = copy.icon;
 
   return (
-    <div className="flex h-full items-center justify-center px-5 text-center text-sm text-white/60">
+    <div className="flex h-full items-center justify-center px-5 text-center text-sm text-[var(--ink-muted)]">
       <div>
         <Icon className={`mx-auto mb-2 h-8 w-8 ${copy.iconClassName ?? ''}`} />
         <p>{copy.title}</p>

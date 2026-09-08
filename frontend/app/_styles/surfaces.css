@@ -1,14 +1,14 @@
-/* ─── Column surfaces ───────────────────────────────────────────────────
-   Surface stack: canvas #f6f6f8 → card #ffffff → frosted overlay.
-   Depth is rare: hairline + whisper shadow for content cards; the
-   five-layer stack only where a card must feel like a physical object.
+/* ─── n8n surfaces ─────────────────────────────────────────────────────
+   Elevation by colour-stepping: void #0e0918 → card #1a1624 → panel
+   #1b1728 → shell #2c2834. No outset drop shadows. Highlighted cards glow
+   from within (white hairline inset + ember bottom-edge inset).
    ──────────────────────────────────────────────────────────────────── */
 .app-shell {
   position: relative;
   isolation: isolate;
 }
 
-/* Bordered content card — hairline + whisper of shadow */
+/* Feature card — one step above the void, colour alone */
 .surface-card {
   background: var(--bg-card);
   border: none;
@@ -20,105 +20,128 @@
   box-shadow: var(--elevation-md);
 }
 
-/* Product card — five-layer progressive stack, hovering presence */
+/* Dark feature panel — large 24px stage */
 .surface-product {
-  background: var(--bg-card);
-  border-radius: var(--radius-card);
-  box-shadow: var(--elevation-xl);
+  background: var(--surface-container-low);
+  border-radius: var(--radius-card-lg);
+  box-shadow: var(--elevation-sm);
 }
 
-/* Transaction widget — dramatic off-axis shadow, inset white edge */
+/* Glowing inset widget — transparent, backlit indicator edge */
 .surface-widget {
-  background: var(--bg-card);
-  border-radius: var(--radius-card);
+  background: rgba(26, 22, 36, 0.6);
+  border-radius: var(--radius-card-lg);
   box-shadow: var(--elevation-widget);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+[data-theme='light'] .surface-widget {
+  background: rgba(255, 255, 255, 0.8);
 }
 
-/* Tonal — canvas-toned inset areas */
+/* Glowing proof card — transparent + inset glow, no fill */
+.surface-glow {
+  background: transparent;
+  border-radius: var(--radius-card-lg);
+  box-shadow: var(--elevation-glow);
+}
+
+/* Tonal — panel-toned inset areas */
 .surface-tonal {
   background: var(--surface-container-low);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-node);
 }
 .surface-tonal-high {
   background: var(--surface-container);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-node);
 }
 
-/* Deep — Midnight Ink inversion for a section that needs to flip dark */
+/* Deep — a stage darker than the void */
 .surface-deep {
   background: var(--surface-deep);
-  color: #e9ecf1;
-  border-radius: var(--radius-card);
+  color: var(--color-ash-text);
+  border-radius: var(--radius-card-lg);
 }
 
-/* Frosted overlay — nav pills, badges, hero chrome */
+/* Frosted overlay — ghost panels, nav pills */
 .glass-surface {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: var(--surface-frosted);
+  border: 1px solid var(--line-inset);
   border-radius: var(--radius-card);
-  box-shadow: var(--elevation-sm);
-}
-[data-theme='dark'] .glass-surface {
-  background: rgba(15, 27, 36, 0.8);
-  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--elevation-halo);
 }
 
-/* AI / data accent card — seafoam rule on the left */
+/* AI / data accent card — electric rule on the left */
 .ai-card-accent {
-  border-left: 3px solid var(--tertiary);
+  border-left: 2px solid transparent;
+  border-image: var(--gradient-electric) 1;
   background: var(--tertiary-fixed);
 }
 
-/* Featured accent surface — Signal Orange. At most once per page. */
+/* Featured ember surface — reserved. Ember must not fill sections;
+   this renders as a glowing card with an ember tagline instead. */
 .surface-signal {
-  background: var(--accent);
-  color: #ffffff;
-  border-radius: var(--radius-card);
+  background: var(--bg-card);
+  color: var(--ink-strong);
+  border-radius: var(--radius-card-lg);
+  box-shadow: var(--elevation-glow);
 }
 
-/* Editor dot grid — Silver Lining dots on white */
+/* Editor dot grid — smoke dots on void */
 .editor-dot-grid {
-  background-color: var(--bg-card);
+  background-color: var(--bg-root);
   background-image: radial-gradient(circle, var(--line-soft) 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: 0 0;
 }
 
-/* Halftone field — signature decorative dot field. Spectrum gradient is
-   ONLY allowed here (never on UI controls). Use behind heroes/sign-in. */
-.halftone-field {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(circle, rgba(17, 26, 74, 0.9) 1.2px, transparent 1.3px);
-  background-size: 10px 10px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, #000 20%, transparent 75%);
-  mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, #000 20%, transparent 75%);
-  opacity: 0.35;
-}
-.halftone-field--spectrum {
-  /* Spectrum gradient revealed only through the dot mask — dots take the
-     gradient colour, the gradient never touches a UI control. */
-  background-image: linear-gradient(115deg, #d65620 0%, #9f7aee 22%, #4575cd 42%, #71d2f0 60%, #44b48b 80%, #f4df69 100%);
-  -webkit-mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
-    radial-gradient(ellipse 70% 60% at 70% 40%, #000 15%, transparent 72%);
-  mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
-    radial-gradient(ellipse 70% 60% at 70% 40%, #000 15%, transparent 72%);
-  -webkit-mask-size: 10px 10px, 100% 100%;
-  mask-size: 10px 10px, 100% 100%;
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
-  opacity: 0.55;
-}
+/* ─── Atmosphere — subliminal radial glows, never visible at a glance.
+   Lives in @layer components so Tailwind inset utilities can reposition it.
+   Gradients are sized to fade out inside their box (no clipped edges). */
+@layer components {
+  .glow-field {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: var(--gradient-atmosphere-ember);
+  }
+  .glow-field--ember-corner {
+    background-image: radial-gradient(ellipse 55% 60% at 100% 0%, rgba(253, 137, 37, 0.22), rgba(255, 12, 0, 0.06) 50%, rgba(0, 0, 0, 0) 100%);
+  }
+  .glow-field--electric-corner {
+    background-image: radial-gradient(ellipse 55% 60% at 0% 100%, rgba(7, 122, 199, 0.22), rgba(107, 33, 239, 0.08) 50%, rgba(0, 0, 0, 0) 100%);
+  }
+  .glow-field--rose {
+    background-image: var(--gradient-footer-rose);
+  }
+  .glow-field--hero {
+    background-image:
+      radial-gradient(ellipse 40% 45% at 78% 32%, rgba(253, 137, 37, 0.2), rgba(255, 12, 0, 0.05) 55%, rgba(0, 0, 0, 0) 100%),
+      radial-gradient(ellipse 34% 32% at 14% 68%, rgba(7, 122, 199, 0.18), rgba(107, 33, 239, 0.05) 60%, rgba(0, 0, 0, 0) 100%);
+  }
+  /* Legacy aliases from the previous theme */
+  .halftone-field,
+  .halftone-field--spectrum,
+  .halftone-field--top {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(ellipse 40% 45% at 78% 32%, rgba(253, 137, 37, 0.2), rgba(255, 12, 0, 0.05) 55%, rgba(0, 0, 0, 0) 100%),
+      radial-gradient(ellipse 34% 32% at 14% 68%, rgba(7, 122, 199, 0.18), rgba(107, 33, 239, 0.05) 60%, rgba(0, 0, 0, 0) 100%);
+  }
 
-/* Variant: dots gather at the top edge and fade before the headline. */
-.halftone-field--top {
-  -webkit-mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
-    radial-gradient(ellipse 90% 55% at 50% -10%, #000 0%, transparent 75%);
-  mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
-    radial-gradient(ellipse 90% 55% at 50% -10%, #000 0%, transparent 75%);
+  /* Ember orb — volumetric bolt stand-in for hero decoration */
+  .ember-orb {
+    position: absolute;
+    border-radius: 9999px;
+    background: radial-gradient(circle at 35% 35%, rgba(255, 190, 120, 0.95), rgba(253, 137, 37, 0.85) 35%, rgba(255, 12, 0, 0.55) 65%, rgba(255, 12, 0, 0) 100%);
+    filter: blur(2px);
+    opacity: 0.9;
+    pointer-events: none;
+  }
 }
 
 /* Hairline divider */
@@ -127,9 +150,22 @@
   background: var(--line-soft);
 }
 
-/* Tailwind v4 @utility — kept for compatibility; the gradient is retired
-   in favour of a flat Indigo Navy fill with a soft inner top light. */
+/* Electric connection line (workflow-canvas edge) */
+.edge-electric {
+  height: 1px;
+  background-image: var(--gradient-electric);
+}
+
+/* Tailwind v4 @utility — compatibility name; now the Ember gradient. */
 @utility bg-brand-gradient {
-  background-color: var(--brand);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 100%);
+  background-image: var(--gradient-ember);
+}
+@utility bg-electric-gradient {
+  background-image: var(--gradient-electric);
+}
+@utility text-electric-gradient {
+  background-image: var(--gradient-electric);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

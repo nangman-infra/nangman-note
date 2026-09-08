@@ -47,9 +47,9 @@ const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 
 /* Column toast: white card, hairline, coloured icon + left rule for state. */
 const variantStyles: Record<ToastVariant, string> = {
-  success: 'border-[var(--line-soft)] bg-white text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--success)] [&_svg]:text-[var(--success)]',
-  error: 'border-[var(--line-soft)] bg-white text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--danger)] [&_svg]:text-[var(--danger)]',
-  info: 'border-[var(--line-soft)] bg-white text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--brand)] [&_svg]:text-brand',
+  success: 'border-[var(--line-soft)] bg-card text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--success)] [&_svg]:text-[var(--success)]',
+  error: 'border-[var(--line-soft)] bg-card text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--danger)] [&_svg]:text-[var(--danger)]',
+  info: 'border-[var(--line-soft)] bg-card text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--brand)] [&_svg]:text-electric',
 };
 
 const variantIcons = {
@@ -239,7 +239,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                     <button
                       type="button"
                       onClick={() => handleUndoClick(toast)}
-                      className="btn-neo mt-2 inline-flex !px-2.5 !py-1 text-xs !text-brand"
+                      className="btn-neo mt-2 inline-flex !px-2.5 !py-1 text-xs !text-electric"
                     >
                       취소
                       {toast.remainingSeconds !== undefined && (

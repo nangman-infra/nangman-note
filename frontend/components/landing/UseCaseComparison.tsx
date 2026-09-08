@@ -58,7 +58,7 @@ export function UseCaseComparison() {
     <section className="py-16 sm:py-24">
       <div className="mx-auto max-w-6xl px-5">
         <ScrollReveal>
-          <p className="text-center text-xs font-semibold tracking-widest text-muted">
+          <p className="text-center text-xs font-medium tracking-widest text-muted">
             USE CASES
           </p>
           <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
@@ -80,7 +80,7 @@ export function UseCaseComparison() {
                 onClick={() => setActive(c.id)}
                 className={`rounded-lg px-4 py-2.5 text-sm font-medium transition ${
                   active === c.id
-                    ? 'bg-brand text-white'
+                    ? 'bg-[var(--surface-container)] text-white'
                     : 'surface-card text-muted hover:text-foreground'
                 }`}
               >
@@ -94,19 +94,19 @@ export function UseCaseComparison() {
         <ScrollReveal delay={200}>
           <div className="mx-auto mt-8 max-w-3xl" role="tabpanel" id={`case-panel-${current.id}`} aria-labelledby={`case-tab-${current.id}`}>
             <div className="surface-card p-6 sm:p-8">
-              <h3 className="text-lg font-semibold">{current.title}</h3>
+              <h3 className="text-lg font-medium">{current.title}</h3>
               <p className="mt-2 text-sm text-muted">{current.description}</p>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-rose-600">
+                  <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-rose-600">
                     <span className="flex h-5 w-5 items-center justify-center rounded-md bg-rose-100 text-[10px]">✕</span>
                     BEFORE
                   </p>
                   <p className="mt-2 text-sm">{current.before}</p>
                 </div>
                 <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-teal-600">
+                  <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-teal-600">
                     <span className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-100 text-[10px]">✓</span>
                     AFTER
                   </p>
@@ -117,16 +117,16 @@ export function UseCaseComparison() {
               {/* 실제 결과물 풀 렌더링 (사례 1) */}
               {current.sampleResult && (
                 <div className="mt-6">
-                  <p className="mb-3 text-[11px] font-semibold tracking-wide text-muted">
+                  <p className="mb-3 text-[11px] font-medium tracking-wide text-muted">
                     실제 AI 결과물 미리보기
                   </p>
                   <div className="overflow-x-auto rounded-lg border border-[var(--line-soft)]">
                     <table className="w-full text-left text-sm">
                       <thead>
-                        <tr className="border-b border-[var(--line-soft)] bg-brand/5">
-                          <th className="px-4 py-2.5 text-xs font-semibold text-brand">안건</th>
-                          <th className="px-4 py-2.5 text-xs font-semibold text-brand">결정사항</th>
-                          <th className="px-4 py-2.5 text-xs font-semibold text-brand">액션아이템</th>
+                        <tr className="border-b border-[var(--line-soft)] bg-[var(--surface-container)]">
+                          <th className="px-4 py-2.5 text-xs font-medium text-electric">안건</th>
+                          <th className="px-4 py-2.5 text-xs font-medium text-electric">결정사항</th>
+                          <th className="px-4 py-2.5 text-xs font-medium text-electric">액션아이템</th>
                         </tr>
                       </thead>
                       <tbody>

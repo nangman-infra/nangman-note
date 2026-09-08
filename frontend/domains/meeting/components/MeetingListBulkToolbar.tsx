@@ -24,12 +24,12 @@ export function MeetingListBulkToolbar({
   onBulkPurge,
 }: MeetingListBulkToolbarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line-soft)] bg-[var(--brand-fixed)] px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line-soft)] bg-[var(--surface-container-low)] px-4 py-2.5">
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={isAllSelected ? onDeselectAll : onSelectAll}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand transition hover:bg-white"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-electric transition hover:bg-[var(--surface-container)]"
         >
           {isAllSelected ? (
             <CheckSquare className="h-3.5 w-3.5" />
@@ -38,7 +38,7 @@ export function MeetingListBulkToolbar({
           )}
           {isAllSelected ? '전체 해제' : '전체 선택'}
         </button>
-        <span className="text-xs font-semibold text-muted">
+        <span className="text-xs font-medium text-muted">
           {selectedCount}개 선택
         </span>
       </div>

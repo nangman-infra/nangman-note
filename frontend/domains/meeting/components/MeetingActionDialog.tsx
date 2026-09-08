@@ -118,11 +118,11 @@ export function MeetingActionDialog({
           ) : null}
         </div>
 
-        <h2 className="text-lg font-semibold">{heading}</h2>
+        <h2 className="text-lg font-medium">{heading}</h2>
         <p className="mt-2 text-sm text-muted">
           {isBulk ? null : (
             <>
-              <span className="font-semibold text-foreground">&quot;{meetingTitle || '제목 없는 회의'}&quot;</span>
+              <span className="font-medium text-foreground">&quot;{meetingTitle || '제목 없는 회의'}&quot;</span>
               <br />
             </>
           )}
@@ -144,7 +144,7 @@ export function MeetingActionDialog({
             disabled={isLoading}
             className={`btn-neo inline-flex border-transparent px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50 ${
               isRestore
-                ? 'bg-brand hover:bg-brand/90 hover:text-white'
+                ? 'bg-[var(--surface-container)] hover:bg-brand/90 hover:text-white'
                 : 'bg-rose-600 hover:bg-rose-700 hover:text-white'
             }`}
           >

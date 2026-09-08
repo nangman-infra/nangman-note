@@ -25,16 +25,16 @@ export function LandingNav() {
   return (
     <nav
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled ? 'border-b border-[var(--line-soft)] bg-white/90 backdrop-blur-xl' : 'bg-transparent'
+        scrolled ? 'border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] backdrop-blur-xl' : 'bg-transparent'
       }`}
     >
       {/* 데스크톱 */}
-      <div className="mx-auto hidden h-[62px] max-w-[1200px] items-center gap-2 px-6 sm:flex lg:px-8">
+      <div className="mx-auto hidden h-[66px] max-w-[1200px] items-center gap-2 px-6 sm:flex lg:px-8">
         <Link href="/landing" className="mr-4 inline-flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand" aria-hidden="true">
+          <span className="bg-brand-gradient flex h-7 w-7 items-center justify-center rounded-md shadow-[0_0_12px_rgba(253,137,37,0.45)]" aria-hidden="true">
             <Sparkles className="h-3.5 w-3.5 text-white" strokeWidth={2} />
           </span>
-          <span className="font-headline text-[15px] text-brand">TransNote</span>
+          <span className="font-headline text-[15px] text-foreground">TransNote</span>
         </Link>
 
         {navLinks.map((link) => (
@@ -43,8 +43,8 @@ export function LandingNav() {
             href={link.href}
             className={`rounded-lg border px-3 py-1.5 text-sm transition ${
               pathname === link.href
-                ? 'border-[var(--line-soft)] bg-white/60 font-medium text-[var(--ink-strong)] backdrop-blur'
-                : 'border-transparent font-normal text-[var(--ink-subtle)] hover:border-[var(--line-soft)] hover:bg-white/60 hover:text-[var(--ink-strong)]'
+                ? 'border-[var(--line-inset)] bg-[var(--surface-frosted)] text-[var(--ink-strong)] backdrop-blur'
+                : 'border-transparent text-[var(--ink-subtle)] hover:border-[var(--line-inset)] hover:bg-[var(--surface-frosted)] hover:text-[var(--ink-strong)]'
             }`}
           >
             {link.label}
@@ -65,10 +65,10 @@ export function LandingNav() {
       {/* 모바일 */}
       <div className="flex items-center justify-between px-5 py-3.5 sm:hidden">
         <Link href="/landing" className="inline-flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand" aria-hidden="true">
+          <span className="bg-brand-gradient flex h-7 w-7 items-center justify-center rounded-md shadow-[0_0_12px_rgba(253,137,37,0.45)]" aria-hidden="true">
             <Sparkles className="h-3.5 w-3.5 text-white" strokeWidth={2} />
           </span>
-          <span className="font-headline text-[15px] text-brand">TransNote</span>
+          <span className="font-headline text-[15px] text-foreground">TransNote</span>
         </Link>
 
         <button

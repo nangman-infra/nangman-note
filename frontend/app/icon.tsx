@@ -19,7 +19,7 @@ export default function Icon() {
           borderRadius: '112px',
           border: '16px solid rgba(103,232,249,0.34)',
           background:
-            '#111a4a',
+            'linear-gradient(30deg, rgb(253,137,37), rgb(255,12,0))',
           color: '#f8fafc',
           fontFamily: 'Inter, system-ui, sans-serif',
           fontWeight: 600,

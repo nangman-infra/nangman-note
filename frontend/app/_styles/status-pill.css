@@ -2,7 +2,7 @@
  * Semantic state variants applied on top of `.status-pill`:
  *   <span class="status-pill status-pill--live">진행 중</span>
  * live = recording (danger tone + pulse), done = seafoam, idle = neutral,
- * warn = Signal Orange tint. Tags are the only 9999px surfaces in Column.
+ * warn = ember tint. Pills (9999px) are reserved for tags and status.
  */
 .status-pill--live,
 .status-pill--done,
@@ -13,7 +13,7 @@
   gap: 0.375rem;
   text-transform: none;
   letter-spacing: 0;
-  font-weight: 500;
+  font-weight: 400;
   font-size: 0.75rem;
   padding: 0.25rem 0.625rem;
 }
@@ -44,10 +44,7 @@
 
 .status-pill--warn {
   background: var(--accent-soft);
-  color: #a4431a;
-}
-[data-theme='dark'] .status-pill--warn {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 @keyframes ai-pulse {

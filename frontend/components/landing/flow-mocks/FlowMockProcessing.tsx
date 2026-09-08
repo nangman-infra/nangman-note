@@ -15,7 +15,7 @@ export function FlowMockProcessing() {
 
   return (
     <div className="surface-card overflow-hidden p-5 text-[11px]">
-      <p className="mb-4 text-center text-xs font-semibold">회의록을 만들고 있습니다</p>
+      <p className="mb-4 text-center text-xs font-medium">회의록을 만들고 있습니다</p>
 
       <div className="space-y-3">
         {steps.map((step) => (
@@ -49,13 +49,13 @@ export function FlowMockProcessing() {
 }
 
 function getStepIconFrameClassName(status: FlowMockStepStatus): string {
-  if (status === 'done') return 'bg-brand/10 text-brand';
+  if (status === 'done') return 'bg-[var(--surface-container)] text-electric';
   if (status === 'active') return 'bg-amber-50 text-amber-600';
   return 'bg-gray-100 text-gray-400';
 }
 
 function getStepLabelClassName(status: FlowMockStepStatus): string {
-  if (status === 'done') return 'text-brand';
+  if (status === 'done') return 'text-electric';
   if (status === 'active') return 'text-amber-700';
   return 'text-gray-400';
 }

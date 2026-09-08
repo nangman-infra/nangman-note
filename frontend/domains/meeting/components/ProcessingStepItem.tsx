@@ -44,7 +44,7 @@ export function ProcessingStepItem({
 
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm font-semibold ${
+          className={`text-sm font-medium ${
             isPending ? 'text-slate-400' : ''
           }`}
         >
@@ -56,7 +56,7 @@ export function ProcessingStepItem({
         {showUploadProgress && (
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
             <div
-              className="h-full rounded-full bg-brand transition-all duration-300"
+              className="h-full rounded-full bg-[var(--surface-container)] transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
             />
           </div>
@@ -73,9 +73,9 @@ function getStepContainerClassName({
   isActive: boolean;
   isDone: boolean;
 }): string {
-  if (isActive) return 'border-brand/30 bg-brand/5';
+  if (isActive) return 'border-electric-deep bg-[var(--surface-container)]';
   if (isDone) return 'border-emerald-200 bg-emerald-50/50';
-  return 'border-[var(--line-soft)] bg-white/50 opacity-50';
+  return 'border-[var(--line-soft)] bg-card/50 opacity-50';
 }
 
 function getStepIconClassName({
@@ -85,7 +85,7 @@ function getStepIconClassName({
   isActive: boolean;
   isDone: boolean;
 }): string {
-  if (isActive) return 'bg-brand/15 text-brand';
+  if (isActive) return 'bg-brand/15 text-electric';
   if (isDone) return 'bg-emerald-100 text-emerald-700';
   return 'bg-slate-100 text-slate-400';
 }

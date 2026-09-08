@@ -76,7 +76,7 @@ export function SignInCard({
 
   return (
     <aside className="motion-rise lg:col-span-5">
-      <div className="surface-product p-6 sm:p-8">
+      <div className="surface-card !rounded-[24px] p-6 sm:p-8">
         <div className="mb-7">
           <p className="label-sm">{copy.eyebrow}</p>
           <h2 className="font-headline mt-1.5 text-2xl text-[var(--ink-strong)]">
@@ -194,9 +194,9 @@ export function SignInCard({
           낭만 계정으로 로그인
         </button>
 
-        <div className="surface-tonal mt-4 border border-[var(--line-soft)] px-4 py-3">
+        <div className="surface-tonal mt-4 px-4 py-3 shadow-[var(--elevation-sm)]">
           <div className="flex gap-2.5">
-            <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-seafoam-deep" strokeWidth={1.75} />
+            <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-electric" strokeWidth={1.5} />
             <div>
               <p className="text-xs font-medium text-[var(--ink-strong)]">
                 비밀번호 없는 로그인
@@ -213,7 +213,7 @@ export function SignInCard({
           {copy.switchLabel}{' '}
           <Link
             href={copy.switchHref}
-            className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
+            className="link-electric inline-flex items-center gap-1 text-[var(--ink-strong)]"
           >
             {copy.switchAction}
             <ArrowRight className="h-3 w-3" />
@@ -224,14 +224,14 @@ export function SignInCard({
           로그인 시{' '}
           <Link
             href="/legal/terms"
-            className="font-medium text-brand hover:underline"
+            className="link-electric text-[var(--ink-subtle)]"
           >
             서비스 이용 약관
           </Link>
           과{' '}
           <Link
             href="/legal/privacy"
-            className="font-medium text-brand hover:underline"
+            className="link-electric text-[var(--ink-subtle)]"
           >
             개인정보 처리방침
           </Link>

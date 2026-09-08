@@ -1,6 +1,6 @@
 'use client';
 
-/** 테마(라이트/다크) 저장·적용 유틸 */
+/** 테마(다크 기본 / 라이트) 저장·적용 유틸 */
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -9,9 +9,9 @@ const THEME_KEY = 'transnote_theme';
 export function getStoredTheme(): ThemeMode {
   try {
     const stored = localStorage.getItem(THEME_KEY);
-    return stored === 'dark' ? 'dark' : 'light';
+    return stored === 'light' ? 'light' : 'dark';
   } catch {
-    return 'light';
+    return 'dark';
   }
 }
 
@@ -32,6 +32,7 @@ export function setTheme(mode: ThemeMode): void {
 
 /**
  * SSR 하이드레이션 전에 저장된 테마를 적용하는 인라인 스크립트.
- * (FOUC — 라이트로 렌더 후 다크로 깜빡이는 현상 방지)
+ * 기본 테마는 다크(<html data-theme="dark">). 사용자가 라이트를 저장한 경우에만 전환한다.
+ * (FOUC — 다크로 렌더 후 라이트로 깜빡이는 현상 방지)
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t==='dark'){document.documentElement.dataset.theme='dark';document.documentElement.style.colorScheme='dark';}}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');if(t==='light'){document.documentElement.dataset.theme='light';document.documentElement.style.colorScheme='light';}}catch(e){}})();`;

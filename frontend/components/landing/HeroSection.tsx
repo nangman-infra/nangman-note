@@ -9,7 +9,8 @@ export function HeroSection() {
   return (
     <section className="relative overflow-hidden pb-16 pt-28 sm:pb-24 sm:pt-36">
       {/* Signature halftone field — spectrum gradient lives only here */}
-      <div className="halftone-field halftone-field--spectrum halftone-field--top -z-10 !opacity-45" aria-hidden="true" />
+      <div className="glow-field glow-field--hero -z-10" aria-hidden="true" />
+      <div className="ember-orb -right-40 top-10 -z-10 hidden h-[640px] w-[640px] opacity-35 blur-3xl lg:block" aria-hidden="true" />
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         {/* Tag with dot */}
         <div className="landing-rise flex justify-center">
@@ -20,7 +21,7 @@ export function HeroSection() {
 
         {/* 헤드라인 */}
         <div className="landing-rise landing-rise-d1">
-          <h1 className="font-headline mx-auto mt-6 max-w-3xl text-center text-[40px] leading-[1.08] text-[var(--ink-strong)] sm:text-[52px] lg:text-[60px]">
+          <h1 className="font-display mx-auto mt-6 max-w-3xl text-center text-[40px] text-[var(--ink-strong)] sm:text-[48px] lg:text-[54px]">
             회의가 끝나면,{' '}
             <span className="landing-gradient-text">회의록은 이미 완성</span>
             되어 있습니다
@@ -28,7 +29,7 @@ export function HeroSection() {
         </div>
 
         <div className="landing-rise landing-rise-d2">
-          <p className="mx-auto mt-6 max-w-xl text-center text-base text-[var(--ink-muted)] sm:text-lg">
+          <p className="mx-auto mt-8 max-w-xl text-center text-base font-light text-[var(--ink-subtle)] sm:text-lg">
             매번 회의록 정리에 30분을 쓰고 있다면 — 실시간 전사와 노트를 결합해
             AI가 주제를 분리하고 구조화된 문서를 자동 생성합니다.
           </p>

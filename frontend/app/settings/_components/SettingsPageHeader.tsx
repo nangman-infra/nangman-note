@@ -22,7 +22,7 @@ export function SettingsPageHeader({ onBack }: SettingsPageHeaderProps) {
         <p className="label-sm mb-2 text-[var(--ink-muted)]">
           Prompt Management
         </p>
-        <h1 className="font-headline text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h1 className="font-headline text-3xl font-medium tracking-tight sm:text-4xl">
           프롬프트 관리
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">

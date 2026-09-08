@@ -216,7 +216,7 @@ export function HomePageContent() {
     if (activeView === 'settings') {
       return (
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-white/90 px-6 py-3 backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] px-6 py-3 backdrop-blur-xl">
             <button
               type="button"
               onClick={handleBackToDashboard}
@@ -238,7 +238,7 @@ export function HomePageContent() {
     if (activeView === 'prompts') {
       return (
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-white/90 px-6 py-3 backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] px-6 py-3 backdrop-blur-xl">
             <button
               type="button"
               onClick={handleBackToDashboard}
@@ -260,7 +260,7 @@ export function HomePageContent() {
     if (selectedMeetingId) {
       return (
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-white/90 px-6 py-3 backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] px-6 py-3 backdrop-blur-xl">
             <button
               type="button"
               onClick={handleBackToDashboard}
@@ -313,8 +313,8 @@ export function HomePageContent() {
               aria-current={activeView === view ? 'page' : undefined}
               className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs transition ${
                 activeView === view
-                  ? 'bg-[var(--brand-fixed)] font-medium text-brand'
-                  : 'font-normal text-[var(--ink-muted)] hover:bg-[var(--surface-container-low)]'
+                  ? 'bg-[var(--surface-container)] text-white'
+                  : 'text-[var(--ink-muted)] hover:bg-[var(--surface-container-low)]'
               }`}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden="true" />

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { DM_Sans, JetBrains_Mono } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/auth/AuthSessionProvider';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
 import { NetworkStatusBanner } from '@/components/feedback/NetworkStatusBanner';
@@ -8,6 +8,7 @@ import { env, getServerRuntimeVar } from '@/lib/config/env';
 import { THEME_INIT_SCRIPT } from '@/lib/theme/theme';
 import { getSiteUrl } from '@/lib/seo/site-url';
 import '@toast-ui/editor/dist/toastui-editor.css';
+import '@toast-ui/editor/dist/theme/toastui-editor-dark.css';
 import './globals.css';
 
 /**
@@ -30,14 +31,14 @@ function buildRuntimeEnvScript(): string {
 }
 
 /**
- * Column type system — SuisseIntl is proprietary, so Inter (the documented
- * substitute) carries headings, body, buttons and nav across weights 300–600.
- * JetBrains Mono stands in for SuisseIntlMono/SFMono on data + code.
+ * n8n type system — geomanist is proprietary, so DM Sans (the documented
+ * substitute) carries display (300), body (400) and book-weight labels (500).
+ * JetBrains Mono is kept for technical readouts (timers, ids, counts).
  */
-const suisse = Inter({
-  variable: '--font-suisse',
+const geo = DM_Sans({
+  variable: '--font-geo',
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
+  weight: ['300', '400', '500'],
   display: 'swap',
 });
 
@@ -116,7 +117,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#111a4a',
+  themeColor: '#0e0918',
   colorScheme: 'dark light',
 };
 
@@ -126,7 +127,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" data-theme="dark" style={{ colorScheme: 'dark' }}>
       <head>
         <script
           dangerouslySetInnerHTML={{ __html: buildRuntimeEnvScript() }}
@@ -134,7 +135,7 @@ export default function RootLayout({
         {/* 저장된 테마를 하이드레이션 전에 적용 (다크 모드 FOUC 방지) */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className={`${suisse.variable} ${monoBrand.variable} antialiased`}>
+      <body className={`${geo.variable} ${monoBrand.variable} antialiased`}>
         <NetworkStatusBanner />
         <AuthSessionProvider>
           <FeedbackProvider>{children}</FeedbackProvider>

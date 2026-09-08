@@ -105,7 +105,7 @@ export function MeetingListContent({
   };
 
   return (
-    <div aria-busy={isLoading} className="scroll-muted flex-1 space-y-2 overflow-y-auto bg-[var(--surface-container-low)] px-4 py-3 lg:px-5">
+    <div aria-busy={isLoading} className="scroll-muted flex-1 space-y-2 overflow-y-auto px-4 py-3 lg:px-5">
       {renderContent()}
     </div>
   );
@@ -131,7 +131,7 @@ function MeetingListEmptyState({
   if (showTrash) {
     return (
       <div className="surface-card p-8 text-center">
-        <p className="mb-1 text-sm font-semibold">휴지통이 비어 있습니다</p>
+        <p className="mb-1 text-sm font-medium">휴지통이 비어 있습니다</p>
         <p className="text-xs text-muted">
           삭제한 회의가 있으면 이곳에서 복구하거나 영구 삭제할 수 있습니다.
         </p>
@@ -142,8 +142,8 @@ function MeetingListEmptyState({
   if (isFirstArchiveEmpty) {
     return (
       <div className="surface-card p-8 text-center">
-        <Mic className="mx-auto mb-3 h-8 w-8 text-brand/60" strokeWidth={1.5} />
-        <p className="mb-1 text-sm font-semibold">아직 기록된 회의가 없습니다</p>
+        <Mic className="mx-auto mb-3 h-8 w-8 text-electric/60" strokeWidth={1.5} />
+        <p className="mb-1 text-sm font-medium">아직 기록된 회의가 없습니다</p>
         <p className="mx-auto mb-4 max-w-sm text-xs leading-relaxed text-muted">
           첫 회의를 시작하면 이곳에 회의 기록과 AI 회의록이 시간순으로 쌓입니다.
         </p>
@@ -158,7 +158,7 @@ function MeetingListEmptyState({
   return (
     <div className="surface-card p-8 text-center">
       <Search className="mx-auto mb-3 h-8 w-8 text-muted/40" />
-      <p className="mb-1 text-sm font-semibold">
+      <p className="mb-1 text-sm font-medium">
         {isSearchApplied ? '검색 결과가 없습니다' : '조건에 맞는 회의가 없습니다'}
       </p>
       {isSearchApplied && searchQuery ? (

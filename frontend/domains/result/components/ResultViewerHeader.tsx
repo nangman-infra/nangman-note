@@ -122,15 +122,15 @@ export function ResultViewerHeader({
               onTitleCancel();
             }
           }}
-          className="input-shell font-headline !text-[28px] leading-[1.1] sm:!text-[34px] lg:!text-[40px]"
+          className="input-shell font-display !text-[32px] sm:!text-[40px] lg:!text-[48px]"
         />
       ) : (
-        <h1 className="font-headline text-[28px] leading-[1.1] text-[var(--ink-strong)] sm:text-[34px] lg:text-[40px]">
+        <h1 className="font-display text-[32px] text-[var(--ink-strong)] sm:text-[40px] lg:text-[48px]">
           <button
             ref={titleButtonRef}
             type="button"
             onClick={onTitleClick}
-            className="rounded text-left transition hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+            className="rounded text-left transition hover:text-[var(--ink-subtle)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-electric-current)]"
             aria-label={`${result.metadata?.title || '회의록'} 제목 편집`}
             title="제목 편집"
           >
@@ -142,19 +142,19 @@ export function ResultViewerHeader({
       <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
         <div>
           <dt className="label-sm">Transcript words</dt>
-          <dd className="data-mono mt-0.5 text-lg font-medium text-seafoam-deep">
+          <dd className="font-headline mt-0.5 text-[22px] text-[var(--ink-strong)]">
             {result.metadata.transcriptWordCount.toLocaleString()}
           </dd>
         </div>
         <div>
           <dt className="label-sm">Note length</dt>
-          <dd className="data-mono mt-0.5 text-lg font-medium text-seafoam-deep">
+          <dd className="font-headline mt-0.5 text-[22px] text-[var(--ink-strong)]">
             {result.metadata.noteLength.toLocaleString()}
           </dd>
         </div>
         <div>
           <dt className="label-sm">Duration</dt>
-          <dd className="data-mono mt-0.5 text-lg font-medium text-seafoam-deep">
+          <dd className="font-headline mt-0.5 text-[22px] text-[var(--ink-strong)]">
             {Math.round(result.metadata.totalDuration / 60)}m
           </dd>
         </div>
@@ -167,7 +167,7 @@ export function ResultViewerHeader({
               <span
                 key={label}
                 title={label}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-medium text-white ring-2 ring-white ${
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-medium text-white ring-2 ring-[var(--bg-root)] ${
                   RESULT_SPEAKER_PALETTE[index % RESULT_SPEAKER_PALETTE.length]
                 }`}
               >
@@ -181,12 +181,12 @@ export function ResultViewerHeader({
                   onClick={() => setShowSpeakerPopover((value) => !value)}
                   aria-label={`추가 참가자 ${overflowSpeakerCount}명 보기`}
                   aria-expanded={showSpeakerPopover}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-container)] text-[10px] font-medium text-[var(--ink-subtle)] ring-2 ring-white transition hover:bg-[var(--surface-container-high)]"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-container)] text-[10px] text-[var(--ink-subtle)] ring-2 ring-[var(--bg-root)] transition hover:bg-[var(--surface-container-high)]"
                 >
                   +{overflowSpeakerCount}
                 </button>
                 {showSpeakerPopover ? (
-                  <div className="surface-card absolute left-0 top-full z-20 mt-1 min-w-[160px] p-2 !shadow-[var(--elevation-md)]">
+                  <div className="absolute left-0 top-full z-20 mt-1 min-w-[160px] rounded-[12px] bg-[var(--surface-container-low)] p-2 shadow-[var(--elevation-md)]">
                     <p className="label-sm mb-1">Participants</p>
                     <ul className="space-y-1">
                       {uniqueSpeakers.map((label, index) => (

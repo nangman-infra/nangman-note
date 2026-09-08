@@ -27,7 +27,7 @@ export function BottomCta({ nextHref, nextLabel }: BottomCtaProps) {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/landing/start"
-              className="btn-neo inline-flex border-transparent bg-brand px-6 py-3 text-sm text-white hover:bg-brand-strong hover:text-white"
+              className="btn-neo inline-flex border-transparent bg-[var(--surface-container)] px-6 py-3 text-sm text-white hover:bg-[var(--surface-container-high)] hover:text-white"
               style={{ color: '#ffffff' }}
             >
               무료로 시작하기

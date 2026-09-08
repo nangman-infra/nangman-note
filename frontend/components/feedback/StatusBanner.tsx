@@ -16,8 +16,8 @@ interface StatusBannerProps {
 const variantStyleMap: Record<BannerVariant, string> = {
   error: 'border-[var(--line-soft)] bg-[var(--danger-soft)] text-[var(--ink-strong)] shadow-[inset_3px_0_0_0_var(--danger)] [&_svg]:text-[var(--danger)]',
   success: 'border-[var(--line-soft)] bg-[var(--success-soft)] text-[var(--ink-strong)] shadow-[inset_3px_0_0_0_var(--success)] [&_svg]:text-[var(--success)]',
-  info: 'border-[var(--line-soft)] bg-[var(--brand-fixed)] text-[var(--ink-strong)] shadow-[inset_3px_0_0_0_var(--brand)] [&_svg]:text-brand',
-  warning: 'border-[var(--line-soft)] bg-[var(--accent-soft)] text-[var(--ink-strong)] shadow-[inset_3px_0_0_0_var(--accent)] [&_svg]:text-[#a4431a]',
+  info: 'border-[var(--line-soft)] bg-[var(--tertiary-fixed)] text-[var(--ink-strong)] shadow-[inset_3px_0_0_0_var(--brand)] [&_svg]:text-electric',
+  warning: 'border-[var(--line-soft)] bg-[var(--accent-soft)] text-[var(--ink-strong)] shadow-[inset_3px_0_0_0_var(--accent)] [&_svg]:text-[var(--accent-text)]',
 };
 
 const variantIconMap = {

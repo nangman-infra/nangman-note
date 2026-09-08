@@ -52,6 +52,8 @@ export function MarkdownWysiwygEditor({
         height,
         usageStatistics: false,
         hideModeSwitch: true,
+        // n8n 다크가 기본 테마. 라이트로 저장된 경우에만 기본 스킨을 사용한다.
+        theme: document.documentElement.dataset.theme === 'light' ? 'light' : 'dark',
         placeholder,
         toolbarItems: [
           ['heading', 'bold', 'italic', 'strike'],

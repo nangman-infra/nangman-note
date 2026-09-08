@@ -53,7 +53,7 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
         <header className="bg-transparent py-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <span className="tag-dot tag-dot--navy">Notes</span>
+              <span className="tag-dot">Notes</span>
             </div>
             <p className="data-mono flex items-center gap-1.5 text-[11px] text-[var(--ink-muted)]">
               <span
@@ -83,7 +83,7 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
             `.markdown-wysiwyg` rules in globals.css (transparent defaultUI +
             white-ish toolbar). This ensures the dot-grid is visible around
             the editor without bleeding into the writing surface. */}
-        <div className="surface-card min-h-0 flex-1 overflow-hidden">
+        <div className="surface-card min-h-0 flex-1 overflow-hidden !rounded-[16px]">
           <MarkdownWysiwygEditor
             value={noteContent}
             onChange={setContent}
@@ -146,7 +146,7 @@ function renderNoteBanner({
 
 function getSaveDotClass(isSaving: boolean, lastSaved: Date | null): string {
   if (isSaving) return 'bg-[var(--accent)]';
-  if (lastSaved) return 'bg-seafoam';
+  if (lastSaved) return 'bg-success';
   return 'bg-[var(--ink-faint)]';
 }
 

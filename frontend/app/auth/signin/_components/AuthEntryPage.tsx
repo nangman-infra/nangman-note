@@ -120,7 +120,8 @@ function AuthEntryContent({ mode }: AuthEntryPageProps) {
   return (
     <div className="relative min-h-dvh overflow-hidden bg-[var(--bg-root)]">
       {/* Signature halftone field — the only place the spectrum gradient may appear */}
-      <div aria-hidden className="halftone-field halftone-field--spectrum opacity-40" />
+      <div aria-hidden className="glow-field glow-field--hero" />
+      <div aria-hidden className="ember-orb -right-24 top-1/2 h-[520px] w-[520px] -translate-y-1/2 opacity-40 blur-3xl" />
 
       <div className="relative mx-auto flex min-h-dvh max-w-6xl items-center px-6 py-12 sm:px-8 lg:px-10">
         <div className="grid w-full grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">

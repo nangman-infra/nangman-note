@@ -8,6 +8,7 @@ declare module '@toast-ui/editor' {
     usageStatistics?: boolean;
     hideModeSwitch?: boolean;
     placeholder?: string;
+    theme?: 'light' | 'dark';
     toolbarItems?: Array<
       | string
       | string[]

@@ -204,8 +204,8 @@ export function ProcessingProgress({
 
   return (
     <div className="surface-card p-5" aria-busy={currentStep !== 'failed' && currentStep !== 'completed'}>
-      <p className="text-xs font-semibold tracking-wide text-muted">처리 중</p>
-      <h3 className="mt-1 text-lg font-semibold">회의 결과 생성 중</h3>
+      <p className="text-xs font-medium tracking-wide text-muted">처리 중</p>
+      <h3 className="mt-1 text-lg font-medium">회의 결과 생성 중</h3>
       <span className="sr-only" role="status" aria-live="polite">
         현재 단계: {currentStep === 'failed' ? '처리 실패' : steps.find((step) => step.key === currentStep)?.label}
       </span>
@@ -240,7 +240,7 @@ export function ProcessingProgress({
               <button
                 type="button"
                 onClick={onRetryUpload}
-                className="btn-neo inline-flex border-transparent bg-brand px-3 py-1.5 text-xs text-white hover:bg-brand-strong hover:text-white"
+                className="btn-neo inline-flex border-transparent bg-[var(--surface-container)] px-3 py-1.5 text-xs text-white hover:bg-[var(--surface-container-high)] hover:text-white"
               >
                 재시도
               </button>
