@@ -36,7 +36,7 @@ export function MeetingListLoadMoreFooter({
           <button
             type="button"
             onClick={onShowAll}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-[var(--surface-container-low)] px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-[var(--surface-container-high)]"
+            className="btn-neo inline-flex w-full !py-2 text-xs"
           >
             회의 {hiddenCount}개 더 보기
           </button>
@@ -50,7 +50,7 @@ export function MeetingListLoadMoreFooter({
             type="button"
             onClick={onLoadMoreFromServer}
             disabled={isLoadingMore}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-[var(--surface-container-low)] px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-[var(--surface-container-high)] disabled:opacity-60"
+            className="btn-neo inline-flex w-full !py-2 text-xs disabled:opacity-60"
           >
             {isLoadingMore ? '이전 회의 불러오는 중...' : '이전 회의 더 불러오기'}
           </button>

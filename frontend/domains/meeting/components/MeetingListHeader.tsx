@@ -92,11 +92,11 @@ export function MeetingListHeader({
   onRunSearch,
 }: MeetingListHeaderProps) {
   return (
-    <header className="space-y-3 border-b border-[var(--line-soft)] bg-white/95 px-5 py-4">
+    <header className="space-y-3 border-b border-[var(--line-soft)] bg-white px-5 py-4 lg:px-6">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="label-sm text-[var(--ink-muted)]">회의</p>
-          <h2 className="truncate font-headline text-xl font-bold tracking-tight text-slate-900">
+          <span className={`tag-dot ${showTrash ? 'tag-dot--orange' : ''}`}>{showTrash ? 'Trash' : 'Archive'}</span>
+          <h2 className="font-headline mt-1.5 truncate text-xl text-[var(--ink-strong)]">
             {showTrash ? '회의 휴지통' : '회의 아카이브'}
           </h2>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">
@@ -106,14 +106,14 @@ export function MeetingListHeader({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="rounded-full bg-[var(--secondary-container)] px-3 py-1.5 text-xs font-bold text-[var(--on-secondary-container)]">
-            {meetingCount}개
+          <span className="data-mono rounded-full border border-[var(--line-soft)] bg-[var(--surface-container-low)] px-3 py-1 text-xs font-medium text-[var(--ink-subtle)]">
+            {meetingCount}
           </span>
           {allowTrashViewToggle && showTrash ? (
             <button
               type="button"
               onClick={onToggleTrash}
-              className="rounded-full bg-[var(--surface-container-low)] px-3 py-1.5 text-xs font-bold text-[var(--ink-subtle)] transition hover:bg-[var(--surface-container-high)]"
+              className="btn-neo inline-flex !px-3 !py-1.5 text-xs"
             >
               아카이브로
             </button>
@@ -122,7 +122,7 @@ export function MeetingListHeader({
             <button
               type="button"
               onClick={onToggleTrash}
-              className="rounded-full bg-[var(--surface-container-low)] px-3 py-1.5 text-xs font-bold text-[var(--ink-subtle)] transition hover:bg-[var(--surface-container-high)]"
+              className="btn-neo inline-flex !px-3 !py-1.5 text-xs"
             >
               삭제한 회의
             </button>
@@ -131,10 +131,8 @@ export function MeetingListHeader({
             <button
               type="button"
               onClick={onToggleSelectionMode}
-              className={`rounded-full p-2 transition ${
-                selectionMode
-                  ? 'bg-brand/10 text-brand'
-                  : 'text-[var(--ink-muted)] hover:bg-slate-100'
+              className={`btn-icon inline-flex ${
+                selectionMode ? '!bg-[var(--brand-fixed)] !text-brand' : ''
               }`}
               title={selectionMode ? '선택 취소' : '선택'}
               aria-label={selectionMode ? '선택 모드 닫기' : '회의 선택 모드'}
@@ -176,13 +174,13 @@ export function MeetingListHeader({
         />
 
         {!showTrash ? (
-          <label className="inline-flex h-10 items-center gap-2 rounded-full bg-[var(--surface-container-low)] px-3 text-xs font-semibold text-[var(--ink-subtle)]">
-            <span className="text-xs font-semibold text-[var(--ink-muted)]">정렬</span>
+          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--line-soft)] bg-white px-3 text-xs text-[var(--ink-subtle)]">
+            <span className="label-sm">Sort</span>
             <select
               id="meeting-sort"
               value={sortBy}
               onChange={(event) => onSortChange(event.target.value as MeetingSortKey)}
-              className="cursor-pointer appearance-none border-none bg-transparent text-xs font-bold text-indigo-700 focus:outline-none"
+              className="cursor-pointer appearance-none border-none bg-transparent text-xs font-medium text-brand focus:outline-none"
               aria-label="회의 정렬"
             >
               <option value="newest">최근 순</option>

@@ -18,7 +18,7 @@ export function FlowMockInProgress() {
       {/* ── Stitch TopBar ── */}
       <header className="flex items-center justify-between bg-slate-50/80 px-3 py-2 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="font-headline text-[11px] font-extrabold tracking-tighter text-indigo-700">
+          <span className="font-headline text-[11px] font-semibold tracking-tighter text-indigo-700">
             TransNote
           </span>
           <nav
@@ -27,7 +27,7 @@ export function FlowMockInProgress() {
           >
             <span className="font-semibold text-indigo-700">대시보드</span>
             <span aria-hidden="true">›</span>
-            <span className="truncate font-bold text-slate-900">주간 정기회의</span>
+            <span className="truncate font-medium text-slate-900">주간 정기회의</span>
           </nav>
         </div>
 
@@ -42,7 +42,7 @@ export function FlowMockInProgress() {
           </div>
 
           {/* Stop button — Stitch error tone */}
-          <span className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2 py-1 text-[9px] font-bold text-white">
+          <span className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2 py-1 text-[9px] font-medium text-white">
             <Square className="h-2.5 w-2.5" aria-hidden="true" />
             종료
           </span>
@@ -100,12 +100,12 @@ export function FlowMockInProgress() {
 
         {/* 우측: 도트 그리드 노트 패널 */}
         <section className="editor-dot-grid min-h-0 overflow-hidden px-3 py-2">
-          <div className="text-[10px] font-bold text-foreground">## 배포 일정</div>
+          <div className="text-[10px] font-medium text-foreground">## 배포 일정</div>
           <div className="mt-0.5 space-y-0.5 text-[9px] leading-relaxed text-muted">
             <p>- 3/15 스테이징 배포 예정</p>
             <p>- QA 시나리오 김OO 담당</p>
           </div>
-          <div className="mt-2 text-[10px] font-bold text-foreground">## API 개선</div>
+          <div className="mt-2 text-[10px] font-medium text-foreground">## API 개선</div>
           <div className="mt-0.5 space-y-0.5 text-[9px] leading-relaxed text-muted">
             <p>- 캐시 레이어 도입 논의</p>
           </div>

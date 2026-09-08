@@ -238,7 +238,7 @@ export function ResultViewer({
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="scroll-muted flex h-full flex-col overflow-y-auto bg-white">
       <ResultViewerHeader
         result={result}
         isEditing={isEditing}
@@ -270,7 +270,7 @@ export function ResultViewer({
         role="tabpanel"
         aria-labelledby={`result-tab-${activeTab}`}
         tabIndex={0}
-        className="scroll-muted flex-1 overflow-y-auto px-6 py-5"
+        className="mx-auto w-full max-w-[880px] flex-1 px-6 py-8 sm:px-8 lg:px-10"
       >
         <ResultViewerTabContent
           activeTab={activeTab}
@@ -287,7 +287,8 @@ export function ResultViewer({
       </section>
 
       {!isEditing && activeTab === 'result' && (
-        <footer className="border-t border-[var(--line-soft)] px-6 py-4">
+        <footer className="border-t border-[var(--line-soft)] bg-[var(--surface-container-low)] px-6 py-5">
+          <div className="mx-auto w-full max-w-[880px] sm:px-2 lg:px-4">
           <ResultRegeneratePanel
             isOpen={showRegenerate}
             isRegenerating={isRegenerating}
@@ -300,6 +301,7 @@ export function ResultViewer({
             onPromptChange={setRegeneratePromptId}
             onRegenerateClick={handleRegenerateClick}
           />
+          </div>
         </footer>
       )}
       <ResultRegenerateConfirmDialog

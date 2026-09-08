@@ -16,7 +16,7 @@ export function StartContent() {
         <section className="pb-8">
           <div className="mx-auto max-w-2xl px-5 text-center">
             <ScrollReveal>
-              <h1 className="text-3xl font-bold sm:text-4xl">
+              <h1 className="text-3xl font-medium sm:text-4xl">
                 다음 회의부터 써보세요
               </h1>
               <p className="mt-3 text-sm text-muted sm:text-base">

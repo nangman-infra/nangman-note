@@ -1,92 +1,135 @@
-/* ─── App Shell ─── */
+/* ─── Column surfaces ───────────────────────────────────────────────────
+   Surface stack: canvas #f6f6f8 → card #ffffff → frosted overlay.
+   Depth is rare: hairline + whisper shadow for content cards; the
+   five-layer stack only where a card must feel like a physical object.
+   ──────────────────────────────────────────────────────────────────── */
 .app-shell {
   position: relative;
   isolation: isolate;
 }
 
-/* ─── Glass Surface: Editorial Frosted Panel ─── */
-.glass-surface {
-  backdrop-filter: blur(20px);
-  background: rgba(255, 255, 255, 0.80);
-  border: none;
-  border-radius: 16px;
-  box-shadow:
-    0 1px 1px rgba(25, 28, 30, 0.02),
-    0 4px 20px rgba(25, 28, 30, 0.04),
-    0 12px 40px rgba(25, 28, 30, 0.06);
-}
-
-/* ─── Surface Card: Clean White with Tonal Lift ─── */
+/* Bordered content card — hairline + whisper of shadow */
 .surface-card {
   background: var(--bg-card);
   border: none;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(25, 28, 30, 0.04);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-sm);
+  transition: box-shadow 0.2s ease;
 }
-
 .surface-card:hover {
-  box-shadow: 0 4px 12px rgba(25, 28, 30, 0.08);
+  box-shadow: var(--elevation-md);
 }
 
-/* ─── Surface Tonal: Background sections without borders ─── */
+/* Product card — five-layer progressive stack, hovering presence */
+.surface-product {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-xl);
+}
+
+/* Transaction widget — dramatic off-axis shadow, inset white edge */
+.surface-widget {
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-widget);
+}
+
+/* Tonal — canvas-toned inset areas */
 .surface-tonal {
   background: var(--surface-container-low);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
 }
-
 .surface-tonal-high {
-  background: var(--surface-container-high);
-  border-radius: 12px;
+  background: var(--surface-container);
+  border-radius: var(--radius-card);
 }
 
-/* ─── AI Content Card accent ─── */
+/* Deep — Midnight Ink inversion for a section that needs to flip dark */
+.surface-deep {
+  background: var(--surface-deep);
+  color: #e9ecf1;
+  border-radius: var(--radius-card);
+}
+
+/* Frosted overlay — nav pills, badges, hero chrome */
+.glass-surface {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-sm);
+}
+[data-theme='dark'] .glass-surface {
+  background: rgba(15, 27, 36, 0.8);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* AI / data accent card — seafoam rule on the left */
 .ai-card-accent {
-  border-left: 4px solid var(--tertiary);
-  background: var(--surface-container-highest);
+  border-left: 3px solid var(--tertiary);
+  background: var(--tertiary-fixed);
 }
 
-/* ─── Editor Dot Grid: Live Meeting Room NoteEditor wrapper background ─── */
-/*
- * Subtle radial-gradient dot pattern layered on top of the base surface.
- * Used as the WRAPPER background for the note editor (not inside the editor content),
- * so the dots evoke a "paper" feel while the editable area keeps a clean surface.
- * Uses existing tokens (no hardcoded hex) and respects the No-Line rule via
- * tonal separation instead of borders. Dot color uses --line-soft (rgba 0.2)
- * so the pattern is felt, not read, on light surfaces.
- */
+/* Featured accent surface — Signal Orange. At most once per page. */
+.surface-signal {
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: var(--radius-card);
+}
+
+/* Editor dot grid — Silver Lining dots on white */
 .editor-dot-grid {
   background-color: var(--bg-card);
-  background-image: radial-gradient(
-    circle,
-    var(--line-soft) 1px,
-    transparent 1px
-  );
+  background-image: radial-gradient(circle, var(--line-soft) 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: 0 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  /* Static background — no animation to disable, but retained for explicit
-     NFR-1 compliance in case motion is layered on later. */
-  .editor-dot-grid {
-    background-attachment: local;
-  }
+/* Halftone field — signature decorative dot field. Spectrum gradient is
+   ONLY allowed here (never on UI controls). Use behind heroes/sign-in. */
+.halftone-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(17, 26, 74, 0.9) 1.2px, transparent 1.3px);
+  background-size: 10px 10px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 70% 40%, #000 20%, transparent 75%);
+  opacity: 0.35;
+}
+.halftone-field--spectrum {
+  /* Spectrum gradient revealed only through the dot mask — dots take the
+     gradient colour, the gradient never touches a UI control. */
+  background-image: linear-gradient(115deg, #d65620 0%, #9f7aee 22%, #4575cd 42%, #71d2f0 60%, #44b48b 80%, #f4df69 100%);
+  -webkit-mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
+    radial-gradient(ellipse 70% 60% at 70% 40%, #000 15%, transparent 72%);
+  mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
+    radial-gradient(ellipse 70% 60% at 70% 40%, #000 15%, transparent 72%);
+  -webkit-mask-size: 10px 10px, 100% 100%;
+  mask-size: 10px 10px, 100% 100%;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  opacity: 0.55;
 }
 
-/* ─── Primary Gradient backgrounds ───
- * Registered as a Tailwind v4 `@utility` so it participates in the utilities
- * layer cascade (takes proper precedence over component-layer rules and
- * matches sibling `bg-*` utility ordering). Using `background-image` +
- * explicit `background-color` fallback ensures the gradient never falls
- * back to an invisible transparent fill if an adjacent `bg-*` utility
- * happens to reset `background-color`.
- */
+/* Variant: dots gather at the top edge and fade before the headline. */
+.halftone-field--top {
+  -webkit-mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
+    radial-gradient(ellipse 90% 55% at 50% -10%, #000 0%, transparent 75%);
+  mask-image: radial-gradient(circle, #000 1.3px, transparent 1.5px),
+    radial-gradient(ellipse 90% 55% at 50% -10%, #000 0%, transparent 75%);
+}
+
+/* Hairline divider */
+.hairline {
+  height: 1px;
+  background: var(--line-soft);
+}
+
+/* Tailwind v4 @utility — kept for compatibility; the gradient is retired
+   in favour of a flat Indigo Navy fill with a soft inner top light. */
 @utility bg-brand-gradient {
   background-color: var(--brand);
-  background-image: linear-gradient(
-    135deg,
-    var(--brand) 0%,
-    var(--brand-container) 100%
-  );
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 100%);
 }

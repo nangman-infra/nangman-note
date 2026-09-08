@@ -50,7 +50,7 @@ export function DefaultSettingsSection({
           </p>
           <h2
             id="template-editor-heading"
-            className="flex items-center gap-2 font-headline text-xl font-bold tracking-tight sm:text-2xl"
+            className="flex items-center gap-2 font-headline text-xl font-medium tracking-tight sm:text-2xl"
           >
             <Mic className="h-5 w-5 text-[var(--brand)]" />
             기본 설정
@@ -61,7 +61,7 @@ export function DefaultSettingsSection({
           </p>
         </header>
 
-        <p className="mb-6 rounded-xl bg-[var(--surface-container-low)] px-4 py-3 text-xs text-[var(--ink-subtle)]">
+        <p className="mb-6 rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-xs text-[var(--ink-subtle)]">
           💡 이 설정은 사용자 계정 기준으로 저장되며, 같은 계정으로 로그인한
           다른 기기에도 적용됩니다.
         </p>

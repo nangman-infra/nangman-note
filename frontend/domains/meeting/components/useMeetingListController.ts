@@ -225,16 +225,22 @@ export function useMeetingListController({
     setShowAll(false); // eslint-disable-line react-hooks/set-state-in-effect
   }, [showTrash, search.isSearchApplied]);
 
+  // 첫 로드가 끝나기 전(세션 준비 대기 포함)에는 "0개"가 아니라 "로딩 중"으로 보고한다.
+  // 그렇지 않으면 상위에서 onboarding 으로 전환되며 이 컴포넌트가 unmount 되어
+  // fetch 가 영원히 시작되지 않는 레이스가 생긴다.
+  const isInitialLoadPending = !showTrash && !hasLoadedMeetings;
+
   useEffect(() => {
     onMeetingsLoaded?.({
       total: meetings.length,
-      isLoading,
+      isLoading: isLoading || isInitialLoadPending,
       isSearchApplied: search.isSearchApplied,
       showTrash,
     });
   }, [
     meetings.length,
     isLoading,
+    isInitialLoadPending,
     search.isSearchApplied,
     showTrash,
     onMeetingsLoaded,

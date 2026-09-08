@@ -32,7 +32,7 @@ export function ValueCards() {
           <p className="text-center text-xs font-semibold tracking-widest text-muted">
             CORE VALUE
           </p>
-          <h2 className="mt-2 text-center text-2xl font-bold sm:text-3xl">
+          <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
             회의록, 이렇게 달라집니다
           </h2>
         </ScrollReveal>
@@ -41,7 +41,7 @@ export function ValueCards() {
           {values.map((v, i) => (
             <ScrollReveal key={v.title} delay={i * 100}>
               <div className="surface-card flex h-full flex-col p-6 transition hover:-translate-y-1 hover:border-[var(--line-strong)]">
-                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${v.color}`}>
+                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-lg ${v.color}`}>
                   <v.icon className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 text-lg font-semibold">{v.title}</h3>

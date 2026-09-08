@@ -19,7 +19,7 @@ export function ResultRegenerateConfirmDialog({
     <dialog
       ref={dialogRef}
       onClose={onClose}
-      className="fixed inset-0 m-auto rounded-xl border border-[var(--line-soft)] bg-white p-6 shadow-xl backdrop:bg-black/40"
+      className="fixed inset-0 m-auto rounded-lg border border-[var(--line-soft)] bg-white p-6 shadow-xl backdrop:bg-black/40"
     >
       <h3 className="text-base font-semibold">재생성 확인</h3>
       <p className="mt-2 text-sm text-muted">

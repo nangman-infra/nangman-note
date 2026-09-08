@@ -106,14 +106,14 @@ export function PromptEditorDialog({
       ref={dialogRef}
       /* Widened to max-w-5xl so the 8/4 desktop split (editor + sidebar)
          has room; below `lg` the grid collapses to a single column. */
-      className="m-auto w-full max-w-5xl rounded-xl bg-transparent p-0 backdrop:bg-black/30"
+      className="m-auto w-full max-w-5xl rounded-lg bg-transparent p-0 backdrop:bg-black/30"
     >
       <form
         onSubmit={handleSubmit}
         className="surface-card w-full space-y-5 p-5 shadow-xl sm:p-6"
       >
         <div className="flex items-center justify-between">
-          <h3 className="font-headline text-lg font-bold tracking-tight">
+          <h3 className="font-headline text-lg font-medium tracking-tight">
             {mode === 'create' ? '새 프롬프트 만들기' : '프롬프트 편집'}
           </h3>
           <button

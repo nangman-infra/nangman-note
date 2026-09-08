@@ -28,7 +28,7 @@ export function ProcessingStepItem({
 }: ProcessingStepItemProps) {
   return (
     <div
-      className={`flex items-start gap-3 rounded-xl border p-3 transition ${getStepContainerClassName({
+      className={`flex items-start gap-3 rounded-lg border p-3 transition ${getStepContainerClassName({
         isActive,
         isDone,
       })}`}

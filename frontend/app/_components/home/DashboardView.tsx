@@ -3,14 +3,14 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { BookOpen, Clock, Mic, Settings, Upload, Users } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BookOpen, Mic, Settings, Upload } from 'lucide-react';
 import { MeetingList, useMeetings } from '@/domains/meeting';
 import type { SidebarTimeFilter, SidebarView } from '@/components/layout/Sidebar';
 import { NotificationBell } from './NotificationBell';
 import { UploadAudioDialog } from './UploadAudioDialog';
 
 /* ================================================================== */
-/* Dashboard View — Stitch "Workspace Overview" style                 */
+/* Dashboard View — Column "ledger" register                          */
 /* ================================================================== */
 
 interface DashboardViewProps {
@@ -58,32 +58,33 @@ export function DashboardView({
 
   return (
     <div className="flex h-full flex-col">
-      {/* ── Stitch TopAppBar ── */}
-      <header className="sticky top-0 z-40 flex items-center justify-between bg-slate-50/80 px-6 py-3 shadow-sm backdrop-blur-xl">
-        <h2 className="font-headline text-xl font-bold tracking-tight text-slate-900">
-          {isMeetingManagement ? '회의 기록' : '워크스페이스 개요'}
-        </h2>
-        <div className="flex items-center gap-3">
-            <NotificationBell onSelectMeeting={onSelectMeeting} />
-            <Link href="/settings" aria-label="설정" className="rounded-full p-2 text-slate-500 transition hover:bg-indigo-50">
-              <Settings className="h-5 w-5" />
-            </Link>
-            {/* Profile Avatar */}
-            <div
-              className="h-8 w-8 overflow-hidden rounded-full border-2 border-[var(--outline-variant)]/20 bg-indigo-100"
-              title={session?.user?.name || session?.user?.email || undefined}
-            >
-              <div className="flex h-full w-full items-center justify-center text-xs font-bold text-indigo-600">
-                {profileInitial}
-              </div>
-            </div>
+      {/* ── Top bar ── */}
+      <header className="sticky top-0 z-40 flex h-[62px] items-center justify-between border-b border-[var(--line-soft)] bg-white/90 px-6 backdrop-blur-xl lg:px-8">
+        <div className="flex items-baseline gap-3">
+          <h2 className="font-headline text-xl text-[var(--ink-strong)]">
+            {isMeetingManagement ? '회의 기록' : '워크스페이스'}
+          </h2>
+          {!isMeetingManagement ? (
+            <span className="label-sm hidden sm:inline">{formatTodayLabel()}</span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <NotificationBell onSelectMeeting={onSelectMeeting} />
+          <Link href="/settings" aria-label="설정" className="btn-icon inline-flex">
+            <Settings className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          </Link>
+          <div
+            className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-brand text-xs font-medium text-white"
+            title={session?.user?.name || session?.user?.email || undefined}
+          >
+            {profileInitial}
+          </div>
         </div>
       </header>
 
-      {/* ── Main Content (scrollable) ── */}
-      <main className={`scroll-muted flex-1 overflow-y-auto ${isMeetingManagement ? '' : ''}`}>
+      {/* ── Main ── */}
+      <main className="scroll-muted flex-1 overflow-y-auto">
         {isMeetingManagement ? (
-          /* ── Meeting management view: full-height MeetingList ── */
           <div className="flex h-full flex-col bg-white">
             <MeetingListWithAutoSwitch
               variant="history"
@@ -101,100 +102,88 @@ export function DashboardView({
             />
           </div>
         ) : (
-          /* ── Dashboard View: Hero + KPI + MeetingList + Bento ── */
-          <div className="mx-auto max-w-7xl space-y-8 p-6 lg:p-8">
-            {/* ── Hero Bento Grid ── */}
+          <div className="mx-auto max-w-[1200px] space-y-12 px-6 py-8 lg:px-8 lg:py-10">
+            {/* ── Hero: split layout, text left / floating widget right ── */}
             {!showTrash && (
-              <section className="grid grid-cols-1 gap-6 md:grid-cols-12">
-                {/* Hero CTA card (8 cols) */}
-                <div className="relative overflow-hidden rounded-xl bg-brand-gradient p-8 text-white shadow-xl md:col-span-8 min-h-[260px] flex flex-col justify-between">
-                  <div className="relative z-10">
-                    <span className="label-sm mb-4 inline-block rounded-full bg-white/20 px-3 py-1">
-                      집중 모드
-                    </span>
-                    <h1 className="font-headline text-3xl font-extrabold leading-tight tracking-tighter lg:text-4xl">
-                      모든 생각을 놓치지 않고<br />자동으로 기록하세요.
-                    </h1>
-                    <p className="mt-3 max-w-md text-sm text-white/70 lg:text-base">
-                      AI가 다음 회의를 전사하고 요약해, 바로 실행할 수 있는 핵심 내용으로 정리합니다.
-                    </p>
-                  </div>
-                  <div className="relative z-10 mt-6 flex gap-4">
-                    <Link
-                      href="/meeting/new"
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-bold !text-indigo-700 transition hover:bg-slate-50 active:scale-95"
-                    >
-                      <Mic className="h-4 w-4" />
+              <section className="relative grid grid-cols-1 items-center gap-10 lg:grid-cols-12">
+                <div className="halftone-field hidden lg:block" aria-hidden="true" />
+                <div className="relative z-10 lg:col-span-6">
+                  <span className="tag-dot">Developer-grade meeting notes</span>
+                  <h1 className="font-headline mt-5 text-[30px] leading-[1.1] text-[var(--ink-strong)] sm:text-[40px] lg:text-[44px]">
+                    말하는 동안 기록되고,
+                    <br />
+                    끝나면 회의록이 완성됩니다.
+                  </h1>
+                  <p className="mt-4 max-w-md text-[15px] leading-relaxed text-[var(--ink-muted)]">
+                    실시간 전사와 노트를 하나의 문서로 결합해, 바로 실행할 수 있는 회의록을 자동으로 정리합니다.
+                  </p>
+                  <div className="mt-7 flex flex-wrap items-center gap-3">
+                    <Link href="/meeting/new" className="btn-primary inline-flex">
+                      <Mic className="h-4 w-4" strokeWidth={1.75} />
                       녹음 시작
+                      <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
                     </Link>
                     <button
                       type="button"
                       onClick={() => setShowUploadDialog(true)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-transparent px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
+                      className="btn-secondary inline-flex"
                     >
-                      <Upload className="h-4 w-4" />
+                      <Upload className="h-4 w-4" strokeWidth={1.75} />
                       오디오 업로드
                     </button>
                   </div>
-                  {/* Decorative blur blob */}
-                  <div className="absolute -right-20 -bottom-20 h-80 w-80 rounded-full bg-[var(--tertiary-fixed-dim)] opacity-20 blur-[100px]" />
                 </div>
 
-                {/* Stat cards (4 cols) */}
-                <div className="grid grid-rows-2 gap-6 md:col-span-4">
-                  <KpiCards
-                    meetingsTotal={meetingsInfo.total}
-                    isLoading={meetingsInfo.isLoading}
-                  />
+                <div className="relative z-10 lg:col-span-6 lg:pl-8">
+                  <LiveLedgerWidget meetingsTotal={meetingsInfo.total} isLoading={meetingsInfo.isLoading} />
                 </div>
               </section>
             )}
 
+            {/* ── Stats row: seafoam numbers, steel labels, no dividers ── */}
+            {!showTrash && (
+              <StatsRow meetingsTotal={meetingsInfo.total} isLoading={meetingsInfo.isLoading} />
+            )}
+
             {/* ── Onboarding (first-time user) ── */}
             {showOnboarding && (
-              <section className="rounded-2xl bg-white p-8 shadow-sm">
-                <h3 className="font-headline text-xl font-bold tracking-tight text-slate-900 mb-6">
-                  3단계로 시작하세요
+              <section className="surface-card p-6 lg:p-8">
+                <span className="tag-dot tag-dot--navy">Getting started</span>
+                <h3 className="font-headline mt-3 text-[28px] leading-[1.1] text-[var(--ink-strong)]">
+                  3단계로 첫 회의록을 만드세요
                 </h3>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-4 rounded-xl bg-[var(--surface-container-low)] p-5 transition hover:bg-[var(--surface-container-high)]">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">1</span>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">새 회의 시작</p>
-                      <p className="mt-0.5 text-xs text-[var(--ink-muted)]">제목만 입력하면 바로 시작됩니다. 전사 모드와 언어는 자동 설정됩니다.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-4 rounded-xl bg-[var(--surface-container-low)] p-5 transition hover:bg-[var(--surface-container-high)]">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">2</span>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">노트 작성</p>
-                      <p className="mt-0.5 text-xs text-[var(--ink-muted)]">회의 중 자유롭게 노트를 작성하세요. 3초마다 자동 저장됩니다.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-4 rounded-xl bg-[var(--surface-container-low)] p-5 transition hover:bg-[var(--surface-container-high)]">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">3</span>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">AI 회의록 확인</p>
-                      <p className="mt-0.5 text-xs text-[var(--ink-muted)]">회의 종료 후 노트와 전사를 결합한 AI 회의록이 자동 생성됩니다.</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 flex gap-3">
+                <ol className="mt-6 grid gap-3 md:grid-cols-3">
+                  {ONBOARDING_STEPS.map((step, index) => (
+                    <li
+                      key={step.title}
+                      className="surface-tonal flex items-start gap-4 p-5"
+                    >
+                      <span className="data-mono flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-xs font-medium text-white">
+                        0{index + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--ink-strong)]">{step.title}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-[var(--ink-muted)]">{step.description}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <div className="mt-6 flex flex-wrap gap-3">
                   <Link href="/meeting/new" className="btn-primary inline-flex">
-                    <Mic className="h-4 w-4" />
+                    <Mic className="h-4 w-4" strokeWidth={1.75} />
                     첫 회의 시작하기
                   </Link>
                   <Link href="/landing/guide" className="btn-secondary inline-flex">
-                    <BookOpen className="h-4 w-4" />
+                    <BookOpen className="h-4 w-4" strokeWidth={1.75} />
                     사용 가이드
                   </Link>
                 </div>
               </section>
             )}
 
-            {/* ── Meeting List — compact archive preview with show-more disclosure ── */}
+            {/* ── Meeting List — compact archive preview ── */}
             {!showOnboarding && (
-              <section className="overflow-hidden rounded-2xl bg-white">
+              <section className="surface-card overflow-hidden">
                 <MeetingListWithAutoSwitch
                   variant="dashboard"
                   showTrash={showTrash}
@@ -212,34 +201,41 @@ export function DashboardView({
               </section>
             )}
 
-            {/* ── Bottom Bento: Stats + Promo ── */}
+            {/* ── Bottom: weekly chart + featured (Signal Orange — once per page) ── */}
             {!showTrash && (
-              <section className="grid grid-cols-1 gap-8 pt-6 md:grid-cols-2">
-                {/* Weekly meeting volume */}
+              <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <WeeklyMeetingChart />
 
-                {/* Quick Start Guide Card */}
-                <div className="relative overflow-hidden rounded-2xl bg-indigo-900 p-8 text-white">
-                  <div className="relative z-10 flex h-full flex-col justify-between">
-                    <div>
-                      <BookOpen className="mb-4 h-9 w-9 text-[var(--tertiary-fixed-dim)]" />
-                      <h5 className="font-headline text-xl font-bold">빠른 시작 가이드</h5>
-                      <p className="mt-2 text-sm leading-relaxed text-indigo-200">
-                        3단계로 첫 회의 노트를 만드는 법을 확인하세요. 녹음·노트 작성·AI 회의록 생성까지 한 번에.
-                      </p>
-                    </div>
-                    <Link
-                      href="/landing/guide"
-                      className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-[var(--tertiary)] px-6 py-2 text-sm font-bold text-white transition hover:bg-[var(--tertiary-container)]"
-                    >
-                      <BookOpen className="h-4 w-4" />
-                      가이드 보기
-                    </Link>
+                <div className="surface-signal relative flex flex-col justify-between overflow-hidden p-6 lg:p-8">
+                  <div className="relative z-10">
+                    <span className="label-sm !text-white/80">Quick start guide</span>
+                    <h5 className="font-headline mt-3 text-[24px] leading-[1.15] text-white">
+                      첫 회의 노트를
+                      <br />
+                      3단계로 만드는 법
+                    </h5>
+                    <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/85">
+                      녹음 · 노트 작성 · AI 회의록 생성까지, 한 번에 따라가는 안내서입니다.
+                    </p>
                   </div>
-                  {/* Decorative background pattern */}
-                  <div className="pointer-events-none absolute right-0 top-0 p-8 opacity-20">
-                    <BookOpen className="h-[120px] w-[120px]" />
-                  </div>
+                  <Link
+                    href="/landing/guide"
+                    className="relative z-10 mt-8 inline-flex w-fit items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-[#a4431a] shadow-[var(--elevation-button)] transition hover:bg-white/90"
+                  >
+                    가이드 보기
+                    <ArrowUpRight className="h-4 w-4" strokeWidth={1.75} />
+                  </Link>
+                  {/* decorative halftone in the card's own colour family */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-8 -top-8 h-56 w-56 opacity-40"
+                    style={{
+                      backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1.5px, transparent 1.6px)',
+                      backgroundSize: '10px 10px',
+                      maskImage: 'radial-gradient(circle at 70% 30%, #000 30%, transparent 70%)',
+                      WebkitMaskImage: 'radial-gradient(circle at 70% 30%, #000 30%, transparent 70%)',
+                    }}
+                  />
                 </div>
               </section>
             )}
@@ -256,6 +252,29 @@ export function DashboardView({
   );
 }
 
+const ONBOARDING_STEPS = [
+  {
+    title: '새 회의 시작',
+    description: '제목만 입력하면 바로 시작됩니다. 전사 모드와 언어는 자동 설정됩니다.',
+  },
+  {
+    title: '노트 작성',
+    description: '회의 중 자유롭게 노트를 작성하세요. 3초마다 자동 저장됩니다.',
+  },
+  {
+    title: 'AI 회의록 확인',
+    description: '회의 종료 후 노트와 전사를 결합한 AI 회의록이 자동 생성됩니다.',
+  },
+] as const;
+
+function formatTodayLabel(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}.${m}.${d}`;
+}
+
 /** Wraps MeetingList — no longer needs column switching */
 function MeetingListWithAutoSwitch({
   onSelectMeeting,
@@ -269,62 +288,135 @@ function MeetingListWithAutoSwitch({
 }
 
 /* ================================================================== */
-/* KPI Cards — Total Transcribed hours + Meetings Held count          */
+/* Live Ledger Widget — floating "transaction widget" for the hero    */
 /* ================================================================== */
 
-interface KpiCardsProps {
-  /** -1 while initial loading, 0 when no meetings, otherwise total count */
-  meetingsTotal: number;
-  isLoading: boolean;
-}
-
-function KpiCards({ meetingsTotal, isLoading }: KpiCardsProps) {
+function useMeetingAggregates() {
   const { meetings } = useMeetings();
 
-  const totalTranscribedHours = useMemo(() => {
+  return useMemo(() => {
     let totalMs = 0;
+    let completed = 0;
+    let recording = 0;
+    let processing = 0;
+    let latest: (typeof meetings)[number] | null = null;
+
     for (const meeting of meetings) {
-      if (!meeting?.startedAt || !meeting?.endedAt) continue;
+      if (!meeting) continue;
+      if (meeting.status === 'completed') completed += 1;
+      if (meeting.status === 'recording') recording += 1;
+      if (meeting.status === 'processing') processing += 1;
+      if (meeting.startedAt) {
+        if (!latest || new Date(meeting.startedAt) > new Date(latest.startedAt)) {
+          latest = meeting;
+        }
+      }
+      if (!meeting.startedAt || !meeting.endedAt) continue;
       const start = new Date(meeting.startedAt).getTime();
       const end = new Date(meeting.endedAt).getTime();
       if (Number.isNaN(start) || Number.isNaN(end)) continue;
       const delta = end - start;
-      if (delta <= 0) continue;
-      totalMs += delta;
+      if (delta > 0) totalMs += delta;
     }
-    return totalMs / (1000 * 60 * 60);
+
+    return {
+      totalHours: totalMs / (1000 * 60 * 60),
+      completed,
+      recording,
+      processing,
+      latest,
+    };
   }, [meetings]);
+}
 
-  const hoursLabel =
-    totalTranscribedHours > 0 ? `${totalTranscribedHours.toFixed(1)}시간` : '—';
+type LedgerStatus = 'live' | 'processing' | 'idle';
 
-  const meetingsLabel = getMeetingsLabel({ isLoading, meetingsTotal });
+const LEDGER_STATUS_VIEW: Record<LedgerStatus, { label: string; pillClass: string }> = {
+  live: { label: '녹음 중', pillClass: 'status-pill--live' },
+  processing: { label: '정리 중', pillClass: 'status-pill--warn' },
+  idle: { label: '대기', pillClass: 'status-pill--done' },
+};
+
+function getLedgerStatus({ recording, processing }: { recording: number; processing: number }): LedgerStatus {
+  if (recording > 0) return 'live';
+  if (processing > 0) return 'processing';
+  return 'idle';
+}
+
+function LiveLedgerWidget({ meetingsTotal, isLoading }: { meetingsTotal: number; isLoading: boolean }) {
+  const { totalHours, recording, processing, latest } = useMeetingAggregates();
+  const hoursLabel = totalHours > 0 ? totalHours.toFixed(1) : '0.0';
+  const countLabel = getMeetingsLabel({ isLoading, meetingsTotal });
+  const status = getLedgerStatus({ recording, processing });
+  const statusView = LEDGER_STATUS_VIEW[status];
 
   return (
-    <>
-      <div className="flex flex-col justify-between rounded-xl bg-[var(--surface-container-low)] p-6">
-        <div className="flex items-start justify-between">
-          <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
-            <Clock className="h-5 w-5" />
-          </div>
-        </div>
+    <div className="surface-widget relative mx-auto w-full max-w-[440px] p-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-[var(--ink-muted)]">총 전사 시간</p>
-          <p className="font-headline text-3xl font-bold text-slate-900">{hoursLabel}</p>
+          <p className="label-sm">Workspace ledger</p>
+          <p className="font-headline mt-1 text-[15px] text-[var(--ink-strong)]">회의 기록 현황</p>
+        </div>
+        <span className={`status-pill ${statusView.pillClass}`}>{statusView.label}</span>
+      </div>
+
+      <div className="mt-5 flex items-baseline gap-2">
+        <span className="data-mono text-[36px] font-medium leading-none text-seafoam-deep">{hoursLabel}</span>
+        <span className="text-sm text-[var(--ink-muted)]">시간 전사</span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[var(--line-soft)] bg-[var(--line-soft)]">
+        <div className="bg-white px-4 py-3">
+          <p className="label-sm">Meetings</p>
+          <p className="data-mono mt-1 text-lg font-medium text-[var(--ink-strong)]">{countLabel}</p>
+        </div>
+        <div className="bg-white px-4 py-3">
+          <p className="label-sm">Latest</p>
+          <p className="mt-1 truncate text-sm font-medium text-[var(--ink-strong)]" title={latest?.title || undefined}>
+            {latest?.title || '—'}
+          </p>
         </div>
       </div>
-      <div className="flex flex-col justify-between rounded-xl bg-[var(--surface-container-low)] p-6">
-        <div className="flex items-start justify-between">
-          <div className="rounded-lg bg-cyan-50/30 p-2 text-[var(--tertiary)]">
-            <Users className="h-5 w-5" />
-          </div>
+
+      <pre className="mt-4 overflow-hidden rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-[11px] leading-[1.6]">
+        <code className="text-[var(--color-charcoal)]">
+          {'{ '}
+          <span className="text-seafoam-deep">&quot;status&quot;</span>: <span className="text-seafoam">&quot;{status}&quot;</span>,{' '}
+          <span className="text-seafoam-deep">&quot;meetings&quot;</span>: <span className="text-seafoam">{countLabel}</span>
+          {' }'}
+        </code>
+      </pre>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/* Stats Row — four columns, seafoam numerals, no dividers            */
+/* ================================================================== */
+
+function StatsRow({ meetingsTotal, isLoading }: { meetingsTotal: number; isLoading: boolean }) {
+  const { totalHours, completed, processing } = useMeetingAggregates();
+  const hoursLabel = totalHours > 0 ? `${totalHours.toFixed(1)}h` : '—';
+  const meetingsLabel = getMeetingsLabel({ isLoading, meetingsTotal });
+  const completedLabel = isLoading ? '—' : String(completed);
+  const processingLabel = isLoading ? '—' : String(processing);
+
+  const stats = [
+    { value: hoursLabel, label: '총 전사 시간' },
+    { value: meetingsLabel, label: '전체 회의' },
+    { value: completedLabel, label: '완료된 회의록' },
+    { value: processingLabel, label: '처리 중' },
+  ];
+
+  return (
+    <section aria-label="워크스페이스 지표" className="grid grid-cols-2 gap-6 border-y border-[var(--line-soft)] py-8 md:grid-cols-4 md:gap-12">
+      {stats.map((stat) => (
+        <div key={stat.label}>
+          <p className="data-mono text-[28px] font-medium leading-none text-seafoam-deep">{stat.value}</p>
+          <p className="mt-2 text-sm text-[var(--ink-muted)]">{stat.label}</p>
         </div>
-        <div>
-          <p className="text-sm font-medium text-[var(--ink-muted)]">전체 회의</p>
-          <p className="font-headline text-3xl font-bold text-slate-900">{meetingsLabel}</p>
-        </div>
-      </div>
-    </>
+      ))}
+    </section>
   );
 }
 
@@ -376,10 +468,10 @@ function getBucketFillClass({
   isToday: boolean;
 }): string {
   if (!hasData) {
-    return 'bg-indigo-600/10';
+    return 'bg-[var(--surface-container-high)]';
   }
 
-  return isToday ? 'bg-indigo-600' : 'bg-indigo-600/20';
+  return isToday ? 'bg-seafoam-deep' : 'bg-seafoam/60';
 }
 
 function WeeklyMeetingChart() {
@@ -424,15 +516,22 @@ function WeeklyMeetingChart() {
   const hasData = totalInWindow > 0;
 
   return (
-    <div className="rounded-2xl border-l-4 border-indigo-600 bg-[var(--surface-container-high)]/50 p-8">
-      <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h5 className="font-headline text-xl font-bold">주간 회의 빈도</h5>
-        <span className="label-sm text-[var(--ink-muted)] tracking-widest">
-          최근 7일 · {totalInWindow}건
+    <div className="surface-card p-6 lg:p-8">
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <span className="tag-dot">Weekly volume</span>
+          <h5 className="font-headline mt-2 text-[20px] text-[var(--ink-strong)]">주간 회의 빈도</h5>
+        </div>
+        <span className="data-mono text-xs text-[var(--ink-muted)]">
+          7d · {totalInWindow}
         </span>
       </div>
 
-      <div className="flex h-32 items-end gap-2" aria-hidden={!hasData}>
+      <div className="relative flex h-32 items-end gap-2" aria-hidden={!hasData}>
+        {/* hairline baseline grid */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[var(--line-soft)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-[var(--line-soft)]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[var(--line-strong)]" />
         {buckets.map((bucket, i) => {
           const isToday = i === todayIndex;
           const percent = getBucketPercent({
@@ -444,7 +543,7 @@ function WeeklyMeetingChart() {
           return (
             <div
               key={bucket.date.toISOString()}
-              className={`w-full rounded-t-lg transition-[height] ${fillClass}`}
+              className={`relative z-10 w-full rounded-t-[2px] transition-[height] ${fillClass}`}
               style={{ height: `${percent}%` }}
               title={`${bucket.date.getMonth() + 1}/${bucket.date.getDate()} · ${bucket.count}건`}
             />
@@ -452,13 +551,13 @@ function WeeklyMeetingChart() {
         })}
       </div>
 
-      <div className="mt-4 flex justify-between label-sm tracking-widest text-[var(--ink-muted)]">
+      <div className="data-mono mt-3 flex justify-between text-[11px] text-[var(--ink-muted)]">
         {buckets.map((bucket, i) => {
           const isToday = i === todayIndex;
           return (
             <span
               key={`label-${bucket.date.toISOString()}`}
-              className={isToday ? 'font-bold text-indigo-600' : ''}
+              className={`w-full text-center ${isToday ? 'font-medium text-seafoam-deep' : ''}`}
             >
               {WEEKDAY_LABELS_KO[bucket.weekday]}
             </span>
@@ -467,7 +566,7 @@ function WeeklyMeetingChart() {
       </div>
 
       {!hasData && (
-        <p className="mt-3 text-xs text-[var(--ink-muted)]">아직 데이터 없음</p>
+        <p className="mt-4 text-xs text-[var(--ink-muted)]">아직 데이터가 없습니다. 첫 회의를 시작하면 여기에 표시됩니다.</p>
       )}
     </div>
   );

@@ -43,7 +43,7 @@ export function ResultRegeneratePanel({
   }
 
   return (
-    <div className="surface-card flex flex-col gap-3 p-3">
+    <div className="surface-card flex flex-col gap-3 p-4">
       {promptOptions.length > 0 ? (
         <select
           value={resolvedRegeneratePromptId}
@@ -82,7 +82,7 @@ export function ResultRegeneratePanel({
         <button
           type="button"
           onClick={onCancel}
-          className="btn-neo inline-flex whitespace-nowrap px-4 py-2 text-sm text-muted hover:text-foreground"
+          className="btn-neo inline-flex whitespace-nowrap !px-4 !py-2 text-sm"
         >
           취소
         </button>
@@ -90,7 +90,7 @@ export function ResultRegeneratePanel({
           type="button"
           onClick={onRegenerateClick}
           disabled={isRegenerating || !resolvedRegeneratePromptId.trim()}
-          className="btn-neo inline-flex whitespace-nowrap border-transparent bg-brand px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-45"
+          className="btn-primary inline-flex whitespace-nowrap !px-4 !py-2 text-sm disabled:cursor-not-allowed disabled:opacity-45"
         >
           {isRegenerating ? '재생성 중...' : '재생성 실행'}
         </button>

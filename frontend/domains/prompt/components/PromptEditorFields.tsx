@@ -34,7 +34,7 @@ export function PromptEditorFields({
       <div>
         <label
           htmlFor="prompt-name"
-          className="label-sm mb-1.5 block text-[var(--ink-muted)]"
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-subtle)]"
         >
           프롬프트 이름
         </label>
@@ -65,7 +65,7 @@ export function PromptEditorFields({
       <div>
         <label
           htmlFor="prompt-document-type"
-          className="label-sm mb-1.5 block text-[var(--ink-muted)]"
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-subtle)]"
         >
           기본 문서 타입
         </label>
@@ -90,7 +90,7 @@ export function PromptEditorFields({
       <div>
         <label
           htmlFor="prompt-content"
-          className="label-sm mb-1.5 block text-[var(--ink-muted)]"
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-subtle)]"
         >
           추가 강조 지시
         </label>

@@ -104,7 +104,7 @@ export function FeatureTab() {
             <ol className="space-y-1.5">
               {current.structure.map((item, i) => (
                 <li key={item} className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-brand/10 text-[10px] font-bold text-brand">
+                  <span className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md bg-brand/10 text-[10px] font-medium text-brand">
                     {i + 1}
                   </span>
                   {item}

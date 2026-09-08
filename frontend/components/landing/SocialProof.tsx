@@ -33,7 +33,7 @@ export function SocialProof() {
           <div className="grid grid-cols-3 gap-4">
             {stats.map((s) => (
               <div key={s.desc} className="surface-card p-5 text-center">
-                <p className="text-3xl font-bold text-brand sm:text-4xl">
+                <p className="text-3xl font-medium text-brand sm:text-4xl">
                   <CountUp target={s.value} />
                   <span className="ml-0.5 text-base font-semibold">{s.unit}</span>
                 </p>

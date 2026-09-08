@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { IBM_Plex_Mono, Inter, Manrope } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import { AuthSessionProvider } from '@/components/auth/AuthSessionProvider';
 import { FeedbackProvider } from '@/components/feedback/FeedbackProvider';
 import { NetworkStatusBanner } from '@/components/feedback/NetworkStatusBanner';
@@ -29,20 +29,20 @@ function buildRuntimeEnvScript(): string {
   return `window.__RUNTIME_ENV__=${JSON.stringify(runtimeEnv)};`;
 }
 
-const manrope = Manrope({
-  variable: '--font-display',
+/**
+ * Column type system — SuisseIntl is proprietary, so Inter (the documented
+ * substitute) carries headings, body, buttons and nav across weights 300–600.
+ * JetBrains Mono stands in for SuisseIntlMono/SFMono on data + code.
+ */
+const suisse = Inter({
+  variable: '--font-suisse',
   subsets: ['latin'],
+  weight: ['300', '400', '500', '600'],
   display: 'swap',
 });
 
-const inter = Inter({
-  variable: '--font-body',
-  subsets: ['latin'],
-  display: 'swap',
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: '--font-code',
+const monoBrand = JetBrains_Mono({
+  variable: '--font-mono-brand',
   subsets: ['latin'],
   weight: ['400', '500'],
   preload: false,
@@ -116,7 +116,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#08131f',
+  themeColor: '#111a4a',
   colorScheme: 'dark light',
 };
 
@@ -134,7 +134,7 @@ export default function RootLayout({
         {/* 저장된 테마를 하이드레이션 전에 적용 (다크 모드 FOUC 방지) */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className={`${manrope.variable} ${inter.variable} ${plexMono.variable} antialiased`}>
+      <body className={`${suisse.variable} ${monoBrand.variable} antialiased`}>
         <NetworkStatusBanner />
         <AuthSessionProvider>
           <FeedbackProvider>{children}</FeedbackProvider>

@@ -87,15 +87,8 @@ export default function NewMeetingPage() {
   };
 
   return (
-    <div className="relative min-h-dvh bg-gradient-to-br from-slate-50 via-white to-indigo-50">
-      {/* Ambient brand glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-      >
-        <div className="absolute -left-32 -top-32 h-80 w-80 rounded-full bg-indigo-200/40 blur-3xl" />
-        <div className="absolute -bottom-40 -right-24 h-96 w-96 rounded-full bg-indigo-300/30 blur-3xl" />
-      </div>
+    <div className="relative min-h-dvh overflow-hidden bg-[var(--bg-root)]">
+      <div aria-hidden className="halftone-field opacity-30" />
 
       <div className="relative mx-auto flex min-h-dvh max-w-6xl items-center px-6 py-12 sm:px-8 lg:px-10">
         <div className="grid w-full grid-cols-1 items-start gap-10 lg:grid-cols-12 lg:gap-16">

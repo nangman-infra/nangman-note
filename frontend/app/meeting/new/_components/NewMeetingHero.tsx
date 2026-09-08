@@ -12,23 +12,21 @@ export function NewMeetingHero({ onBack }: NewMeetingHeroProps) {
       <button
         type="button"
         onClick={onBack}
-        className="btn-secondary mb-6 inline-flex w-fit text-sm"
+        className="btn-neo mb-6 inline-flex w-fit !px-3 !py-1.5 text-xs"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         워크스페이스로 돌아가기
       </button>
 
-      <span className="inline-flex w-fit items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-bold tracking-wide text-indigo-700">
-        <Sparkles className="h-3.5 w-3.5" />
-        Start Session
+      <span className="tag-dot">
+        <Sparkles className="h-3.5 w-3.5 text-seafoam-deep" strokeWidth={1.75} />
+        Start session
       </span>
 
-      <h1 className="mt-5 font-headline text-4xl font-extrabold tracking-tight text-[var(--ink-strong)] sm:text-5xl">
+      <h1 className="font-headline mt-5 text-[40px] leading-[1.05] text-[var(--ink-strong)] sm:text-[48px]">
         회의를 시작하고
         <br />
-        <span className="bg-gradient-to-r from-[var(--brand)] to-[var(--brand-container)] bg-clip-text text-transparent">
-          노트를 바로 작성하세요
-        </span>
+        <span className="text-brand">노트를 바로 작성하세요</span>
       </h1>
 
       <p className="mt-5 max-w-md text-base leading-relaxed text-[var(--ink-muted)]">
@@ -67,11 +65,11 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <article className="rounded-xl bg-[var(--surface-container-low)] p-4 transition hover:bg-[var(--surface-container-high)]">
-      <div className="mb-2 inline-flex rounded-full bg-indigo-100 p-2 text-indigo-700">
-        <Icon className="h-4 w-4" />
+    <article className="surface-card p-4">
+      <div className="mb-3 inline-flex rounded-lg border border-[var(--line-soft)] bg-[var(--surface-container-low)] p-2 text-brand">
+        <Icon className="h-4 w-4" strokeWidth={1.75} />
       </div>
-      <h3 className="text-sm font-semibold text-[var(--ink-strong)]">
+      <h3 className="text-sm font-medium text-[var(--ink-strong)]">
         {title}
       </h3>
       <p className="mt-1 text-xs text-[var(--ink-muted)]">{description}</p>

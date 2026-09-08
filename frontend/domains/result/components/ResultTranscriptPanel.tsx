@@ -34,22 +34,25 @@ export function ResultTranscriptPanel({
   }
 
   return (
-    <div className="surface-card p-5">
-      <div className="space-y-2">
+    <div className="surface-card overflow-hidden">
+      <div className="flex items-center justify-between border-b border-[var(--line-soft)] bg-[var(--surface-container-low)] px-5 py-3">
+        <span className="tag-dot">Transcript</span>
+        <span className="data-mono text-[11px] text-[var(--ink-muted)]">{transcripts.length} segments</span>
+      </div>
+      <div className="divide-y divide-[var(--line-soft)]">
         {transcripts.map((segment) => (
-          <div key={segment.id} className="flex gap-3 text-sm">
-            <span className="shrink-0 font-mono text-xs text-muted">
-              [{formatSegmentTime(segment.startTime)} ~{' '}
-              {formatSegmentTime(segment.endTime)}]
+          <div key={segment.id} className="flex gap-4 px-5 py-3 text-sm">
+            <span className="data-mono shrink-0 pt-0.5 text-[11px] text-seafoam-deep">
+              {formatSegmentTime(segment.startTime)}
             </span>
             {segment.speakerLabel ? (
               <span
-                className={`inline-flex h-5 shrink-0 items-center rounded px-1.5 text-[10px] font-semibold ${getResultSpeakerBadgeClass(segment.speakerLabel)}`}
+                className={`inline-flex h-5 shrink-0 items-center rounded-[4px] px-1.5 text-[10px] font-medium ${getResultSpeakerBadgeClass(segment.speakerLabel)}`}
               >
                 {getResultSpeakerDisplayName(segment.speakerLabel)}
               </span>
             ) : null}
-            <span>{segment.text}</span>
+            <span className="leading-relaxed text-[var(--ink-subtle)]">{segment.text}</span>
           </div>
         ))}
       </div>
@@ -58,12 +61,12 @@ export function ResultTranscriptPanel({
 }
 
 const RESULT_SPEAKER_BADGE_CLASSES = [
-  'bg-indigo-100 text-indigo-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-rose-100 text-rose-700',
-  'bg-amber-100 text-amber-700',
-  'bg-sky-100 text-sky-700',
-  'bg-fuchsia-100 text-fuchsia-700',
+  'bg-[var(--brand-fixed)] text-brand',
+  'bg-[var(--tertiary-fixed)] text-[var(--tertiary)]',
+  'bg-[var(--info-soft)] text-[var(--info)]',
+  'bg-[var(--accent-soft)] text-[#a4431a]',
+  'bg-[var(--surface-container)] text-[var(--ink-subtle)]',
+  'bg-[var(--danger-soft)] text-[var(--danger)]',
 ] as const;
 
 function getResultSpeakerDisplayName(speakerLabel: string): string {

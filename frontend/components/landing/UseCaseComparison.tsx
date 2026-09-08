@@ -61,7 +61,7 @@ export function UseCaseComparison() {
           <p className="text-center text-xs font-semibold tracking-widest text-muted">
             USE CASES
           </p>
-          <h2 className="mt-2 text-center text-2xl font-bold sm:text-3xl">
+          <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
             실제 결과물로 확인하세요
           </h2>
         </ScrollReveal>
@@ -78,7 +78,7 @@ export function UseCaseComparison() {
                 aria-selected={active === c.id}
                 aria-controls={`case-panel-${c.id}`}
                 onClick={() => setActive(c.id)}
-                className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                className={`rounded-lg px-4 py-2.5 text-sm font-medium transition ${
                   active === c.id
                     ? 'bg-brand text-white'
                     : 'surface-card text-muted hover:text-foreground'
@@ -98,14 +98,14 @@ export function UseCaseComparison() {
               <p className="mt-2 text-sm text-muted">{current.description}</p>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4">
+                <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-4">
                   <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-rose-600">
                     <span className="flex h-5 w-5 items-center justify-center rounded-md bg-rose-100 text-[10px]">✕</span>
                     BEFORE
                   </p>
                   <p className="mt-2 text-sm">{current.before}</p>
                 </div>
-                <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
+                <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-4">
                   <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-teal-600">
                     <span className="flex h-5 w-5 items-center justify-center rounded-md bg-teal-100 text-[10px]">✓</span>
                     AFTER
@@ -120,7 +120,7 @@ export function UseCaseComparison() {
                   <p className="mb-3 text-[11px] font-semibold tracking-wide text-muted">
                     실제 AI 결과물 미리보기
                   </p>
-                  <div className="overflow-x-auto rounded-xl border border-[var(--line-soft)]">
+                  <div className="overflow-x-auto rounded-lg border border-[var(--line-soft)]">
                     <table className="w-full text-left text-sm">
                       <thead>
                         <tr className="border-b border-[var(--line-soft)] bg-brand/5">

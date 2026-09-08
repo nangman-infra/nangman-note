@@ -36,12 +36,12 @@ const privacySections: LegalDocumentSection[] = [
     id: 'collected-items',
     title: '처리하는 항목',
     children: (
-      <div className="overflow-hidden rounded-2xl border border-[var(--line-soft)]">
+      <div className="overflow-hidden rounded-lg border border-[var(--line-soft)]">
         <table className="w-full border-collapse text-left text-xs sm:text-sm">
           <thead className="bg-[var(--surface-container-low)] text-[var(--ink-strong)]">
             <tr>
-              <th className="px-4 py-3 font-bold">구분</th>
-              <th className="px-4 py-3 font-bold">처리 항목</th>
+              <th className="px-4 py-3 font-medium">구분</th>
+              <th className="px-4 py-3 font-medium">처리 항목</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--line-soft)]">

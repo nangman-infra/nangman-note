@@ -1,52 +1,126 @@
-/* ─── Stitch "Cognitive Workspace" Design Tokens ─── */
+/* ─────────────────────────────────────────────────────────────────────
+   Column — "deep navy ledger under cool dawn" design tokens
+
+   Two-layer token model:
+   1. Brand primitives  (--color-*)   : raw Column palette, never themed.
+   2. Semantic tokens   (--bg-*, --ink-*, --line-*, --brand*, --tertiary*)
+      : what components consume. Re-pointed under [data-theme='dark'].
+
+   Legacy semantic names from the previous design system are preserved so
+   existing components keep working; only their values changed.
+   ──────────────────────────────────────────────────────────────────── */
 :root {
-  /* Surface hierarchy (light → dark layering) */
-  --bg-root: #f7f9fb;
+  /* ── Brand primitives ─────────────────────────────────────────── */
+  --color-indigo-navy: #111a4a;
+  --color-midnight-ink: #011821;
+  --color-slate-ink: #3b3e47;
+  --color-steel: #7c7f88;
+  --color-fog: #a9acb6;
+  --color-mist: #cbcccf;
+  --color-silver-lining: #e3e4e8;
+  --color-cloud-canvas: #f6f6f8;
+  --color-pure-white: #ffffff;
+  --color-charcoal: #232730;
+  --color-obsidian: #12161e;
+  --color-signal-orange: #ec652b;
+  --color-peach-glow: #f2936b;
+  --color-seafoam-400: #94efb7;
+  --color-seafoam-600: #44b48b;
+  --color-seafoam-700: #167e6c;
+  --color-deep-sea: #023247;
+  --color-sky-cyan: #88deeb;
+  --color-cobalt-edge: #1e4199;
+  --color-ocean-depth: #0c6997;
+
+  /* ── Surfaces ─────────────────────────────────────────────────── */
+  --bg-root: var(--color-cloud-canvas);
   --bg-elevated: rgba(255, 255, 255, 0.84);
-  --bg-card: #ffffff;
-  --surface-container-low: #f2f4f6;
-  --surface-container: #eceef0;
-  --surface-container-high: #e6e8ea;
-  --surface-container-highest: #e0e3e5;
+  --bg-card: var(--color-pure-white);
+  --surface-container-low: #f6f6f8;
+  --surface-container: #eeeff2;
+  --surface-container-high: #e3e4e8;
+  --surface-container-highest: #d9dbe0;
+  --surface-deep: var(--color-midnight-ink);
 
-  /* Ink */
-  --ink-strong: #191c1e;
-  --ink-muted: #666775;
-  --ink-subtle: #454654;
+  /* ── Ink ──────────────────────────────────────────────────────── */
+  --ink-strong: var(--color-obsidian);
+  --ink-subtle: var(--color-slate-ink);
+  --ink-muted: var(--color-steel);
+  --ink-faint: var(--color-fog);
+  --ink-hairline: var(--color-mist);
 
-  /* Lines — "Ghost Border" philosophy: felt, not seen */
-  --line-soft: rgba(197, 197, 215, 0.2);
-  --line-strong: rgba(197, 197, 215, 0.4);
-  --outline-variant: #c5c5d7;
+  /* ── Lines — hairline, not ghost ──────────────────────────────── */
+  --line-soft: var(--color-silver-lining);
+  --line-strong: var(--color-mist);
+  --outline-variant: var(--color-fog);
 
-  /* Brand — Deep Indigo */
-  --brand: #2035bd;
-  --brand-strong: #1e33bb;
-  --brand-container: #3e51d5;
-  --brand-fixed: #dfe0ff;
-  --brand-fixed-dim: #bcc2ff;
+  /* ── Brand — Indigo Navy ──────────────────────────────────────── */
+  --brand: var(--color-indigo-navy);
+  --brand-strong: #0b1238;
+  --brand-container: var(--color-indigo-navy);
+  --brand-fixed: #e9ebf3;
+  --brand-fixed-dim: #d1d5e6;
   --on-brand: #ffffff;
-  --on-brand-container: #d6d9ff;
+  --on-brand-container: #ffffff;
 
-  /* Tertiary — AI Accent (Teal/Cyan) */
-  --tertiary: #00505a;
-  --tertiary-container: #006a77;
-  --tertiary-fixed: #9cf0ff;
-  --tertiary-fixed-dim: #00daf3;
+  /* ── Tertiary — Seafoam (data / code / live signal) ───────────── */
+  --tertiary: var(--color-seafoam-700);
+  --tertiary-container: #0f5f52;
+  --tertiary-fixed: #e6f6ef;
+  --tertiary-fixed-dim: var(--color-seafoam-600);
+  --tertiary-bright: var(--color-seafoam-400);
   --on-tertiary: #ffffff;
 
-  /* Secondary */
-  --secondary: #505f7c;
-  --secondary-container: #cbdafd;
-  --on-secondary-container: #505f7d;
+  /* ── Secondary — neutral chips ────────────────────────────────── */
+  --secondary: var(--color-slate-ink);
+  --secondary-container: #eeeff2;
+  --on-secondary-container: var(--color-slate-ink);
 
-  /* Semantic */
-  --accent: #d97706;
-  --danger: #ba1a1a;
-  --error-container: #ffdad6;
-  --success: #16a34a;
+  /* ── Semantic ─────────────────────────────────────────────────── */
+  --accent: var(--color-signal-orange);
+  --accent-soft: #fdeee6;
+  --danger: #b42318;
+  --danger-soft: #fdf0ee;
+  --error-container: var(--danger-soft);
+  --success: var(--color-seafoam-700);
+  --success-soft: var(--tertiary-fixed);
+  --warning: #b45309;
+  --warning-soft: #fdf3e6;
+  --info: var(--color-ocean-depth);
+  --info-soft: #e8f6fa;
+
+  /* ── Elevation ────────────────────────────────────────────────── */
+  --elevation-sm: rgba(18, 22, 30, 0.024) 0px 1px 4px 0px,
+    rgba(18, 22, 30, 0.05) 0px 1px 0px 0px,
+    rgba(18, 22, 30, 0.024) 0px 0px 0px 1px;
+  --elevation-md: rgba(17, 26, 74, 0.05) 0px 8px 16px 0px,
+    rgba(17, 26, 74, 0.05) 0px 4px 8px 0px,
+    rgba(18, 22, 30, 0.04) 0px 0px 0px 1px;
+  --elevation-xl: rgba(0, 0, 0, 0.02) 0px 40px 32px 0px,
+    rgba(0, 0, 0, 0.03) 0px 22px 18px 0px,
+    rgba(0, 0, 0, 0.03) 0px 12px 10px 0px,
+    rgba(0, 0, 0, 0.04) 0px 7px 5px 0px,
+    rgba(0, 0, 0, 0.07) 0px 3px 2px 0px;
+  --elevation-widget: rgba(30, 30, 44, 0.15) 24px 48px 64px 0px,
+    rgb(255, 255, 255) 0px 0px 0px 1px inset;
+  --elevation-button: rgba(17, 26, 74, 0.1) 0px 1px 3px 0px,
+    rgba(17, 26, 74, 0.05) 0px 1px 0px 0px,
+    rgba(255, 255, 255, 0.5) 0px 1px 0px 0px inset,
+    rgba(255, 255, 255, 0.5) 0px 1px 4px 0px inset;
+
+  /* ── Shape & rhythm ───────────────────────────────────────────── */
+  --radius-card: 8px;
+  --radius-input: 8px;
+  --radius-button: 8px;
+  --radius-tag: 9999px;
+  --section-gap: 72px;
+  --card-padding: 24px;
 }
 
+/* ─── Tailwind v4 theme bridge ─────────────────────────────────────
+   Semantic utilities (bg-brand, text-muted …) plus a re-tuned default
+   palette so the many `text-slate-*` / `text-indigo-*` utilities used
+   across the app resolve to Column tones instead of stock Tailwind. */
 @theme inline {
   --color-background: var(--bg-root);
   --color-elevated: var(--bg-elevated);
@@ -58,10 +132,141 @@
   --color-brand-container: var(--brand-container);
   --color-tertiary: var(--tertiary);
   --color-tertiary-dim: var(--tertiary-fixed-dim);
-  --font-sans: var(--font-display), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
-  --font-mono: var(--font-code), 'IBM Plex Mono', 'SFMono-Regular', monospace;
-  --font-headline: var(--font-display), 'Manrope', sans-serif;
-  --font-body: 'Inter', var(--font-display), 'Pretendard', sans-serif;
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-line: var(--line-soft);
+  --color-navy: var(--color-indigo-navy);
+  --color-seafoam: var(--color-seafoam-600);
+  --color-seafoam-deep: var(--color-seafoam-700);
+  --color-seafoam-bright: var(--color-seafoam-400);
+  --color-signal: var(--color-signal-orange);
+  --color-peach: var(--color-peach-glow);
+  --color-skywash: var(--color-sky-cyan);
+  --color-deep: var(--surface-deep);
+
+  /* indigo → Indigo Navy scale */
+  --color-indigo-50: #f1f2f8;
+  --color-indigo-100: #e9ebf3;
+  --color-indigo-200: #d1d5e6;
+  --color-indigo-300: #a9b0cf;
+  --color-indigo-400: #6f7aa8;
+  --color-indigo-500: #3b477e;
+  --color-indigo-600: #1c2660;
+  --color-indigo-700: #111a4a;
+  --color-indigo-800: #0b1238;
+  --color-indigo-900: #070c27;
+  --color-indigo-950: #04071a;
+
+  /* slate → Column neutrals */
+  --color-slate-50: #f6f6f8;
+  --color-slate-100: #eeeff2;
+  --color-slate-200: #e3e4e8;
+  --color-slate-300: #cbcccf;
+  --color-slate-400: #a9acb6;
+  --color-slate-500: #7c7f88;
+  --color-slate-600: #5c5f68;
+  --color-slate-700: #3b3e47;
+  --color-slate-800: #232730;
+  --color-slate-900: #12161e;
+  --color-slate-950: #011821;
+
+  /* emerald / teal → Seafoam */
+  --color-emerald-50: #e6f6ef;
+  --color-emerald-100: #cdeee0;
+  --color-emerald-200: #94efb7;
+  --color-emerald-300: #6fd6a4;
+  --color-emerald-400: #44b48b;
+  --color-emerald-500: #2d9a7a;
+  --color-emerald-600: #167e6c;
+  --color-emerald-700: #0f5f52;
+  --color-emerald-800: #0b483e;
+  --color-emerald-900: #07332c;
+  --color-teal-50: #e6f6ef;
+  --color-teal-100: #cdeee0;
+  --color-teal-300: #6fd6a4;
+  --color-teal-400: #44b48b;
+  --color-teal-600: #167e6c;
+  --color-teal-700: #0f5f52;
+  --color-teal-800: #0b483e;
+
+  /* sky / cyan → Sky Cyan / Ocean Depth */
+  --color-sky-50: #eef9fb;
+  --color-sky-100: #d9f2f7;
+  --color-sky-200: #b3e6f0;
+  --color-sky-300: #88deeb;
+  --color-sky-500: #2f9dbf;
+  --color-sky-600: #0c6997;
+  --color-sky-700: #0a5a80;
+  --color-sky-800: #06455f;
+  --color-sky-900: #023247;
+  --color-cyan-50: #eef9fb;
+  --color-cyan-300: #88deeb;
+  --color-cyan-500: #2f9dbf;
+
+  /* amber / orange → Signal Orange family */
+  --color-amber-50: #fdf3e6;
+  --color-amber-100: #fbe4cc;
+  --color-amber-300: #f2936b;
+  --color-amber-500: #ec652b;
+  --color-amber-600: #c95420;
+  --color-amber-700: #a4431a;
+  --color-amber-800: #7d3313;
+  --color-orange-500: #ec652b;
+  --color-orange-600: #c95420;
+
+  /* rose / red → muted institutional danger */
+  --color-rose-50: #fdf0ee;
+  --color-rose-100: #f9dcd8;
+  --color-rose-200: #f2bdb6;
+  --color-rose-300: #e4948a;
+  --color-rose-500: #c9402f;
+  --color-rose-600: #b42318;
+  --color-rose-700: #921c13;
+  --color-rose-800: #6e150e;
+  --color-rose-900: #4d0f0a;
+
+  /* violet → Cobalt Edge (decorative only) */
+  --color-violet-50: #eef1fa;
+  --color-violet-600: #1e4199;
+
+  /* ── Typography ───────────────────────────────────────────────── */
+  --font-sans: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  --font-mono: var(--font-mono-brand), 'JetBrains Mono', 'SFMono-Regular', ui-monospace, Menlo, monospace;
+  --font-headline: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
+  --font-body: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
+
+  --text-micro: 10px;
+  --text-micro--line-height: 1.5;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 1.33;
+  --text-subheading-sm: 20px;
+  --text-subheading-sm--line-height: 1.1;
+  --text-subheading-sm--letter-spacing: -0.01em;
+  --text-subheading-lg: 28px;
+  --text-subheading-lg--line-height: 1.1;
+  --text-subheading-lg--letter-spacing: -0.01em;
+  --text-heading-sm: 40px;
+  --text-heading-sm--line-height: 1.1;
+  --text-heading-sm--letter-spacing: -0.02em;
+  --text-heading: 48px;
+  --text-heading--line-height: 1.1;
+  --text-heading--letter-spacing: -0.02em;
+  --text-heading-lg: 52px;
+  --text-heading-lg--line-height: 1.1;
+  --text-heading-lg--letter-spacing: -0.03em;
+  --text-display: 60px;
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.01em;
+
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-xl: var(--elevation-xl);
+  --shadow-widget: var(--elevation-widget);
+  --shadow-button: var(--elevation-button);
 }
 
 @layer base {
@@ -77,129 +282,158 @@
   body {
     margin: 0;
     color: var(--ink-strong);
-    font-family: 'Inter', var(--font-display), 'Pretendard', 'Noto Sans KR', sans-serif;
-    letter-spacing: -0.01em;
+    font-family: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+    font-feature-settings: 'salt' 2, 'cv11';
+    font-size: 15px;
+    line-height: 1.5;
+    letter-spacing: 0;
     background: var(--bg-root);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   a {
     color: inherit;
   }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--ink-strong);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-feature-settings: 'cv11', 'salt' 2;
+  }
 }
 
 ::selection {
   color: #ffffff;
-  background-color: rgba(32, 53, 189, 0.82);
+  background-color: rgba(17, 26, 74, 0.85);
 }
 
-/* ─── Dark Theme ─── */
+/* ─── Dark Theme — "Deep Surface" inversion (Midnight Ink family) ──── */
 [data-theme='dark'] {
-  /* Surface hierarchy */
-  --bg-root: #0f1216;
-  --bg-elevated: rgba(24, 28, 34, 0.9);
-  --bg-card: #171b21;
-  --surface-container-low: #1c2129;
-  --surface-container: #21262f;
-  --surface-container-high: #262c36;
-  --surface-container-highest: #2c323d;
+  --bg-root: #0a121a;
+  --bg-elevated: rgba(13, 24, 33, 0.9);
+  --bg-card: #0f1b24;
+  --surface-container-low: #13212b;
+  --surface-container: #182833;
+  --surface-container-high: #1f313d;
+  --surface-container-highest: #273b48;
+  --surface-deep: #05101a;
 
-  /* Ink */
-  --ink-strong: #e7eaee;
-  --ink-muted: #9aa1ad;
-  --ink-subtle: #c3c7d0;
+  --ink-strong: #e9ecf1;
+  --ink-subtle: #c3c8d2;
+  --ink-muted: #8f97a5;
+  --ink-faint: #667080;
+  --ink-hairline: #3a4753;
 
-  /* Lines */
   --line-soft: rgba(148, 163, 184, 0.14);
   --line-strong: rgba(148, 163, 184, 0.28);
-  --outline-variant: #3d4450;
+  --outline-variant: #3a4753;
 
-  /* Brand */
-  --brand: #93a2ff;
-  --brand-strong: #a7b3ff;
-  --brand-container: #3e51d5;
-  --brand-fixed: #2a3466;
-  --brand-fixed-dim: #38427a;
-  --on-brand: #10143a;
-  --on-brand-container: #d6d9ff;
+  --brand: #b9c1ec;
+  --brand-strong: #d1d7f5;
+  --brand-container: #2a3775;
+  --brand-fixed: #1b2450;
+  --brand-fixed-dim: #26306a;
+  --on-brand: #0b1238;
+  --on-brand-container: #ffffff;
 
-  /* Tertiary */
-  --tertiary: #6fe3f5;
-  --tertiary-container: #00505a;
-  --tertiary-fixed: #073d46;
-  --tertiary-fixed-dim: #00b3c9;
-  --on-tertiary: #00272d;
+  --tertiary: #6fd6a4;
+  --tertiary-container: #167e6c;
+  --tertiary-fixed: #0f3a33;
+  --tertiary-fixed-dim: #44b48b;
+  --tertiary-bright: #94efb7;
+  --on-tertiary: #04231d;
 
-  /* Secondary */
-  --secondary: #aebad2;
-  --secondary-container: #2b3854;
-  --on-secondary-container: #cbd8f5;
+  --secondary: #c3c8d2;
+  --secondary-container: #1f313d;
+  --on-secondary-container: #dde2ea;
 
-  /* Semantic */
-  --accent: #f0a04b;
-  --danger: #ff8f88;
-  --error-container: #5a1f1c;
-  --success: #4ade80;
+  --accent: #f2936b;
+  --accent-soft: #3a2118;
+  --danger: #f08b80;
+  --danger-soft: #3d1a17;
+  --error-container: var(--danger-soft);
+  --success: #6fd6a4;
+  --success-soft: #0f3a33;
+  --warning: #f2b06b;
+  --warning-soft: #3a2a14;
+  --info: #88deeb;
+  --info-soft: #0f2f3b;
+
+  --elevation-sm: rgba(0, 0, 0, 0.35) 0px 1px 4px 0px, rgba(255, 255, 255, 0.05) 0px 0px 0px 1px;
+  --elevation-md: rgba(0, 0, 0, 0.45) 0px 8px 16px 0px, rgba(255, 255, 255, 0.05) 0px 0px 0px 1px;
+  --elevation-xl: rgba(0, 0, 0, 0.5) 0px 40px 32px 0px, rgba(0, 0, 0, 0.35) 0px 12px 10px 0px;
+  --elevation-widget: rgba(0, 0, 0, 0.55) 24px 48px 64px 0px, rgba(255, 255, 255, 0.06) 0px 0px 0px 1px inset;
+  --elevation-button: rgba(0, 0, 0, 0.4) 0px 1px 3px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset;
 }
 
 [data-theme='dark'] ::selection {
-  background-color: rgba(147, 162, 255, 0.5);
+  background-color: rgba(185, 193, 236, 0.45);
 }
 
-/*
- * 하드코딩된 Tailwind 팔레트 유틸리티의 다크 매핑.
- * (컴포넌트 전반이 bg-white/text-slate-* 등을 직접 사용하므로,
- * 다크 모드에서 해당 유틸리티를 표면/잉크 토큰으로 재매핑한다)
- */
-[data-theme='dark'] .bg-white {
-  background-color: var(--bg-card);
-}
+/* Dark remap of stock-palette utilities still used in some components.
+   Palette scales are re-tuned above, but light tints (e.g. bg-white,
+   bg-indigo-50) must swap to dark surfaces to stay legible. */
+[data-theme='dark'] .bg-white { background-color: var(--bg-card); }
 [data-theme='dark'] .bg-white\/80,
-[data-theme='dark'] .bg-white\/90 {
-  background-color: rgba(23, 27, 33, 0.85);
-}
+[data-theme='dark'] .bg-white\/90,
+[data-theme='dark'] .bg-white\/95 { background-color: rgba(15, 27, 36, 0.88); }
 [data-theme='dark'] .bg-slate-50,
 [data-theme='dark'] .bg-slate-100,
-[data-theme='dark'] .bg-slate-50\/80 {
-  background-color: var(--surface-container-low);
-}
+[data-theme='dark'] .bg-slate-50\/80 { background-color: var(--surface-container-low); }
 [data-theme='dark'] .bg-indigo-50,
 [data-theme='dark'] .bg-indigo-50\/40,
 [data-theme='dark'] .bg-indigo-50\/60,
-[data-theme='dark'] .bg-indigo-100 {
-  background-color: var(--brand-fixed);
-}
+[data-theme='dark'] .bg-indigo-100 { background-color: var(--brand-fixed); }
 [data-theme='dark'] .text-slate-900,
-[data-theme='dark'] .text-slate-800 {
-  color: var(--ink-strong);
-}
+[data-theme='dark'] .text-slate-800 { color: var(--ink-strong); }
 [data-theme='dark'] .text-slate-700,
-[data-theme='dark'] .text-slate-600 {
-  color: var(--ink-subtle);
-}
+[data-theme='dark'] .text-slate-600 { color: var(--ink-subtle); }
 [data-theme='dark'] .text-slate-500,
-[data-theme='dark'] .text-slate-400 {
-  color: var(--ink-muted);
-}
+[data-theme='dark'] .text-slate-400 { color: var(--ink-muted); }
 [data-theme='dark'] .text-indigo-600,
-[data-theme='dark'] .text-indigo-700 {
-  color: var(--brand);
-}
-[data-theme='dark'] .border-slate-200 {
-  border-color: var(--line-strong);
-}
+[data-theme='dark'] .text-indigo-700,
+[data-theme='dark'] .text-indigo-800 { color: var(--brand); }
+[data-theme='dark'] .border-slate-200 { border-color: var(--line-strong); }
 [data-theme='dark'] .hover\:bg-slate-50:hover,
 [data-theme='dark'] .hover\:bg-slate-100:hover,
 [data-theme='dark'] .hover\:bg-indigo-50:hover,
-[data-theme='dark'] .hover\:bg-indigo-50\/60:hover {
-  background-color: var(--surface-container-high);
-}
-[data-theme='dark'] .shadow-sm,
-[data-theme='dark'] .shadow-lg,
-[data-theme='dark'] .shadow-xl,
-[data-theme='dark'] .shadow-2xl {
-  --tw-shadow-color: rgba(0, 0, 0, 0.55);
-}
-[data-theme='dark'] .ring-white {
-  --tw-ring-color: var(--bg-card);
-}
+[data-theme='dark'] .hover\:bg-indigo-50\/60:hover { background-color: var(--surface-container-high); }
+[data-theme='dark'] .ring-white { --tw-ring-color: var(--bg-card); }
+[data-theme='dark'] .bg-rose-50 { background-color: var(--danger-soft); }
+[data-theme='dark'] .bg-amber-50,
+[data-theme='dark'] .bg-amber-100 { background-color: var(--warning-soft); }
+[data-theme='dark'] .bg-emerald-50,
+[data-theme='dark'] .bg-emerald-100,
+[data-theme='dark'] .bg-teal-50,
+[data-theme='dark'] .bg-teal-100 { background-color: var(--success-soft); }
+[data-theme='dark'] .bg-sky-50,
+[data-theme='dark'] .bg-sky-100 { background-color: var(--info-soft); }
+[data-theme='dark'] .text-rose-700,
+[data-theme='dark'] .text-rose-800,
+[data-theme='dark'] .text-rose-900 { color: var(--danger); }
+[data-theme='dark'] .text-amber-700,
+[data-theme='dark'] .text-amber-800,
+[data-theme='dark'] .text-amber-900 { color: var(--warning); }
+[data-theme='dark'] .text-emerald-700,
+[data-theme='dark'] .text-emerald-800,
+[data-theme='dark'] .text-emerald-900,
+[data-theme='dark'] .text-teal-700,
+[data-theme='dark'] .text-teal-800 { color: var(--success); }
+[data-theme='dark'] .text-sky-700,
+[data-theme='dark'] .text-sky-800,
+[data-theme='dark'] .text-sky-900 { color: var(--info); }

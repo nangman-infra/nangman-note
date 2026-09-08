@@ -45,10 +45,11 @@ interface FeedbackContextValue {
 
 const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 
+/* Column toast: white card, hairline, coloured icon + left rule for state. */
 const variantStyles: Record<ToastVariant, string> = {
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-  error: 'border-rose-200 bg-rose-50 text-rose-900',
-  info: 'border-sky-200 bg-sky-50 text-sky-900',
+  success: 'border-[var(--line-soft)] bg-white text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--success)] [&_svg]:text-[var(--success)]',
+  error: 'border-[var(--line-soft)] bg-white text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--danger)] [&_svg]:text-[var(--danger)]',
+  info: 'border-[var(--line-soft)] bg-white text-[var(--ink-strong)] shadow-[var(--elevation-md),inset_3px_0_0_0_var(--brand)] [&_svg]:text-brand',
 };
 
 const variantIcons = {
@@ -227,22 +228,22 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
             <section
               key={toast.id}
               role="status"
-              className={`pointer-events-auto motion-rise w-[min(92vw,360px)] rounded-xl border px-3 py-2 shadow-lg ${variantStyles[toast.variant]}`}
+              className={`pointer-events-auto motion-rise w-[min(92vw,360px)] rounded-lg border px-3.5 py-3 ${variantStyles[toast.variant]}`}
             >
               <div className="flex items-start gap-2">
                 <Icon className="mt-0.5 h-4 w-4 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">{toast.title}</p>
-                  {toast.description ? <p className="mt-0.5 text-xs opacity-90">{toast.description}</p> : null}
+                  <p className="text-sm font-medium">{toast.title}</p>
+                  {toast.description ? <p className="mt-0.5 text-xs text-[var(--ink-muted)]">{toast.description}</p> : null}
                   {toast.isUndo && (
                     <button
                       type="button"
                       onClick={() => handleUndoClick(toast)}
-                      className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white/80 px-2.5 py-1 text-xs font-semibold text-sky-700 shadow-sm transition hover:bg-white"
+                      className="btn-neo mt-2 inline-flex !px-2.5 !py-1 text-xs !text-brand"
                     >
                       취소
                       {toast.remainingSeconds !== undefined && (
-                        <span className="ml-0.5 tabular-nums text-sky-500">
+                        <span className="data-mono ml-0.5 text-[var(--ink-muted)]">
                           {toast.remainingSeconds}초
                         </span>
                       )}
@@ -255,7 +256,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
                   onClick={() =>
                     toast.isUndo ? settleUndoToast(toast.id) : dismissToast(toast.id)
                   }
-                  className="rounded-md p-1 hover:bg-black/5"
+                  className="btn-icon inline-flex !p-1"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>

@@ -19,10 +19,10 @@ export default function AppleIcon() {
           borderRadius: 42,
           border: '6px solid rgba(103,232,249,0.36)',
           background:
-            'radial-gradient(circle at 20% 16%, rgba(56,189,248,0.26), transparent 36%), linear-gradient(130deg, #061220 0%, #0f2a45 100%)',
+            '#111a4a',
           color: '#f8fafc',
           fontFamily: 'Inter, system-ui, sans-serif',
-          fontWeight: 800,
+          fontWeight: 600,
           fontSize: 70,
           letterSpacing: '-0.05em',
         }}

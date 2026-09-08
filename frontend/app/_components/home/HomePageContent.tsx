@@ -216,16 +216,17 @@ export function HomePageContent() {
     if (activeView === 'settings') {
       return (
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 bg-slate-50/80 px-6 py-3 backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-white/90 px-6 py-3 backdrop-blur-xl">
             <button
               type="button"
               onClick={handleBackToDashboard}
-              className="btn-secondary inline-flex text-sm"
+              className="btn-neo inline-flex !px-3 !py-1.5 text-xs"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
               대시보드
             </button>
-            <span className="text-sm font-semibold text-slate-900">설정</span>
+            <span className="text-[var(--ink-faint)]" aria-hidden="true">/</span>
+            <span className="text-sm font-medium text-[var(--ink-strong)]">설정</span>
           </div>
           <div className="flex-1 overflow-y-auto">
             <SettingsInlineView prompts={prompts} />
@@ -237,16 +238,17 @@ export function HomePageContent() {
     if (activeView === 'prompts') {
       return (
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 bg-slate-50/80 px-6 py-3 backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-white/90 px-6 py-3 backdrop-blur-xl">
             <button
               type="button"
               onClick={handleBackToDashboard}
-              className="btn-secondary inline-flex text-sm"
+              className="btn-neo inline-flex !px-3 !py-1.5 text-xs"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
               대시보드
             </button>
-            <span className="text-sm font-semibold text-slate-900">프롬프트</span>
+            <span className="text-[var(--ink-faint)]" aria-hidden="true">/</span>
+            <span className="text-sm font-medium text-[var(--ink-strong)]">프롬프트</span>
           </div>
           <div className="flex-1 overflow-y-auto">
             <PromptsInlineView prompts={prompts} />
@@ -258,15 +260,17 @@ export function HomePageContent() {
     if (selectedMeetingId) {
       return (
         <div className="flex h-full flex-col">
-          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] px-6 py-3">
+          <div className="flex items-center gap-3 border-b border-[var(--line-soft)] bg-white/90 px-6 py-3 backdrop-blur-xl">
             <button
               type="button"
               onClick={handleBackToDashboard}
-              className="btn-secondary inline-flex text-sm"
+              className="btn-neo inline-flex !px-3 !py-1.5 text-xs"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
               대시보드
             </button>
+            <span className="text-[var(--ink-faint)]" aria-hidden="true">/</span>
+            <span className="text-sm font-medium text-[var(--ink-strong)]">회의록</span>
           </div>
           <div className="flex-1 overflow-hidden">
             <ResultViewer
@@ -307,10 +311,10 @@ export function HomePageContent() {
               type="button"
               onClick={() => handleViewChange(view)}
               aria-current={activeView === view ? 'page' : undefined}
-              className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-md px-2 text-xs font-semibold transition ${
+              className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs transition ${
                 activeView === view
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-[var(--ink-muted)] hover:bg-white/70'
+                  ? 'bg-[var(--brand-fixed)] font-medium text-brand'
+                  : 'font-normal text-[var(--ink-muted)] hover:bg-[var(--surface-container-low)]'
               }`}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden="true" />

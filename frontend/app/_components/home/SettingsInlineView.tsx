@@ -152,9 +152,9 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
     <div className="mx-auto w-full max-w-4xl space-y-6 p-6 lg:p-8">
       {/* Transcription Defaults */}
       <ErrorBoundary>
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-white p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">전사</p>
-          <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">기본 전사 설정</h2>
+          <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">기본 전사 설정</h2>
           <div className="space-y-4">
             <div>
               <label htmlFor="inline-default-prompt" className="mb-1.5 block text-sm font-medium">기본 결과 프롬프트</label>
@@ -230,9 +230,9 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Theme */}
       <ErrorBoundary>
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-white p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">화면</p>
-          <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">테마</h2>
+          <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">테마</h2>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {themeMode === 'light' ? <Sun className="h-5 w-5 text-amber-500" /> : <Moon className="h-5 w-5 text-indigo-400" />}
@@ -258,9 +258,9 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Notifications */}
       <ErrorBoundary>
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-white p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">알림</p>
-          <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">알림</h2>
+          <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">알림</h2>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">회의 완료 알림</p>
@@ -286,9 +286,9 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Data */}
       <ErrorBoundary>
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-white p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">데이터</p>
-          <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">데이터</h2>
+          <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">데이터</h2>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">전체 회의 내보내기</p>
@@ -313,9 +313,9 @@ export function SettingsInlineView({ prompts }: SettingsInlineViewProps) {
 
       {/* Account */}
       <ErrorBoundary>
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
+        <section className="rounded-lg bg-white p-6 shadow-sm">
           <p className="label-sm text-[var(--ink-muted)]">계정</p>
-          <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">계정</h2>
+          <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">계정</h2>
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Mail className="h-5 w-5 text-[var(--ink-muted)]" />

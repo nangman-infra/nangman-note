@@ -19,17 +19,15 @@ const FEATURE_BULLETS: ReadonlyArray<{ title: string; description: string }> = [
 export function SignInHero() {
   return (
     <section className="motion-rise lg:col-span-7">
-      <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-bold tracking-wide text-indigo-700">
-        <Sparkles className="h-3.5 w-3.5" />
-        Cognitive Workspace
+      <span className="tag-dot">
+        <Sparkles className="h-3.5 w-3.5 text-seafoam-deep" strokeWidth={1.75} />
+        Meeting notes, engineered
       </span>
 
-      <h1 className="mt-5 font-headline text-4xl font-extrabold tracking-tight text-[var(--ink-strong)] sm:text-5xl lg:text-6xl">
+      <h1 className="font-headline mt-5 text-[40px] leading-[1.05] text-[var(--ink-strong)] sm:text-[48px] lg:text-[56px]">
         AI가 함께하는
         <br />
-        <span className="bg-gradient-to-r from-[var(--brand)] to-[var(--brand-container)] bg-clip-text text-transparent">
-          회의 노트
-        </span>
+        <span className="text-brand">회의 노트</span>
       </h1>
 
       <p className="mt-5 max-w-md text-base leading-relaxed text-[var(--ink-muted)]">
@@ -40,11 +38,11 @@ export function SignInHero() {
       <ul className="mt-8 space-y-3.5">
         {FEATURE_BULLETS.map((item) => (
           <li key={item.title} className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
-              <Check className="h-3.5 w-3.5" strokeWidth={3} />
+            <span className="mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[var(--tertiary-fixed)] text-seafoam-deep">
+              <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
             </span>
             <div>
-              <p className="text-sm font-semibold text-[var(--ink-strong)]">
+              <p className="text-sm font-medium text-[var(--ink-strong)]">
                 {item.title}
               </p>
               <p className="text-xs text-[var(--ink-muted)]">
@@ -58,14 +56,14 @@ export function SignInHero() {
       <div className="mt-10 flex flex-wrap items-center gap-5 text-xs text-[var(--ink-muted)]">
         <Link
           href="/landing"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-700 transition hover:text-indigo-900"
+          className="inline-flex items-center gap-1 font-medium text-brand transition hover:underline"
         >
           서비스 소개
           <ArrowRight className="h-3 w-3" />
         </Link>
         <Link
           href="/landing/guide"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-700 transition hover:text-indigo-900"
+          className="inline-flex items-center gap-1 font-medium text-brand transition hover:underline"
         >
           7단계 사용 가이드
           <ArrowRight className="h-3 w-3" />

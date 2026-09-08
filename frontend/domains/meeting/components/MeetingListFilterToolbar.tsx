@@ -63,10 +63,10 @@ export function MeetingListFilterToolbar({
           type="button"
           onClick={() => setIsAdvancedFilterOpen((prev) => !prev)}
           disabled={showTrash}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+          className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
             hasAdvancedFilter && !showTrash
-              ? 'bg-brand text-white shadow-md shadow-brand/10'
-              : 'bg-[var(--surface-container-low)] text-[var(--ink-subtle)] hover:bg-[var(--surface-container-high)]'
+              ? 'border-brand bg-brand text-white'
+              : 'border-[var(--line-soft)] bg-white text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
           } disabled:cursor-not-allowed disabled:opacity-50`}
           aria-expanded={shouldShowAdvancedFilter}
           aria-controls="meeting-advanced-filters"
@@ -81,10 +81,10 @@ export function MeetingListFilterToolbar({
               type="button"
               onClick={() => onFilterChange(filter.key)}
               disabled={showTrash}
-              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+              className={`h-8 whitespace-nowrap rounded-lg border px-3.5 text-xs font-medium transition ${
                 activeFilter === filter.key && !showTrash
-                  ? 'bg-brand text-white shadow-md shadow-brand/10'
-                  : 'bg-[var(--surface-container-low)] text-[var(--ink-subtle)] hover:bg-[var(--surface-container-high)]'
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-[var(--line-soft)] bg-white text-[var(--ink-subtle)] hover:border-[var(--line-strong)] hover:text-[var(--ink-strong)]'
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {filter.label}
@@ -96,7 +96,7 @@ export function MeetingListFilterToolbar({
       {shouldShowAdvancedFilter && !showTrash ? (
         <div
           id="meeting-advanced-filters"
-          className="grid gap-3 rounded-xl bg-[var(--surface-container-low)] p-3 md:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] md:items-end"
+          className="grid gap-3 rounded-lg border border-[var(--line-soft)] bg-[var(--surface-container-low)] p-3 md:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] md:items-end"
         >
           <div>
             <p className="label-sm mb-2 text-[var(--ink-muted)]">기간</p>
@@ -106,10 +106,10 @@ export function MeetingListFilterToolbar({
                   key={filter.key}
                   type="button"
                   onClick={() => onTimeFilterChange(filter.key)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                     timeFilter === filter.key
-                      ? 'bg-white text-indigo-700 shadow-sm'
-                      : 'text-[var(--ink-subtle)] hover:bg-white/70'
+                      ? 'border-brand bg-white text-brand'
+                      : 'border-transparent text-[var(--ink-subtle)] hover:bg-white'
                   }`}
                 >
                   {filter.label}
@@ -124,7 +124,7 @@ export function MeetingListFilterToolbar({
             <select
               value={tagFilter ?? ''}
               onChange={(event) => onTagFilterChange(event.target.value || null)}
-              className="input-shell h-10 rounded-xl text-sm"
+              className="input-shell h-10 text-sm"
             >
               <option value="">전체 프롬프트</option>
               {promptFilters.map((prompt) => (
@@ -138,8 +138,8 @@ export function MeetingListFilterToolbar({
       ) : null}
 
       {!showTrash && hasAppliedFilter ? (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-[var(--surface-container-low)] px-3 py-2">
-          <span className="text-[11px] font-semibold text-muted">적용 중</span>
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-[var(--line-soft)] bg-[var(--surface-container-low)] px-3 py-2">
+          <span className="label-sm">Applied</span>
           <AppliedFilterChip
             visible={activeFilter !== 'all'}
             label={activeFilterLabel}
@@ -172,7 +172,7 @@ export function MeetingListFilterToolbar({
             <button
               type="button"
               onClick={onResetFilters}
-              className="ml-auto rounded-full px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:bg-white hover:text-indigo-700"
+              className="ml-auto rounded-lg px-2.5 py-1 text-[11px] font-medium text-muted transition hover:bg-white hover:text-brand"
             >
               필터 초기화
             </button>
@@ -199,15 +199,15 @@ function AppliedFilterChip({
   if (!visible) return null;
 
   const toneClassName = {
-    amber: 'text-amber-700 hover:bg-amber-200/60',
-    indigo: 'text-indigo-700 hover:bg-indigo-100',
-    teal: 'text-teal-700 hover:bg-teal-100',
-    violet: 'text-violet-700 hover:bg-violet-200/60',
+    amber: 'text-[#a4431a] before:bg-[var(--accent)]',
+    indigo: 'text-brand before:bg-brand',
+    teal: 'text-[var(--tertiary)] before:bg-[var(--tertiary-fixed-dim)]',
+    violet: 'text-[var(--ink-subtle)] before:bg-[var(--ink-faint)]',
   }[tone];
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold shadow-sm ${toneClassName}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-white px-2.5 py-1 text-[11px] font-medium before:h-1.5 before:w-1.5 before:rounded-full before:content-[''] ${toneClassName}`}
     >
       {label}
       <button

@@ -116,11 +116,11 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
       <ErrorBoundary>
         <section>
           <p className="label-sm mb-2 text-[var(--ink-muted)]">시스템 라이브러리</p>
-          <h2 className="mb-4 font-headline text-xl font-bold tracking-tight">시스템 기본 프롬프트</h2>
+          <h2 className="mb-4 font-headline text-xl font-medium tracking-tight">시스템 기본 프롬프트</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {systemPrompts.map((prompt) => (
-              <div key={prompt.id} className="rounded-xl bg-[var(--surface-container-low)] p-5 transition hover:bg-[var(--surface-container-high)]">
-                <p className="text-sm font-bold text-slate-900">{prompt.name}</p>
+              <div key={prompt.id} className="surface-card p-5">
+                <p className="text-sm font-medium text-slate-900">{prompt.name}</p>
                 <p className="mt-1.5 line-clamp-2 text-xs text-[var(--ink-muted)]">
                   {getPromptDescription(prompt)}
                 </p>
@@ -139,7 +139,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="label-sm text-[var(--ink-muted)]">템플릿 편집기</p>
-              <h2 className="font-headline text-xl font-bold tracking-tight">
+              <h2 className="font-headline text-xl font-medium tracking-tight">
                 {inlineEditingId ? '프롬프트 편집' : '새 프롬프트 만들기'}
               </h2>
             </div>
@@ -154,7 +154,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
             {/* Left 8/12: Editor form */}
             <div className="space-y-4 lg:col-span-8">
               <div>
-                <label htmlFor="inline-prompt-name" className="label-sm mb-1.5 block text-[var(--ink-muted)]">
+                <label htmlFor="inline-prompt-name" className="mb-1.5 block text-xs font-medium text-[var(--ink-subtle)]">
                   프롬프트 이름
                 </label>
                 <input
@@ -170,7 +170,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
               </div>
 
               <div>
-                <label htmlFor="inline-prompt-type" className="label-sm mb-1.5 block text-[var(--ink-muted)]">
+                <label htmlFor="inline-prompt-type" className="mb-1.5 block text-xs font-medium text-[var(--ink-subtle)]">
                   기본 문서 타입
                 </label>
                 <select
@@ -190,7 +190,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
               </div>
 
               <div>
-                <label htmlFor="inline-prompt-content" className="label-sm mb-1.5 block text-[var(--ink-muted)]">
+                <label htmlFor="inline-prompt-content" className="mb-1.5 block text-xs font-medium text-[var(--ink-subtle)]">
                   추가 강조 지시
                 </label>
                 <textarea
@@ -257,7 +257,7 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
               </section>
 
               {/* AI Tip card */}
-              <section className="ai-card-accent rounded-r-xl p-4">
+              <section className="ai-card-accent rounded-r-lg p-4">
                 <header className="mb-3 flex items-center gap-2">
                   <span className="text-[var(--tertiary)]" aria-hidden="true">✦</span>
                   <h4 className="label-sm text-[var(--tertiary)]">AI 작성 팁</h4>
@@ -288,18 +288,18 @@ export function PromptsInlineView({ prompts }: PromptsInlineViewProps) {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="label-sm text-[var(--ink-muted)]">내 프롬프트</p>
-              <h2 className="font-headline text-xl font-bold tracking-tight">개인 등록 프롬프트</h2>
+              <h2 className="font-headline text-xl font-medium tracking-tight">개인 등록 프롬프트</h2>
             </div>
             <span className="text-xs text-[var(--ink-muted)]">{userPrompts.length}개</span>
           </div>
 
           {userPrompts.length === 0 ? (
-            <div className="rounded-xl bg-[var(--surface-container-low)] p-8 text-center">
+            <div className="rounded-lg bg-[var(--surface-container-low)] p-8 text-center">
               <p className="text-sm text-[var(--ink-muted)]">아직 등록된 프롬프트가 없습니다.</p>
               <p className="mt-1 text-xs text-[var(--ink-muted)]">위 에디터에서 새 프롬프트를 만들어보세요.</p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl bg-white">
+            <div className="overflow-hidden rounded-lg bg-white">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--line-soft)] bg-[var(--surface-container-low)]">

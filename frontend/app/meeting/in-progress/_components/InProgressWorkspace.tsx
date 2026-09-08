@@ -47,11 +47,7 @@ export function InProgressWorkspace({
   return (
     <>
       <main className="flex-1 flex overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 z-10 flex gap-1 rounded-none bg-slate-100 p-1 lg:hidden" style={{ position: 'relative' }}>
-          {/* We use a wrapper to keep mobile tabs inside the flow without absolute positioning issues */}
-        </div>
-
-        <section className={`w-2/5 flex-col bg-slate-900 text-slate-100 border-r border-[var(--outline-variant)]/10 hidden lg:flex ${mobilePanel === 'transcript' ? '!flex w-full' : ''}`}>
+        <section className={`surface-deep hidden w-2/5 flex-col !rounded-none border-r border-white/5 lg:flex ${mobilePanel === 'transcript' ? '!flex w-full' : ''}`}>
           <ErrorBoundary>
             <div className="flex min-h-0 flex-1 flex-col">
               <TranscriptPanel
@@ -82,14 +78,14 @@ export function InProgressWorkspace({
         </section>
       </main>
 
-      <div className="flex gap-1 bg-slate-100 p-1 lg:hidden">
+      <div className="flex gap-1 border-t border-[var(--line-soft)] bg-[var(--surface-container-low)] p-1.5 lg:hidden">
         <button
           type="button"
           onClick={() => onMobilePanelChange('note')}
-          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`flex-1 rounded-[6px] px-3 py-2 text-xs transition-colors ${
             mobilePanel === 'note'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-brand font-medium text-white shadow-[var(--elevation-button)]'
+              : 'font-normal text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
           }`}
         >
           노트
@@ -97,10 +93,10 @@ export function InProgressWorkspace({
         <button
           type="button"
           onClick={() => onMobilePanelChange('transcript')}
-          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`flex-1 rounded-[6px] px-3 py-2 text-xs transition-colors ${
             mobilePanel === 'transcript'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-brand font-medium text-white shadow-[var(--elevation-button)]'
+              : 'font-normal text-[var(--ink-muted)] hover:text-[var(--ink-strong)]'
           }`}
         >
           전사

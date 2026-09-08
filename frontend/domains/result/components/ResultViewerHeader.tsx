@@ -82,12 +82,12 @@ export function ResultViewerHeader({
   }, [showSpeakerPopover]);
 
   return (
-    <header className="px-6 py-6 sm:px-8 lg:px-12">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="rounded-full bg-[var(--tertiary-fixed)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--tertiary)]">
-          {result.metadata?.totalDuration > 0 ? '완료' : '노트 기반'}
+    <header className="mx-auto w-full max-w-[880px] px-6 pb-2 pt-8 sm:px-8 lg:px-10">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <span className="tag-dot">
+          {result.metadata?.totalDuration > 0 ? 'AI minutes' : 'Note-based minutes'}
         </span>
-        <span className="text-sm font-medium text-[var(--ink-muted)]">
+        <span className="data-mono text-xs text-[var(--ink-muted)]">
           {new Date(result.createdAt).toLocaleDateString('ko-KR', {
             year: 'numeric',
             month: 'long',
@@ -122,15 +122,15 @@ export function ResultViewerHeader({
               onTitleCancel();
             }
           }}
-          className="input-shell font-headline text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
+          className="input-shell font-headline !text-[28px] leading-[1.1] sm:!text-[34px] lg:!text-[40px]"
         />
       ) : (
-        <h1 className="font-headline text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+        <h1 className="font-headline text-[28px] leading-[1.1] text-[var(--ink-strong)] sm:text-[34px] lg:text-[40px]">
           <button
             ref={titleButtonRef}
             type="button"
             onClick={onTitleClick}
-            className="rounded text-left transition hover:text-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600"
+            className="rounded text-left transition hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
             aria-label={`${result.metadata?.title || '회의록'} 제목 편집`}
             title="제목 편집"
           >
@@ -139,14 +139,26 @@ export function ResultViewerHeader({
         </h1>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded-full bg-[var(--secondary-container)] px-2.5 py-1 font-semibold text-[var(--on-secondary-container)]">
-          단어 수: {result.metadata.transcriptWordCount}
-        </span>
-        <span className="rounded-full bg-[var(--secondary-container)] px-2.5 py-1 font-semibold text-[var(--on-secondary-container)]">
-          노트 길이: {result.metadata.noteLength}
-        </span>
-      </div>
+      <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
+        <div>
+          <dt className="label-sm">Transcript words</dt>
+          <dd className="data-mono mt-0.5 text-lg font-medium text-seafoam-deep">
+            {result.metadata.transcriptWordCount.toLocaleString()}
+          </dd>
+        </div>
+        <div>
+          <dt className="label-sm">Note length</dt>
+          <dd className="data-mono mt-0.5 text-lg font-medium text-seafoam-deep">
+            {result.metadata.noteLength.toLocaleString()}
+          </dd>
+        </div>
+        <div>
+          <dt className="label-sm">Duration</dt>
+          <dd className="data-mono mt-0.5 text-lg font-medium text-seafoam-deep">
+            {Math.round(result.metadata.totalDuration / 60)}m
+          </dd>
+        </div>
+      </dl>
 
       {uniqueSpeakers.length > 0 ? (
         <div className="mt-4 flex items-center gap-3">
@@ -155,7 +167,7 @@ export function ResultViewerHeader({
               <span
                 key={label}
                 title={label}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white ring-2 ring-white ${
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-medium text-white ring-2 ring-white ${
                   RESULT_SPEAKER_PALETTE[index % RESULT_SPEAKER_PALETTE.length]
                 }`}
               >
@@ -169,20 +181,18 @@ export function ResultViewerHeader({
                   onClick={() => setShowSpeakerPopover((value) => !value)}
                   aria-label={`추가 참가자 ${overflowSpeakerCount}명 보기`}
                   aria-expanded={showSpeakerPopover}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 ring-2 ring-white hover:bg-slate-300 transition"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-container)] text-[10px] font-medium text-[var(--ink-subtle)] ring-2 ring-white transition hover:bg-[var(--surface-container-high)]"
                 >
                   +{overflowSpeakerCount}
                 </button>
                 {showSpeakerPopover ? (
-                  <div className="absolute left-0 top-full z-20 mt-1 min-w-[160px] rounded-lg bg-white p-2 shadow-lg">
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      전체 참가자
-                    </p>
+                  <div className="surface-card absolute left-0 top-full z-20 mt-1 min-w-[160px] p-2 !shadow-[var(--elevation-md)]">
+                    <p className="label-sm mb-1">Participants</p>
                     <ul className="space-y-1">
                       {uniqueSpeakers.map((label, index) => (
                         <li key={label} className="flex items-center gap-2 text-xs">
                           <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white ${
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-medium text-white ${
                               RESULT_SPEAKER_PALETTE[
                                 index % RESULT_SPEAKER_PALETTE.length
                               ]
@@ -205,7 +215,7 @@ export function ResultViewerHeader({
         </div>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
         {!isEditing ? (
           <>
             <ResultExportMenu
@@ -214,19 +224,19 @@ export function ResultViewerHeader({
               onExportDOCX={onExportDOCX}
               onExportMD={onExportMD}
             />
-            <button type="button" onClick={onStartEdit} className="btn-secondary inline-flex">
-              <Edit3 className="h-4 w-4" />
+            <button type="button" onClick={onStartEdit} className="btn-neo inline-flex">
+              <Edit3 className="h-4 w-4" strokeWidth={1.75} />
               편집
             </button>
-            <button type="button" onClick={onCopy} className="btn-secondary inline-flex">
-              <Copy className="h-4 w-4" />
+            <button type="button" onClick={onCopy} className="btn-neo inline-flex">
+              <Copy className="h-4 w-4" strokeWidth={1.75} />
               복사
             </button>
           </>
         ) : (
           <>
-            <button type="button" onClick={onCancelEdit} className="btn-secondary inline-flex">
-              <X className="h-4 w-4" />
+            <button type="button" onClick={onCancelEdit} className="btn-neo inline-flex">
+              <X className="h-4 w-4" strokeWidth={1.75} />
               취소
             </button>
             <button type="button" onClick={onSave} className="btn-primary inline-flex">

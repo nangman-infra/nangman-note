@@ -275,9 +275,9 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
       aria-busy={isBusy}
       onKeyDown={handleDialogKeyDown}
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 id="upload-audio-dialog-title" className="font-headline text-lg font-bold text-slate-900">
+          <h2 id="upload-audio-dialog-title" className="font-headline text-lg font-medium text-slate-900">
             오디오 파일 업로드
           </h2>
           <button
@@ -301,7 +301,7 @@ export function UploadAudioDialog({ open, onClose, onUploaded }: UploadAudioDial
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isBusy}
-            className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center transition hover:border-indigo-300 hover:bg-indigo-50/40 disabled:opacity-60"
+            className="flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center transition hover:border-indigo-300 hover:bg-indigo-50/40 disabled:opacity-60"
           >
             <FileAudio className="h-7 w-7 text-indigo-500" />
             {file ? (

@@ -102,7 +102,7 @@ export function ResultExportMenu({
           role="menu"
           aria-label="내보내기 형식"
           onKeyDown={handleMenuKeyDown}
-          className="absolute left-0 top-full z-20 mt-1 min-w-[180px] rounded-lg bg-white py-1 shadow-lg"
+          className="surface-card absolute left-0 top-full z-20 mt-1 min-w-[180px] py-1 !shadow-[var(--elevation-md)]"
         >
           <button
             ref={(element) => { itemRefs.current[0] = element; }}
@@ -113,7 +113,7 @@ export function ResultExportMenu({
               onExportPDF();
             }}
             disabled={isExporting !== null}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--ink-subtle)] hover:bg-[var(--surface-container-low)] hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isExporting === 'pdf' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -131,7 +131,7 @@ export function ResultExportMenu({
               onExportDOCX();
             }}
             disabled={isExporting !== null}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--ink-subtle)] hover:bg-[var(--surface-container-low)] hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isExporting === 'docx' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -149,7 +149,7 @@ export function ResultExportMenu({
               onExportMD();
             }}
             disabled={isExporting !== null}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--ink-subtle)] hover:bg-[var(--surface-container-low)] hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isExporting === 'md' ? (
               <Loader2 className="h-4 w-4 animate-spin" />

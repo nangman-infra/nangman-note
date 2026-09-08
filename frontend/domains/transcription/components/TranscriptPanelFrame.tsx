@@ -19,25 +19,23 @@ export function TranscriptPanelFrame({
 }: TranscriptPanelFrameProps) {
   return (
     <>
-      <div className="bg-slate-950/50 px-4 py-3">
+      <div className="border-b border-white/[0.06] bg-black/20 px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold tracking-wide text-slate-400">
-              TRANSCRIPTION
-            </p>
-            <h2 className="mt-1 text-sm font-semibold text-slate-100">{title}</h2>
+            <p className="label-sm !text-seafoam">Live transcription</p>
+            <h2 className="mt-1 text-sm font-medium !text-white">{title}</h2>
           </div>
           <span
-            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusClassName}`}
+            className={`status-pill !text-[10px] ${statusClassName}`}
           >
             {statusLabel}
           </span>
         </div>
-        <div className="mt-2 text-[10px] text-slate-400">
-          Meeting ID: {meetingId.slice(0, 8)}...
+        <div className="data-mono mt-2 text-[10px] text-white/40">
+          id · {meetingId.slice(0, 8)}
         </div>
         {error ? (
-          <div className="mt-1.5 rounded bg-rose-500/15 px-2 py-1 text-[10px] text-rose-300">
+          <div className="data-mono mt-1.5 rounded-[4px] bg-[#f08b80]/15 px-2 py-1 text-[10px] text-[#f08b80]">
             {error}
           </div>
         ) : null}

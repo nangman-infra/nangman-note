@@ -15,7 +15,7 @@ export function BottomCta({ nextHref, nextLabel }: BottomCtaProps) {
     <section className="py-16 sm:py-24">
       <div className="mx-auto max-w-2xl px-5 text-center">
         <ScrollReveal>
-          <h2 className="text-2xl font-bold sm:text-3xl">
+          <h2 className="text-2xl font-medium sm:text-3xl">
             다음 회의부터 바로 써보세요
           </h2>
           <p className="mt-3 text-sm text-muted">

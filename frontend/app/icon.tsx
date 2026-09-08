@@ -19,10 +19,10 @@ export default function Icon() {
           borderRadius: '112px',
           border: '16px solid rgba(103,232,249,0.34)',
           background:
-            'radial-gradient(circle at 16% 14%, rgba(56,189,248,0.28), transparent 36%), linear-gradient(130deg, #04101b 0%, #0a2035 100%)',
+            '#111a4a',
           color: '#f8fafc',
           fontFamily: 'Inter, system-ui, sans-serif',
-          fontWeight: 800,
+          fontWeight: 600,
           fontSize: 208,
           letterSpacing: '-0.06em',
         }}

@@ -33,7 +33,7 @@ export function FaqAccordion() {
           <p className="text-center text-xs font-semibold tracking-widest text-muted">
             FAQ
           </p>
-          <h2 className="mt-2 text-center text-2xl font-bold sm:text-3xl">
+          <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
             자주 묻는 질문
           </h2>
         </ScrollReveal>

@@ -78,16 +78,16 @@ export function NotificationBell({ onSelectMeeting }: NotificationBellProps) {
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 ? (
-          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-medium text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         ) : null}
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl bg-white p-2 shadow-xl ring-1 ring-black/5">
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg bg-white p-2 shadow-xl ring-1 ring-black/5">
           <div className="flex items-center justify-between px-2 py-1.5">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
               알림
             </p>
             {notifications.length > 0 ? (

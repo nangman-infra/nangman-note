@@ -8,7 +8,7 @@ import { FileText, Mic, NotebookText, Clock, Tag } from 'lucide-react';
  */
 export function AppPreview() {
   return (
-    <div className="glass-surface mx-auto w-full max-w-5xl overflow-hidden" aria-hidden="true">
+    <div className="surface-product mx-auto w-full max-w-5xl overflow-hidden border border-[var(--line-soft)]" aria-hidden="true">
       {/* 모바일: 단일 컬럼 뷰어만 */}
       <div className="block sm:hidden">
         <MobilePreview />
@@ -155,7 +155,7 @@ function MeetingCardMini({
 }) {
   return (
     <div
-      className={`cursor-default rounded-xl border p-2 transition hover:scale-[1.02] hover:border-brand/40 ${
+      className={`cursor-default rounded-lg border p-2 transition hover:scale-[1.02] hover:border-brand/40 ${
         active
           ? 'border-brand/30 bg-brand/5'
           : 'border-[var(--line-soft)] bg-white/50'

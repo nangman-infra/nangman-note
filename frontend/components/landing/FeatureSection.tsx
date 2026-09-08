@@ -25,7 +25,7 @@ export function FeatureSection({
           <span className="inline-block rounded-full border border-[var(--line-soft)] bg-white/70 px-3 py-1 text-[11px] font-semibold tracking-wide text-brand">
             {badge}
           </span>
-          <h3 className="mt-3 text-xl font-bold sm:text-2xl">{title}</h3>
+          <h3 className="mt-3 text-xl font-medium sm:text-2xl">{title}</h3>
           <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
         </ScrollReveal>
       </div>

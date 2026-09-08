@@ -21,9 +21,9 @@ export function InProgressQuickActions({
         onClick={onShowSummaryInfo}
         aria-label="AI 요약 안내"
         title="AI 요약 안내"
-        className="pointer-events-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 text-white shadow-lg transition hover:brightness-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+        className="pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-lg bg-brand text-white shadow-[var(--elevation-md)] transition hover:bg-brand-strong active:scale-95"
       >
-        <Sparkles className="h-6 w-6" aria-hidden="true" />
+        <Sparkles className="h-5 w-5" aria-hidden="true" strokeWidth={1.75} />
       </button>
 
       <button
@@ -31,9 +31,9 @@ export function InProgressQuickActions({
         onClick={onSaveNote}
         aria-label="노트 저장"
         title="노트 저장"
-        className="pointer-events-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-lg transition hover:bg-slate-50 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--tertiary)]"
+        className="surface-card pointer-events-auto inline-flex h-12 w-12 items-center justify-center text-[var(--ink-strong)] transition hover:bg-[var(--surface-container-low)] active:scale-95"
       >
-        <Save className="h-6 w-6 text-[var(--tertiary)]" aria-hidden="true" />
+        <Save className="h-5 w-5 text-[var(--tertiary)]" aria-hidden="true" strokeWidth={1.75} />
       </button>
     </div>
   );

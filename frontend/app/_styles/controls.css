@@ -1,80 +1,146 @@
-/* ─── Buttons ─── */
+/* ─── Column controls: buttons, inputs, labels, focus ──────────────────
+   Rules of the system:
+   • Every interactive surface is 8px radius. 9999px is for tags only.
+   • Primary = Indigo Navy fill. Secondary = navy outline. Never two fills
+     side by side.
+   • Signal Orange (.btn-accent) is rare — at most one surface per page.
+   ──────────────────────────────────────────────────────────────────── */
 @layer components {
+  /* Neutral ghost/outlined control (toolbar buttons, tertiary actions) */
   .btn-neo {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 8px;
+    border-radius: var(--radius-button);
     border: 1px solid var(--line-soft);
-    padding: 0.6rem 0.9rem;
-    font-size: 0.87rem;
-    font-weight: 600;
-    transition: all 0.2s ease;
+    background: var(--bg-card);
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: var(--ink-subtle);
+    box-shadow: var(--elevation-sm);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   }
-
   .btn-neo:hover {
-    transform: translateY(-1px);
     border-color: var(--line-strong);
+    color: var(--ink-strong);
+    background: var(--surface-container-low);
   }
 
-  /* Primary CTA: Gradient button */
+  /* Primary filled — Indigo Navy */
   .btn-primary {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 8px;
+    border-radius: var(--radius-button);
     border: none;
     padding: 0.75rem 1.25rem;
     font-size: 0.875rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-container) 100%);
-    color: #ffffff;
-    box-shadow: 0 2px 16px rgba(32, 53, 189, 0.25);
-    transition: all 0.2s ease;
+    font-weight: 500;
+    line-height: 1.25rem;
+    background: var(--brand);
+    color: var(--on-brand);
+    box-shadow: var(--elevation-button);
+    transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
   }
-
   .btn-primary:hover {
-    opacity: 0.92;
-    box-shadow: 0 4px 24px rgba(32, 53, 189, 0.35);
-    transform: translateY(-1px);
+    background: var(--brand-strong);
+  }
+  .btn-primary:active {
+    transform: translateY(1px);
   }
 
-  /* Secondary: Ghost border */
+  /* Secondary outlined — navy hairline */
   .btn-secondary {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 8px;
-    border: 1px solid rgba(197, 197, 215, 0.2);
-    padding: 0.6rem 0.9rem;
-    font-size: 0.87rem;
-    font-weight: 600;
+    border-radius: var(--radius-button);
+    border: 1px solid var(--brand);
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
     color: var(--brand);
     background: transparent;
-    transition: all 0.2s ease;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
-
   .btn-secondary:hover {
-    background: rgba(32, 53, 189, 0.04);
+    background: rgba(17, 26, 74, 0.06);
   }
 
-  /* AI Action button */
+  /* Data / AI action — Seafoam 700 */
   .btn-ai {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 8px;
+    border-radius: var(--radius-button);
     border: none;
-    padding: 0.6rem 0.9rem;
-    font-size: 0.87rem;
-    font-weight: 700;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
     background: var(--tertiary);
-    color: #ffffff;
-    transition: all 0.2s ease;
+    color: var(--on-tertiary);
+    box-shadow: var(--elevation-button);
+    transition: background-color 0.15s ease;
   }
-
   .btn-ai:hover {
     background: var(--tertiary-container);
+  }
+
+  /* Accent — Signal Orange. One per page. */
+  .btn-accent {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-button);
+    border: none;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    background: var(--accent);
+    color: #ffffff;
+    box-shadow: var(--elevation-button);
+    transition: filter 0.15s ease;
+  }
+  .btn-accent:hover {
+    filter: brightness(0.94);
+  }
+
+  /* Destructive — muted institutional red */
+  .btn-danger {
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-button);
+    border: none;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    background: var(--danger);
+    color: #ffffff;
+    transition: filter 0.15s ease;
+  }
+  .btn-danger:hover {
+    filter: brightness(0.92);
+  }
+
+  /* Icon-only ghost button (nav actions, dismiss) */
+  .btn-icon {
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-button);
+    padding: 0.5rem;
+    color: var(--ink-muted);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-icon:hover {
+    background: var(--surface-container);
+    color: var(--ink-strong);
   }
 }
 
@@ -82,8 +148,8 @@
 .btn-neo.bg-brand:hover,
 .btn-neo.bg-brand:visited {
   color: #ffffff !important;
+  border-color: transparent;
 }
-
 .btn-neo.bg-brand svg,
 .btn-neo.bg-brand span,
 .btn-neo.bg-brand:hover svg,
@@ -91,81 +157,141 @@
   color: #ffffff !important;
 }
 
-/* ─── Focus States ─── */
+/* ─── Focus — navy ring, always visible for keyboard ─────────────────── */
 .btn-neo:focus-visible,
 .btn-primary:focus-visible,
 .btn-secondary:focus-visible,
+.btn-ai:focus-visible,
+.btn-accent:focus-visible,
+.btn-danger:focus-visible,
+.btn-icon:focus-visible,
 .input-shell:focus-visible,
 button:focus-visible,
 a:focus-visible,
+select:focus-visible,
 textarea:focus-visible,
 input:focus-visible {
-  outline: 3px solid rgba(32, 53, 189, 0.35);
+  outline: 2px solid rgba(17, 26, 74, 0.55);
   outline-offset: 2px;
 }
+[data-theme='dark'] .btn-neo:focus-visible,
+[data-theme='dark'] button:focus-visible,
+[data-theme='dark'] a:focus-visible,
+[data-theme='dark'] select:focus-visible,
+[data-theme='dark'] textarea:focus-visible,
+[data-theme='dark'] input:focus-visible {
+  outline-color: rgba(185, 193, 236, 0.7);
+}
 
-/* ─── Input Fields: No-border, tonal bg shift on focus ─── */
+/* ─── Inputs — white field, Silver Lining hairline, navy focus ─────────── */
 .input-shell {
   width: 100%;
-  border-radius: 12px;
-  border: none;
-  background: var(--surface-container-low);
-  padding: 0.64rem 0.82rem;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--line-soft);
+  background: var(--bg-card);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
   color: var(--ink-strong);
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: rgba(18, 22, 30, 0.02) 0px 1px 2px 0px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
-
 .input-shell::placeholder {
-  color: var(--ink-muted);
+  color: var(--ink-faint);
 }
-
+.input-shell:hover {
+  border-color: var(--line-strong);
+}
 .input-shell:focus {
-  background: #ffffff;
-  box-shadow: 0 0 0 2px var(--brand);
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(17, 26, 74, 0.12);
+}
+[data-theme='dark'] .input-shell:focus {
+  box-shadow: 0 0 0 3px rgba(185, 193, 236, 0.22);
 }
 
-/* ─── Status Pills ─── */
+/* ─── Tags & labels ──────────────────────────────────────────────────── */
 .status-pill {
-  border-radius: 9999px;
-  padding: 0.24rem 0.64rem;
-  font-size: 0.7rem;
+  border-radius: var(--radius-tag);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-/* ─── Scrollbar ─── */
+/* Tag with dot — category label, no rounding */
+.tag-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.tag-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--tertiary-fixed-dim);
+  flex-shrink: 0;
+}
+.tag-dot--navy::before {
+  background: var(--brand);
+}
+.tag-dot--orange::before {
+  background: var(--accent);
+}
+
+/* Small technical label — mono, uppercase, steel */
+.label-sm {
+  font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+/* Data readout — mono, tabular */
+.data-mono {
+  font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'cv11', 'salt' 2;
+}
+
+/* Editorial heading treatment — tight tracking scales with size */
+.font-headline {
+  font-family: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.font-headline.text-5xl,
+.font-headline.text-6xl,
+.font-headline.lg\:text-5xl,
+.font-headline.lg\:text-6xl {
+  letter-spacing: -0.03em;
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────── */
 .scroll-muted {
   scrollbar-width: thin;
-  scrollbar-color: rgba(197, 197, 215, 0.5) transparent;
+  scrollbar-color: var(--ink-hairline) transparent;
 }
-
 .scroll-muted::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
-
 .scroll-muted::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .scroll-muted::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background-color: rgba(197, 197, 215, 0.5);
-}
-
-/* ─── Typography: Headline utility ─── */
-.font-headline {
-  font-family: 'Manrope', var(--font-display), sans-serif;
-  letter-spacing: -0.02em;
-}
-
-/* ─── Label utility: Technical metadata ─── */
-.label-sm {
-  font-family: 'Inter', var(--font-display), sans-serif;
-  font-size: 0.625rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  background-color: var(--ink-hairline);
 }

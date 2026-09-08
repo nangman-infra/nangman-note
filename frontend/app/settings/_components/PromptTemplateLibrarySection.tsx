@@ -43,7 +43,7 @@ export function PromptTemplateLibrarySection({
             </p>
             <h2
               id="system-library-heading"
-              className="font-headline text-xl font-bold tracking-tight sm:text-2xl"
+              className="font-headline text-xl font-medium tracking-tight sm:text-2xl"
             >
               프롬프트 템플릿 라이브러리
             </h2>
@@ -63,7 +63,7 @@ export function PromptTemplateLibrarySection({
         </header>
 
         {prompts.length === 0 ? (
-          <div className="rounded-xl bg-[var(--surface-container-low)] p-8 text-center">
+          <div className="rounded-lg bg-[var(--surface-container-low)] p-8 text-center">
             <p className="text-sm text-muted">
               등록된 프롬프트가 없습니다. 새 프롬프트를 만들어보세요.
             </p>
@@ -106,7 +106,7 @@ export function PromptTemplateLibrarySection({
                     ) : null}
                   </div>
 
-                  <h3 className="font-headline text-lg font-bold leading-snug tracking-tight">
+                  <h3 className="font-headline text-lg font-medium leading-snug tracking-tight">
                     {prompt.name}
                   </h3>
                   <p className="mt-1.5 line-clamp-2 text-sm text-[var(--ink-subtle)]">
@@ -130,7 +130,7 @@ export function PromptTemplateLibrarySection({
                       <button
                         type="button"
                         onClick={() => onEdit(prompt)}
-                        className="inline-flex items-center gap-1 text-sm font-bold text-[var(--brand)] hover:underline"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-[var(--brand)] hover:underline"
                       >
                         <Edit3 className="h-4 w-4" />
                         Edit

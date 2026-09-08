@@ -233,7 +233,7 @@ export function ProcessingProgress({
       )}
 
       {error && currentStep === 'failed' ? (
-        <div role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+        <div role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           {error}
           <div className="mt-3 flex flex-wrap gap-2">
             {onRetryUpload && (

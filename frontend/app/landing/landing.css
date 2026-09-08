@@ -14,14 +14,10 @@
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  background-image: linear-gradient(
-      to right,
-      rgba(18, 33, 43, 0.03) 1px,
-      transparent 1px
-    ),
-    linear-gradient(to bottom, rgba(18, 33, 43, 0.03) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse at 50% 30%, #000 40%, transparent 80%);
+  /* Column: faint halftone dot field instead of a ruled grid */
+  background-image: radial-gradient(circle, rgba(17, 26, 74, 0.16) 1px, transparent 1.2px);
+  background-size: 12px 12px;
+  mask-image: radial-gradient(ellipse at 50% 20%, #000 20%, transparent 70%);
 }
 
 /* 헤드라인 orphan 방지 */
@@ -31,12 +27,13 @@
   text-wrap: balance;
 }
 
-/* 그라데이션 텍스트 */
+/* 강조 텍스트 — Column은 UI 요소에 그라데이션을 쓰지 않는다.
+   Indigo Navy 본문 + Seafoam 하이라이트 밑줄로 강조한다. */
 .landing-gradient-text {
-  background: linear-gradient(135deg, var(--brand) 0%, #0e7490 50%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--brand);
+  background-image: linear-gradient(transparent 78%, rgba(68, 180, 139, 0.35) 78%);
+  background-repeat: no-repeat;
+  padding: 0 0.08em;
 }
 
 /* 섹션 구분선 */

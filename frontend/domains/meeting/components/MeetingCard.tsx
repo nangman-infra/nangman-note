@@ -59,10 +59,10 @@ export const MeetingCard = memo(
 
     return (
       <article
-        className={`group relative w-full rounded-xl px-4 py-3 transition-all ${
+        className={`group relative w-full rounded-lg border px-4 py-3 transition-all ${
           isRecording
-            ? 'border-l-4 border-l-[var(--tertiary)] bg-[var(--surface-container-low)]'
-            : 'bg-[var(--surface-container-low)]'
+            ? 'border-[var(--line-soft)] bg-white shadow-[inset_3px_0_0_0_var(--tertiary)]'
+            : 'border-[var(--line-soft)] bg-white'
         } ${cardSelectionClassName} ${selectionMode ? 'cursor-pointer' : ''}`}
         onClick={selectionMode ? handleCardClick : undefined}
         onKeyDown={selectionMode ? (event) => {
@@ -79,10 +79,10 @@ export const MeetingCard = memo(
           {/* Selection checkbox */}
           {selectionMode ? (
             <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] border transition ${
                 isSelected
                   ? 'border-brand bg-brand text-white'
-                  : 'border-[var(--outline-variant)] bg-white hover:border-brand'
+                  : 'border-[var(--line-strong)] bg-white hover:border-brand'
               }`}
               aria-hidden="true"
             >
@@ -91,14 +91,14 @@ export const MeetingCard = memo(
           ) : null}
 
           <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--line-soft)] transition ${
               isRecording
-                ? 'bg-white text-[var(--tertiary)]'
-                : 'bg-white/80 text-indigo-600'
+                ? 'bg-[var(--tertiary-fixed)] text-[var(--tertiary)]'
+                : 'bg-[var(--surface-container-low)] text-[var(--ink-muted)] group-hover:text-brand'
             }`}
             aria-hidden="true"
           >
-            <FileText className="h-4 w-4" />
+            <FileText className="h-4 w-4" strokeWidth={1.75} />
           </div>
 
           {/* Content — inbox-style: title + metadata */}
@@ -110,22 +110,22 @@ export const MeetingCard = memo(
               disabled={mode === 'trash' || selectionMode}
               aria-current={isActive ? 'true' : undefined}
             >
-              <h3 className="line-clamp-1 text-sm font-bold text-slate-900 transition-colors group-hover:text-indigo-700">
+              <h3 className="line-clamp-1 text-sm font-medium text-[var(--ink-strong)] transition-colors group-hover:text-brand">
                 {meeting.title || '제목 없는 회의'}
               </h3>
               {meeting.searchSnippet && meeting.searchMatchedIn ? (
-                <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                  <span className="mr-1.5 inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600">
+                <p className="mt-1 line-clamp-2 text-xs text-[var(--ink-muted)]">
+                  <span className="label-sm mr-1.5 inline-flex items-center rounded-[4px] bg-[var(--brand-fixed)] px-1.5 py-0.5 !text-[10px] !text-brand">
                     {getSearchMatchLabel(meeting.searchMatchedIn)}
                   </span>
                   {meeting.searchSnippet}
                 </p>
               ) : null}
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--ink-muted)]">
+              <div className="data-mono mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--ink-muted)]">
                 <span>{formatDate(meeting.startedAt)}</span>
                 {duration > 0 && (
                   <>
-                    <span className="text-slate-300">·</span>
+                    <span className="text-[var(--ink-hairline)]">·</span>
                     <span>{formatDuration(duration)}</span>
                   </>
                 )}
@@ -140,14 +140,14 @@ export const MeetingCard = memo(
                 {config.label}
               </span>
             ) : (
-              <span className={`rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold ${config.colorClass}`}>
+              <span className={`status-pill status-pill--idle ${config.colorClass}`}>
                 {config.label}
               </span>
             )}
 
             {meeting.status === 'completed' &&
             meeting.processingPhase === MeetingProcessingPhase.REGENERATING ? (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-brand">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 재생성 중
               </span>
@@ -157,7 +157,7 @@ export const MeetingCard = memo(
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="rounded-full p-2 text-[var(--ink-muted)] opacity-100 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                className="btn-icon inline-flex opacity-100 hover:!bg-[var(--danger-soft)] hover:!text-[var(--danger)] focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 aria-label="회의 삭제"
               >
                 <Trash2 className="h-4 w-4" />
@@ -170,7 +170,7 @@ export const MeetingCard = memo(
           <div
             role={meeting.needsAttention ? 'alert' : 'status'}
             aria-live={meeting.needsAttention ? 'assertive' : 'polite'}
-            className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold ${
+            className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
               getProcessingBannerClassName(meeting.needsAttention)
             }`}
           >
@@ -189,7 +189,7 @@ export const MeetingCard = memo(
             <button
               type="button"
               onClick={onRestore}
-              className="btn-secondary inline-flex justify-center px-2 py-1.5 text-xs"
+              className="btn-secondary inline-flex justify-center !px-2 !py-1.5 text-xs"
             >
               <RotateCcw className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">복구</span>
@@ -197,7 +197,7 @@ export const MeetingCard = memo(
             <button
               type="button"
               onClick={onPurge}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-700"
+              className="btn-danger inline-flex !px-2 !py-1.5 text-xs"
             >
               <Trash2 className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">영구삭제</span>

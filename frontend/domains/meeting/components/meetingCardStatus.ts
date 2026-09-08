@@ -5,53 +5,53 @@ import type { Meeting } from '../types/meeting.types';
 const statusConfig = {
   recording: {
     label: '진행 중',
-    colorClass: 'text-indigo-600',
+    colorClass: '!bg-[var(--brand-fixed)] !text-brand',
   },
   processing: {
     label: '정리 중',
-    colorClass: 'text-amber-600',
+    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
   },
   completed: {
     label: '완료',
-    colorClass: 'text-slate-500',
+    colorClass: '!bg-[var(--success-soft)] !text-[var(--success)]',
   },
 } as const;
 
 const processingPhaseConfig = {
   [MeetingProcessingPhase.UPLOADING]: {
     label: '업로드 중',
-    colorClass: 'text-sky-600',
+    colorClass: '!bg-[var(--info-soft)] !text-[var(--info)]',
   },
   [MeetingProcessingPhase.TRANSCRIBING]: {
     label: '전사 중',
-    colorClass: 'text-amber-600',
+    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
   },
   [MeetingProcessingPhase.GENERATING]: {
     label: '정리 중',
-    colorClass: 'text-amber-600',
+    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
   },
   [MeetingProcessingPhase.REGENERATING]: {
     label: '재생성 중',
-    colorClass: 'text-indigo-600',
+    colorClass: '!bg-[var(--brand-fixed)] !text-brand',
   },
 } as const;
 
 const completionStateConfig = {
   [MeetingCompletionState.SUCCEEDED]: {
     label: '완료',
-    colorClass: 'text-slate-500',
+    colorClass: '!bg-[var(--success-soft)] !text-[var(--success)]',
   },
   [MeetingCompletionState.PARTIAL]: {
     label: '부분 완료',
-    colorClass: 'text-orange-600',
+    colorClass: '!bg-[var(--accent-soft)] !text-[#a4431a]',
   },
   [MeetingCompletionState.ATTENTION_REQUIRED]: {
     label: '확인 필요',
-    colorClass: 'text-rose-600',
+    colorClass: '!bg-[var(--danger-soft)] !text-[var(--danger)]',
   },
   [MeetingCompletionState.FAILED]: {
     label: '실패',
-    colorClass: 'text-rose-600',
+    colorClass: '!bg-[var(--danger-soft)] !text-[var(--danger)]',
   },
 } as const;
 
@@ -67,7 +67,7 @@ export function getMeetingStatusConfig(meeting: Meeting): MeetingCardStatusConfi
   if (meeting.status === 'processing' && meeting.needsAttention) {
     return {
       label: '확인 필요',
-      colorClass: 'text-rose-600',
+      colorClass: '!bg-[var(--danger-soft)] !text-[var(--danger)]',
     };
   }
 
@@ -93,14 +93,14 @@ export function getCardSelectionClassName({
   isSelected: boolean;
   isActive?: boolean;
 }): string {
-  if (isSelected) return 'bg-indigo-50 shadow-md ring-2 ring-brand/30';
-  if (isActive) return 'bg-white shadow-md ring-1 ring-brand/10';
-  return 'hover:bg-white hover:shadow-sm';
+  if (isSelected) return '!border-brand !bg-[var(--brand-fixed)]';
+  if (isActive) return '!border-brand shadow-[var(--elevation-md)]';
+  return 'hover:border-[var(--line-strong)] hover:shadow-[var(--elevation-sm)]';
 }
 
 export function getProcessingBannerClassName(needsAttention?: boolean): string {
-  if (needsAttention) return 'bg-rose-50 text-rose-700';
-  return 'bg-amber-50 text-amber-700';
+  if (needsAttention) return 'bg-[var(--danger-soft)] text-[var(--danger)]';
+  return 'bg-[var(--accent-soft)] text-[#a4431a]';
 }
 
 export function getProcessingBannerMessage(meeting: Meeting): string {

@@ -6,12 +6,13 @@
 
 .markdown-wysiwyg .toastui-editor-toolbar {
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
 }
 
 .markdown-wysiwyg .toastui-editor-contents {
   color: var(--ink-strong);
-  font-family: 'Inter', var(--font-display), 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-family: var(--font-suisse), 'Inter', 'Pretendard', 'Noto Sans KR', sans-serif;
   font-size: 0.96rem;
   line-height: 1.7;
 }
@@ -24,4 +25,24 @@
 
 .markdown-wysiwyg .toastui-editor-md-tab-container {
   display: none;
+}
+
+.markdown-wysiwyg .toastui-editor-toolbar-icons {
+  border-radius: 6px;
+}
+.markdown-wysiwyg .toastui-editor-contents h1,
+.markdown-wysiwyg .toastui-editor-contents h2,
+.markdown-wysiwyg .toastui-editor-contents h3 {
+  color: var(--ink-strong);
+  border-bottom: none;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+.markdown-wysiwyg .toastui-editor-contents code {
+  color: var(--tertiary);
+  background: var(--tertiary-fixed);
+  font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
+}
+[data-theme='dark'] .markdown-wysiwyg .toastui-editor-toolbar {
+  background: rgba(15, 27, 36, 0.85);
 }

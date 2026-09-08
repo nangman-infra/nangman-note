@@ -39,7 +39,7 @@ export function NewMeetingForm({
       <button
         type="button"
         onClick={onBack}
-        className="btn-secondary mb-4 inline-flex text-sm lg:hidden"
+        className="btn-neo mb-4 inline-flex !px-3 !py-1.5 text-xs lg:hidden"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         돌아가기
@@ -51,11 +51,11 @@ export function NewMeetingForm({
           if (!isLoading) onStart();
         }}
         aria-busy={isLoading}
-        className="rounded-2xl bg-white p-8 shadow-xl sm:p-10"
+        className="surface-product p-8 sm:p-10"
       >
         <div className="mb-7">
-          <p className="label-sm text-[var(--ink-muted)]">새 회의</p>
-          <h2 className="mt-1 font-headline text-2xl font-extrabold tracking-tight text-[var(--ink-strong)]">
+          <p className="label-sm">New meeting</p>
+          <h2 className="font-headline mt-1.5 text-2xl text-[var(--ink-strong)]">
             회의 시작
           </h2>
         </div>
@@ -73,7 +73,7 @@ export function NewMeetingForm({
           <div>
             <label
               htmlFor="meeting-title"
-              className="label-sm mb-2 block text-[var(--ink-muted)]"
+              className="mb-2 block text-xs font-medium text-[var(--ink-subtle)]"
             >
               회의 제목 (선택)
             </label>
@@ -94,7 +94,7 @@ export function NewMeetingForm({
           <div>
             <label
               htmlFor="meeting-agenda"
-              className="label-sm mb-2 block text-[var(--ink-muted)]"
+              className="mb-2 block text-xs font-medium text-[var(--ink-subtle)]"
             >
               회의 아젠다 (선택)
             </label>
@@ -111,32 +111,32 @@ export function NewMeetingForm({
             </p>
           </div>
 
-          <div className="rounded-xl bg-[var(--surface-container-low)] px-4 py-3.5">
+          <div className="surface-tonal border border-[var(--line-soft)] px-4 py-3.5">
             <div className="flex items-start gap-2.5">
               <Settings2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-muted)]" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs leading-relaxed text-[var(--ink-subtle)]">
                   결과 프롬프트:{' '}
-                  <span className="font-semibold text-[var(--ink-strong)]">
+                  <span className="font-medium text-[var(--ink-strong)]">
                     {promptLabel}
                   </span>
                   {' · '}전사:{' '}
-                  <span className="font-semibold text-[var(--ink-strong)]">
+                  <span className="font-medium text-[var(--ink-strong)]">
                     {modeLabel}
                   </span>
                   {' · '}
-                  <span className="font-semibold text-[var(--ink-strong)]">
+                  <span className="font-medium text-[var(--ink-strong)]">
                     {languageLabel}
                   </span>
                   {' · '}
-                  <span className="font-semibold text-[var(--ink-strong)]">
+                  <span className="font-medium text-[var(--ink-strong)]">
                     {translateLabel}
                   </span>
                 </p>
                 <button
                   type="button"
                   onClick={onOpenSettings}
-                  className="mt-1.5 text-[11px] font-semibold text-[var(--brand)] hover:underline"
+                  className="mt-1.5 text-[11px] font-medium text-brand hover:underline"
                 >
                   설정에서 변경
                 </button>
@@ -149,7 +149,7 @@ export function NewMeetingForm({
           <button
             type="submit"
             disabled={isLoading}
-            className="btn-primary inline-flex w-full py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn-primary inline-flex w-full !py-3 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Mic className="h-4 w-4" />
             {isLoading ? '회의를 준비하는 중...' : '회의 시작'}

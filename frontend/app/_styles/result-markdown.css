@@ -1,78 +1,121 @@
-/* ─── Result Markdown Styling ─── */
+/* ─── Result Markdown — editorial document register ─── */
 .result-markdown {
-  color: var(--ink-strong);
-  line-height: 1.75;
-  font-size: 0.92rem;
+  color: var(--ink-subtle);
+  line-height: 1.7;
+  font-size: 0.9375rem;
 }
 
 .result-markdown h1,
 .result-markdown h2,
 .result-markdown h3,
 .result-markdown h4 {
-  font-family: 'Manrope', var(--font-display), sans-serif;
-  margin-top: 1.1em;
-  margin-bottom: 0.45em;
-  line-height: 1.3;
-  font-weight: 700;
+  color: var(--ink-strong);
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  line-height: 1.25;
+  font-weight: 600;
   letter-spacing: -0.02em;
+}
+.result-markdown > :first-child {
+  margin-top: 0;
+}
+.result-markdown h1 { font-size: 1.75rem; }
+.result-markdown h2 { font-size: 1.375rem; }
+.result-markdown h3 { font-size: 1.125rem; }
+.result-markdown h4 { font-size: 1rem; }
+
+.result-markdown h2 {
+  padding-bottom: 0.4em;
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .result-markdown p,
 .result-markdown ul,
 .result-markdown ol,
 .result-markdown table {
-  margin: 0.6em 0;
+  margin: 0.7em 0;
 }
 
-/*
- * Tables follow the No-Line Rule: no 1px borders. Instead we use tonal
- * background alternation — header row with a stronger surface tint +
- * weight, and body rows with subtle zebra striping — so structure is
- * felt through surface hierarchy, not drawn with lines.
- */
+.result-markdown strong {
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+
+.result-markdown a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+}
+
+.result-markdown blockquote {
+  margin: 1em 0;
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 2px solid var(--brand);
+  color: var(--ink-muted);
+}
+
+/* Tables — ledger register: hairline rules, mono numerals */
 .result-markdown table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.88rem;
-  border-radius: 10px;
+  font-size: 0.875rem;
+  border-radius: var(--radius-card);
   overflow: hidden;
   background: var(--bg-card);
+  box-shadow: var(--elevation-sm);
 }
 
 .result-markdown th,
 .result-markdown td {
-  padding: 0.55rem 0.75rem;
+  padding: 0.6rem 0.875rem;
   text-align: left;
+  border-bottom: 1px solid var(--line-soft);
+  font-variant-numeric: tabular-nums;
 }
 
 .result-markdown thead th,
 .result-markdown th {
-  background: var(--surface-container);
-  color: var(--ink-strong);
-  font-weight: 700;
-}
-
-.result-markdown tbody tr:nth-child(even) td {
   background: var(--surface-container-low);
+  color: var(--ink-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.result-markdown tbody tr:nth-child(odd) td {
-  background: var(--bg-card);
+.result-markdown tbody tr:last-child td {
+  border-bottom: none;
 }
 
+/* Code — seafoam-tinted monospace signals "data, not prose" */
 .result-markdown code {
-  border-radius: 6px;
-  background: var(--surface-container-high);
-  padding: 0.1rem 0.35rem;
-  font-family: var(--font-code), 'IBM Plex Mono', monospace;
-  font-size: 0.83em;
+  border-radius: 4px;
+  background: var(--tertiary-fixed);
+  color: var(--tertiary);
+  padding: 0.1rem 0.4rem;
+  font-family: var(--font-mono-brand), 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.8125em;
+  font-feature-settings: 'cv11', 'salt' 2;
 }
 
 .result-markdown pre {
   overflow-x: auto;
-  border-radius: 10px;
-  background: #101d26;
-  color: #ecf3f7;
-  padding: 0.75rem;
+  border-radius: var(--radius-card);
+  background: var(--bg-card);
+  color: var(--color-charcoal);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--elevation-sm);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.result-markdown pre code {
+  background: transparent;
+  color: var(--tertiary);
+  padding: 0;
+  font-size: inherit;
+}
+[data-theme='dark'] .result-markdown pre {
+  color: #e9ecf1;
 }

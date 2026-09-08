@@ -52,11 +52,17 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
       <div className="flex h-full w-full min-h-0 flex-col px-6">
         <header className="bg-transparent py-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">노트 편집기</p>
-            <p className="text-xs text-muted">
+            <div className="flex items-center gap-2.5">
+              <span className="tag-dot tag-dot--navy">Notes</span>
+            </div>
+            <p className="data-mono flex items-center gap-1.5 text-[11px] text-[var(--ink-muted)]">
+              <span
+                className={`inline-block h-1.5 w-1.5 rounded-full ${getSaveDotClass(isSaving, lastSaved)}`}
+                aria-hidden="true"
+              />
               {getSaveStatusLabel(isSaving, lastSaved)}
               {isNearLengthLimit || isOverLength
-                ? ` · ${noteContent.length.toLocaleString()}/${NOTE_MAX_LENGTH.toLocaleString()}자`
+                ? ` · ${noteContent.length.toLocaleString()}/${NOTE_MAX_LENGTH.toLocaleString()}`
                 : ''}
             </p>
           </div>
@@ -77,7 +83,7 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
             `.markdown-wysiwyg` rules in globals.css (transparent defaultUI +
             white-ish toolbar). This ensures the dot-grid is visible around
             the editor without bleeding into the writing surface. */}
-        <div className="min-h-0 flex-1">
+        <div className="surface-card min-h-0 flex-1 overflow-hidden">
           <MarkdownWysiwygEditor
             value={noteContent}
             onChange={setContent}
@@ -88,13 +94,13 @@ export function NoteEditor({ meetingId }: NoteEditorProps) {
 
         {showShortcutHint && (
           <div className="flex items-center justify-between bg-transparent py-2">
-            <p className="text-[11px] text-muted">
-              Cmd+Z 실행취소 · Cmd+Y 다시실행 · Cmd+B 굵게
+            <p className="data-mono text-[11px] text-[var(--ink-muted)]">
+              ⌘Z undo · ⌘Y redo · ⌘B bold
             </p>
             <button
               type="button"
               onClick={dismissShortcutHint}
-              className="rounded-full p-1 text-muted transition hover:bg-black/5"
+              className="btn-icon inline-flex !p-1"
               aria-label="단축키 힌트 닫기"
             >
               <X className="h-3 w-3" />
@@ -136,6 +142,12 @@ function renderNoteBanner({
   }
 
   return null;
+}
+
+function getSaveDotClass(isSaving: boolean, lastSaved: Date | null): string {
+  if (isSaving) return 'bg-[var(--accent)]';
+  if (lastSaved) return 'bg-seafoam';
+  return 'bg-[var(--ink-faint)]';
 }
 
 function getSaveStatusLabel(isSaving: boolean, lastSaved: Date | null): string {

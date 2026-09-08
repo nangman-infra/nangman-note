@@ -110,18 +110,18 @@ export function GuideContent() {
                   <p className="label-sm text-[var(--ink-muted)]">
                     GUIDE
                   </p>
-                  <h1 className="mt-2 font-headline text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
+                  <h1 className="mt-2 font-headline text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
                     사용 가이드
                   </h1>
                   <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--ink-muted)]">
                     회의 시작부터 결과 확인까지, 7단계로 TransNote의 모든 기능을 안내합니다.
                   </p>
                 </div>
-                <div className="grid grid-cols-7 gap-1.5 rounded-2xl bg-white/70 p-2 shadow-sm">
+                <div className="grid grid-cols-7 gap-1.5 rounded-lg bg-white/70 p-2 shadow-sm">
                   {flowSteps.map((step) => (
                     <span
                       key={step.num}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-container-low)] text-[11px] font-bold text-[var(--ink-muted)]"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface-container-low)] text-[11px] font-medium text-[var(--ink-muted)]"
                       aria-label={`${step.num} ${step.title}`}
                     >
                       {step.num}
@@ -143,7 +143,7 @@ export function GuideContent() {
                 {flowSteps.map((step) => (
                   <li key={step.num}>
                     <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm">
-                      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--surface-container-low)] text-[11px] font-bold text-[var(--ink-muted)]">
+                      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--surface-container-low)] text-[11px] font-medium text-[var(--ink-muted)]">
                         {step.num}
                       </span>
                       <span className="truncate font-semibold text-[var(--ink-subtle)]">
@@ -159,14 +159,14 @@ export function GuideContent() {
           <div className="space-y-4">
             {flowSteps.map((step, i) => (
               <ScrollReveal key={step.num} delay={i * 60}>
-                <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[var(--line-soft)]">
+                <section className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-[var(--line-soft)]">
                   <div className="grid gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
                     <div className="flex flex-col p-5 sm:p-6">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--brand)] text-xs font-bold text-white">
+                        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--brand)] text-xs font-medium text-white">
                           {step.num}
                         </span>
-                        <h2 className="font-headline text-xl font-bold tracking-tight text-slate-950">
+                        <h2 className="font-headline text-xl font-medium tracking-tight text-slate-950">
                           {step.title}
                         </h2>
                       </div>
@@ -226,7 +226,7 @@ function EditExportMock() {
 
         {/* 에디터 콘텐츠 */}
         <div className="space-y-1.5 text-[10px]">
-          <p className="font-bold">## 배포 일정 확인</p>
+          <p className="font-medium">## 배포 일정 확인</p>
           <p>3/15 스테이징, 3/18 프로덕션 배포 확정</p>
           <p className="rounded bg-brand/5 px-2 py-1 text-brand">← 여기를 직접 수정할 수 있습니다</p>
         </div>

@@ -64,7 +64,7 @@ export function PromptEditorSidebar({
 
       <section
         aria-labelledby="prompt-ai-tip-heading"
-        className="ai-card-accent rounded-r-xl p-4"
+        className="ai-card-accent rounded-r-lg p-4"
       >
         <header className="mb-3 flex items-center gap-2">
           <Sparkles

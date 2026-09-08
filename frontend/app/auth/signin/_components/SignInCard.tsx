@@ -76,10 +76,10 @@ export function SignInCard({
 
   return (
     <aside className="motion-rise lg:col-span-5">
-      <div className="rounded-2xl bg-white p-6 shadow-xl sm:p-8">
+      <div className="surface-product p-6 sm:p-8">
         <div className="mb-7">
-          <p className="label-sm text-[var(--ink-muted)]">{copy.eyebrow}</p>
-          <h2 className="mt-1 font-headline text-2xl font-extrabold tracking-tight text-[var(--ink-strong)]">
+          <p className="label-sm">{copy.eyebrow}</p>
+          <h2 className="font-headline mt-1.5 text-2xl text-[var(--ink-strong)]">
             {copy.title}
           </h2>
           <p className="mt-1.5 text-sm text-[var(--ink-muted)]">
@@ -88,14 +88,14 @@ export function SignInCard({
         </div>
 
         {errorInfo && (
-          <div className="mb-5 rounded-xl bg-rose-50 px-4 py-3.5" role="alert">
+          <div className="mb-5 rounded-lg border border-[var(--line-soft)] bg-[var(--danger-soft)] px-4 py-3.5 shadow-[inset_3px_0_0_0_var(--danger)]" role="alert">
             <div className="flex gap-2.5">
-              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-600" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--danger)]" />
               <div>
-                <p className="text-xs font-semibold text-rose-800">
+                <p className="text-xs font-medium text-[var(--ink-strong)]">
                   {errorInfo.title}
                 </p>
-                <p className="mt-1 text-[11px] leading-relaxed text-rose-700">
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-subtle)]">
                   {errorInfo.description}
                 </p>
               </div>
@@ -103,7 +103,7 @@ export function SignInCard({
             <button
               type="button"
               onClick={onSsoSignIn}
-              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm transition hover:bg-rose-100"
+              className="btn-neo mt-3 inline-flex w-full !py-2 text-xs"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               다시 시도
@@ -115,7 +115,7 @@ export function SignInCard({
           <div>
             <label
               htmlFor="email"
-              className="label-sm mb-1.5 block text-[var(--ink-muted)]"
+              className="mb-1.5 block text-xs font-medium text-[var(--ink-subtle)]"
             >
               이메일
             </label>
@@ -145,7 +145,7 @@ export function SignInCard({
           <button
             type="submit"
             disabled={emailStatus === 'submitting'}
-            className="btn-primary inline-flex w-full py-3.5 text-base disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-primary inline-flex w-full !py-3 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {emailStatus === 'submitting' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -157,10 +157,10 @@ export function SignInCard({
         </form>
 
         {emailStatus === 'sent' ? (
-          <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3" role="status">
+          <div className="mt-4 rounded-lg border border-[var(--line-soft)] bg-[var(--success-soft)] px-4 py-3 shadow-[inset_3px_0_0_0_var(--success)]" role="status">
             <div className="flex gap-2.5">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
-              <p className="text-xs leading-relaxed text-emerald-800">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--success)]" />
+              <p className="text-xs leading-relaxed text-[var(--ink-subtle)]">
                 입력한 이메일로 로그인 링크를 보냈습니다. 메일함에서 링크를
                 열면 TransNote로 돌아옵니다.
               </p>
@@ -169,10 +169,10 @@ export function SignInCard({
         ) : null}
 
         {emailStatus === 'error' ? (
-          <div className="mt-4 rounded-xl bg-rose-50 px-4 py-3" role="alert">
+          <div className="mt-4 rounded-lg border border-[var(--line-soft)] bg-[var(--danger-soft)] px-4 py-3 shadow-[inset_3px_0_0_0_var(--danger)]" role="alert">
             <div className="flex gap-2.5">
-              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-600" />
-              <p className="text-xs leading-relaxed text-rose-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--danger)]" />
+              <p className="text-xs leading-relaxed text-[var(--ink-subtle)]">
                 메일 발송을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.
               </p>
             </div>
@@ -181,29 +181,27 @@ export function SignInCard({
 
         <div className="my-6 flex items-center gap-3">
           <div className="h-px flex-1 bg-[var(--line-soft)]" />
-          <span className="text-[11px] font-semibold text-[var(--ink-muted)]">
-            또는
-          </span>
+          <span className="label-sm">or</span>
           <div className="h-px flex-1 bg-[var(--line-soft)]" />
         </div>
 
         <button
           type="button"
           onClick={onSsoSignIn}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--surface-container-low)] px-4 py-3 text-sm font-bold text-[var(--brand)] transition hover:bg-[var(--surface-container-high)]"
+          className="btn-secondary inline-flex w-full !py-3"
         >
           <Lock className="h-4 w-4" />
           낭만 계정으로 로그인
         </button>
 
-        <div className="mt-4 rounded-xl bg-indigo-50 px-4 py-3">
+        <div className="surface-tonal mt-4 border border-[var(--line-soft)] px-4 py-3">
           <div className="flex gap-2.5">
-            <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-indigo-600" />
+            <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-seafoam-deep" strokeWidth={1.75} />
             <div>
-              <p className="text-xs font-semibold text-indigo-800">
+              <p className="text-xs font-medium text-[var(--ink-strong)]">
                 비밀번호 없는 로그인
               </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-indigo-700">
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
                 이름과 비밀번호는 받지 않습니다. 이메일은 로그인 링크 발송과
                 계정 식별에만 사용합니다.
               </p>
@@ -215,7 +213,7 @@ export function SignInCard({
           {copy.switchLabel}{' '}
           <Link
             href={copy.switchHref}
-            className="inline-flex items-center gap-1 font-bold text-indigo-700 hover:underline"
+            className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
           >
             {copy.switchAction}
             <ArrowRight className="h-3 w-3" />
@@ -226,14 +224,14 @@ export function SignInCard({
           로그인 시{' '}
           <Link
             href="/legal/terms"
-            className="font-semibold text-indigo-700 hover:underline"
+            className="font-medium text-brand hover:underline"
           >
             서비스 이용 약관
           </Link>
           과{' '}
           <Link
             href="/legal/privacy"
-            className="font-semibold text-indigo-700 hover:underline"
+            className="font-medium text-brand hover:underline"
           >
             개인정보 처리방침
           </Link>
@@ -241,7 +239,7 @@ export function SignInCard({
         </p>
       </div>
 
-      <p className="mt-5 text-center text-[11px] text-[var(--ink-muted)]">
+      <p className="data-mono mt-5 text-center text-[11px] text-[var(--ink-muted)]">
         © 낭만 인프라 · TransNote v1.0
       </p>
     </aside>

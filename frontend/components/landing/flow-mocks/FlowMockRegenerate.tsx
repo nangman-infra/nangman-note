@@ -37,7 +37,7 @@ export function FlowMockRegenerate() {
         </div>
 
         {/* 재생성 버튼 */}
-        <div className="flex items-center justify-center gap-2 rounded-xl bg-brand py-2.5 font-semibold text-white">
+        <div className="flex items-center justify-center gap-2 rounded-lg bg-brand py-2.5 font-semibold text-white">
           <RefreshCw className="h-3.5 w-3.5" />
           이 프롬프트로 재생성
         </div>

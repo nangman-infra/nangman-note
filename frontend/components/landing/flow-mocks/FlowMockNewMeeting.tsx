@@ -52,7 +52,7 @@ export function FlowMockNewMeeting() {
         </div>
 
         {/* 시작 버튼 */}
-        <div className="flex items-center justify-center gap-2 rounded-xl bg-brand py-2.5 font-semibold text-white">
+        <div className="flex items-center justify-center gap-2 rounded-lg bg-brand py-2.5 font-semibold text-white">
           <Mic className="h-3.5 w-3.5" />
           회의 시작
         </div>

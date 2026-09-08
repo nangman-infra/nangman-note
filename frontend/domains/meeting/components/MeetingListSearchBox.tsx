@@ -84,7 +84,7 @@ export function MeetingListSearchBox({
           }
           aria-autocomplete="list"
           aria-haspopup="listbox"
-          className={`input-shell h-10 rounded-full text-sm !pl-10 !pr-8 ${
+          className={`input-shell h-10 text-sm !pl-10 !pr-8 ${
             showTrash ? 'bg-slate-100 opacity-60 cursor-not-allowed' : ''
           }`}
           disabled={showTrash}
@@ -95,7 +95,7 @@ export function MeetingListSearchBox({
             type="button"
             aria-label="검색어 지우기"
             onClick={onClearSearch}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-[var(--ink-muted)] transition hover:bg-slate-100"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-[4px] p-0.5 text-[var(--ink-muted)] transition hover:bg-[var(--surface-container)]"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -106,7 +106,7 @@ export function MeetingListSearchBox({
             id="meeting-search-listbox"
             role="listbox"
             aria-label="추천 검색어"
-            className="surface-card absolute z-30 mt-2 w-full overflow-hidden bg-white/95 p-1.5 shadow-[0_14px_28px_rgba(18,33,43,0.15)]"
+            className="surface-card absolute z-30 mt-2 w-full overflow-hidden bg-white p-1.5 !shadow-[var(--elevation-md)]"
           >
             <div className="mb-1 flex items-center justify-between px-2 py-1">
               <p className="text-[11px] font-semibold tracking-wide text-muted">
@@ -165,7 +165,7 @@ export function MeetingListSearchBox({
             }
             disabled={showTrash}
             aria-label="검색 범위"
-            className="input-shell h-10 shrink-0 rounded-full !px-3 text-xs font-semibold disabled:opacity-60"
+            className="btn-neo inline-flex h-10 shrink-0 !px-3 text-xs disabled:opacity-60"
           >
             {MEETING_SEARCH_SCOPE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>

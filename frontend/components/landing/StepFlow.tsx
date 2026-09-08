@@ -38,7 +38,7 @@ export function StepFlow() {
           <p className="text-center text-xs font-semibold tracking-widest text-muted">
             HOW IT WORKS
           </p>
-          <h2 className="mt-2 text-center text-2xl font-bold sm:text-3xl">
+          <h2 className="mt-2 text-center text-2xl font-medium sm:text-3xl">
             3단계로 완성되는 회의록
           </h2>
         </ScrollReveal>
@@ -50,10 +50,10 @@ export function StepFlow() {
           {steps.map((step, i) => (
             <ScrollReveal key={step.num} delay={i * 120}>
               <div className="surface-card relative flex flex-col items-center p-6 text-center transition hover:-translate-y-1 hover:border-[var(--line-strong)]">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${step.color}`}>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${step.color}`}>
                   <step.icon className="h-6 w-6" />
                 </div>
-                <span className="mt-3 text-[11px] font-bold tracking-widest text-muted">
+                <span className="mt-3 text-[11px] font-medium tracking-widest text-muted">
                   STEP {step.num}
                 </span>
                 <h3 className="mt-1 text-lg font-semibold">{step.title}</h3>
@@ -66,7 +66,7 @@ export function StepFlow() {
         </div>
 
         <ScrollReveal delay={400}>
-          <div className="mx-auto mt-10 max-w-2xl rounded-2xl border border-[var(--line-soft)] bg-white/60 p-5 text-center">
+          <div className="mx-auto mt-10 max-w-2xl rounded-lg border border-[var(--line-soft)] bg-white/60 p-5 text-center">
             <p className="text-sm text-muted">
               💡 문서의 기본 구조는 유지하면서, <span className="font-semibold text-foreground">어떤 부분을 강조할지 직접 조정</span>할 수 있습니다.
               같은 회의를 다른 관점으로 다시 정리하는 것도 가능합니다.

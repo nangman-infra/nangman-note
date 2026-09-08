@@ -62,8 +62,8 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
       {/* Compact layout: visible on screens ≤1024px (lg breakpoint), hidden on desktop */}
       <div className="h-dvh bg-[var(--bg-root)] p-3 lg:hidden">
         {/* Mobile top bar */}
-        <header className="mb-3 flex items-center justify-between rounded-xl bg-slate-50/80 px-4 py-2.5 shadow-sm backdrop-blur-xl motion-rise">
-          <span className="font-headline text-sm font-extrabold tracking-tighter text-indigo-700">TransNote</span>
+        <header className="mb-3 flex items-center justify-between rounded-lg bg-slate-50/80 px-4 py-2.5 shadow-sm backdrop-blur-xl motion-rise">
+          <span className="font-headline text-sm font-semibold tracking-tighter text-indigo-700">TransNote</span>
           <div className="inline-flex rounded-lg bg-[var(--surface-container-low)] p-1">
             <button
               type="button"
@@ -122,7 +122,7 @@ export function ThreeColumnLayout({ sidebar, list, viewer }: ThreeColumnLayoutPr
         <div className="grid h-full grid-cols-[64px_300px_minmax(500px,1fr)] xl:grid-cols-[280px_360px_minmax(0,1fr)] gap-4">
           <aside
             aria-label="사이드바 네비게이션"
-            className="overflow-hidden rounded-2xl bg-slate-100 motion-rise"
+            className="overflow-hidden rounded-lg bg-slate-100 motion-rise"
           >
             <ErrorBoundary>{sidebar}</ErrorBoundary>
           </aside>

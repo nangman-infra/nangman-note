@@ -18,10 +18,10 @@ export function FlowMockManage() {
     <div className="surface-card overflow-hidden text-[11px]">
       {/* ── 헤더: eyebrow + Manrope 헤드라인 ── */}
       <header className="px-3 pb-2 pt-3">
-        <p className="text-[8px] font-bold uppercase tracking-widest text-[var(--ink-muted)]">
+        <p className="text-[8px] font-medium uppercase tracking-widest text-[var(--ink-muted)]">
           Prompt Management
         </p>
-        <h2 className="mt-0.5 font-headline text-[14px] font-extrabold leading-tight tracking-tight text-slate-900">
+        <h2 className="mt-0.5 font-headline text-[14px] font-semibold leading-tight tracking-tight text-slate-900">
           프롬프트 관리
         </h2>
       </header>
@@ -29,7 +29,7 @@ export function FlowMockManage() {
       {/* ── System Library: 3열 템플릿 카드 그리드 ── */}
       <section className="px-3 pb-3">
         <div className="mb-1.5 flex items-baseline justify-between">
-          <p className="text-[8px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+          <p className="text-[8px] font-medium uppercase tracking-wider text-[var(--ink-muted)]">
             System Library
           </p>
           <span className="text-[8px] font-semibold text-[var(--ink-muted)]">
@@ -63,7 +63,7 @@ export function FlowMockManage() {
 
       {/* ── Template Editor: 기본값 설정 (tonal surface-container-low) ── */}
       <section className="bg-[var(--surface-container-low)] px-3 py-2.5">
-        <p className="mb-1.5 text-[8px] font-bold uppercase tracking-wider text-[var(--ink-muted)]">
+        <p className="mb-1.5 text-[8px] font-medium uppercase tracking-wider text-[var(--ink-muted)]">
           Template Editor
         </p>
         <div className="space-y-1.5">
@@ -106,7 +106,7 @@ function TemplateMiniCard({
       >
         <Icon className="h-3 w-3" />
       </span>
-      <p className="mt-1.5 font-headline text-[10px] font-bold leading-tight tracking-tight text-slate-900">
+      <p className="mt-1.5 font-headline text-[10px] font-medium leading-tight tracking-tight text-slate-900">
         {name}
       </p>
       <p className="mt-0.5 line-clamp-1 text-[8px] leading-snug text-[var(--ink-subtle)]">
@@ -116,7 +116,7 @@ function TemplateMiniCard({
         <span className="text-[7px] font-semibold uppercase tracking-widest text-[var(--ink-muted)]">
           {typeLabel}
         </span>
-        <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-brand">
+        <span className="inline-flex items-center gap-0.5 text-[8px] font-medium text-brand">
           <Edit3 className="h-2 w-2" aria-hidden="true" />
           Edit
         </span>
