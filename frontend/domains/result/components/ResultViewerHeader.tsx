@@ -154,7 +154,7 @@ export function ResultViewerHeader({
         <div>
           <dt className="label-sm">진행 시간</dt>
           <dd className="font-headline mt-0.5 text-[22px] text-[var(--ink-strong)]">
-            {Math.round(result.metadata.totalDuration / 60)}m
+            {Math.round(result.metadata.totalDuration / 60)}분
           </dd>
         </div>
       </dl>

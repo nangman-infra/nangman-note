@@ -71,7 +71,8 @@ export function TwoColumnLayout({
                 <div className="min-w-0 flex-1 truncate text-xs text-[var(--ink-muted)]">{breadcrumb}</div>
               ) : null}
             </div>
-            <div className="inline-flex flex-shrink-0 rounded-lg border border-[var(--line-soft)] bg-[var(--surface-container-low)] p-0.5">
+            {showViewer ? (
+            <div className="inline-flex flex-shrink-0 rounded-lg bg-[var(--surface-container-low)] p-0.5">
               <button
                 type="button"
                 onClick={() => setActiveView('dashboard')}
@@ -94,6 +95,7 @@ export function TwoColumnLayout({
                 문서
               </button>
             </div>
+            ) : null}
           </div>
           {mobileNavigation ? <div className="mt-2">{mobileNavigation}</div> : null}
         </header>
