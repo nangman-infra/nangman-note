@@ -26,6 +26,7 @@ import { TranscriptionUploadEntity } from '../../transcription/domain/transcript
 import { TranscriptionUploadStatus } from '../../transcription/domain/transcription-upload-status.enum';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { ListMeetingsQueryDto } from './dto/list-meetings-query.dto';
+import type { MeetingStatsDto } from './dto/meeting-stats.dto';
 import { SearchMeetingsQueryDto } from './dto/search-meetings-query.dto';
 import { UpdateMeetingDto } from './dto/update-meeting.dto';
 import { StructuredLogger } from '../../../shared/logging/structured-logger';
@@ -124,6 +125,74 @@ export class MeetingService {
         limit,
         total,
       },
+    };
+  }
+
+  /**
+   * 대시보드 집계. 목록 API는 페이지 단위(기본 50개)라 클라이언트에서 합산하면
+   * 로드된 창(window)만 반영된다. 여기서는 소유자의 전체 회의를 한 번에 읽어
+   * 상태별 개수·총 전사 시간·최근 7일 분포를 서버에서 계산한다.
+   * DB 엔진(sqlite/postgres)에 무관하도록 날짜 연산은 애플리케이션에서 수행한다.
+   */
+  async stats(ownerSub?: string): Promise<MeetingStatsDto> {
+    const rows = await this.meetingRepository.find({
+      where: ownerSub ? { ownerSub } : undefined,
+      select: { status: true, startedAt: true, endedAt: true },
+    });
+
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const weekly = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(todayStart);
+      date.setDate(todayStart.getDate() - (6 - index));
+      return { date: formatLocalDate(date), count: 0 };
+    });
+    const oldestStart = new Date(todayStart);
+    oldestStart.setDate(todayStart.getDate() - 6);
+
+    let recordingMeetings = 0;
+    let processingMeetings = 0;
+    let completedMeetings = 0;
+    let totalTranscribedMs = 0;
+
+    for (const row of rows) {
+      if (row.status === MeetingStatus.RECORDING) recordingMeetings += 1;
+      if (row.status === MeetingStatus.PROCESSING) processingMeetings += 1;
+      if (row.status === MeetingStatus.COMPLETED) completedMeetings += 1;
+
+      const startedAt = toDate(row.startedAt);
+      const endedAt = toDate(row.endedAt);
+      if (startedAt && endedAt) {
+        const delta = endedAt.getTime() - startedAt.getTime();
+        if (delta > 0) totalTranscribedMs += delta;
+      }
+
+      if (startedAt && startedAt >= oldestStart) {
+        const dayStart = new Date(
+          startedAt.getFullYear(),
+          startedAt.getMonth(),
+          startedAt.getDate(),
+        );
+        const diffDays = Math.round(
+          (dayStart.getTime() - oldestStart.getTime()) / MS_PER_DAY,
+        );
+        if (diffDays >= 0 && diffDays < weekly.length) {
+          weekly[diffDays].count += 1;
+        }
+      }
+    }
+
+    return {
+      totalMeetings: rows.length,
+      recordingMeetings,
+      processingMeetings,
+      completedMeetings,
+      totalTranscribedSeconds: Math.round(totalTranscribedMs / 1000),
+      weekly,
     };
   }
 
@@ -1026,4 +1095,19 @@ export class MeetingService {
     });
     return updated;
   }
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatLocalDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }

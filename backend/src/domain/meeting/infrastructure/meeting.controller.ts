@@ -38,6 +38,12 @@ export class MeetingController {
     return this.meetingService.list(query, user?.sub);
   }
 
+  /** 대시보드 집계 — 페이지네이션과 무관한 전체 기준 통계 */
+  @Get('stats')
+  async stats(@CurrentUser() user?: AuthUser) {
+    return this.meetingService.stats(user?.sub);
+  }
+
   @Get('trash')
   async listTrash(
     @Query() query: ListMeetingsQueryDto,

@@ -1,5 +1,11 @@
 import { apiClient } from '@/lib/api/client';
-import type { Meeting, CreateMeetingDto, SearchResult } from '../types/meeting.types';
+import type {
+  Meeting,
+  MeetingPage,
+  MeetingStats,
+  CreateMeetingDto,
+  SearchResult,
+} from '../types/meeting.types';
 import { MeetingTranscriptionMode } from '../types/meeting.types';
 
 interface CompleteMeetingOptions {
@@ -14,13 +20,25 @@ export const meetingApi = {
     return response.data.data;
   },
 
+  // 회의 목록 조회 (서버 전체 개수 포함)
+  listPage: async (params?: { page?: number; limit?: number }): Promise<MeetingPage> => {
+    const response = await apiClient.get<{
+      data: { meetings: Meeting[]; pagination?: { total?: number } };
+    }>('/api/v1/meetings', { params });
+    const { meetings, pagination } = response.data.data;
+    return { meetings, total: pagination?.total ?? meetings.length };
+  },
+
   // 회의 목록 조회
   list: async (params?: { page?: number; limit?: number }): Promise<Meeting[]> => {
-    const response = await apiClient.get<{ data: { meetings: Meeting[] } }>(
-      '/api/v1/meetings',
-      { params }
-    );
-    return response.data.data.meetings;
+    const page = await meetingApi.listPage(params);
+    return page.meetings;
+  },
+
+  // 대시보드 집계 — 로드된 페이지가 아니라 전체 회의 기준
+  stats: async (): Promise<MeetingStats> => {
+    const response = await apiClient.get<{ data: MeetingStats }>('/api/v1/meetings/stats');
+    return response.data.data;
   },
 
   // 휴지통 회의 목록 조회

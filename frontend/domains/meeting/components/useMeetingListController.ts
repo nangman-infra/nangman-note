@@ -61,6 +61,7 @@ export function useMeetingListController({
   const {
     meetings,
     trashMeetings,
+    meetingsTotal,
     hasMoreMeetings,
     isLoadingMore,
     isLoading,
@@ -232,13 +233,15 @@ export function useMeetingListController({
 
   useEffect(() => {
     onMeetingsLoaded?.({
-      total: meetings.length,
+      // 서버 total 우선 — 로드된 페이지 창 크기(50)가 전체 개수로 보이지 않게 한다.
+      total: meetingsTotal ?? meetings.length,
       isLoading: isLoading || isInitialLoadPending,
       isSearchApplied: search.isSearchApplied,
       showTrash,
     });
   }, [
     meetings.length,
+    meetingsTotal,
     isLoading,
     isInitialLoadPending,
     search.isSearchApplied,

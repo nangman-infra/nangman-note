@@ -225,6 +225,68 @@ describe('MeetingService', () => {
     });
   });
 
+  describe('stats', () => {
+    it('aggregates counts, transcribed duration and a 7-day distribution over every meeting of the owner', async () => {
+      const now = new Date();
+      const today = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        10,
+      );
+      const twoDaysAgo = new Date(today);
+      twoDaysAgo.setDate(today.getDate() - 2);
+      const tenDaysAgo = new Date(today);
+      tenDaysAgo.setDate(today.getDate() - 10);
+
+      meetingRepository.find.mockResolvedValue([
+        buildMeeting({
+          status: MeetingStatus.COMPLETED,
+          startedAt: today,
+          endedAt: new Date(today.getTime() + 30 * 60 * 1000),
+        }),
+        buildMeeting({
+          status: MeetingStatus.COMPLETED,
+          startedAt: twoDaysAgo,
+          endedAt: new Date(twoDaysAgo.getTime() + 45 * 60 * 1000),
+        }),
+        buildMeeting({ status: MeetingStatus.RECORDING, startedAt: today }),
+        buildMeeting({
+          status: MeetingStatus.PROCESSING,
+          startedAt: tenDaysAgo,
+          endedAt: new Date(tenDaysAgo.getTime() + 15 * 60 * 1000),
+        }),
+      ]);
+
+      const stats = await service.stats('owner-1');
+
+      expect(meetingRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { ownerSub: 'owner-1' } }),
+      );
+      expect(stats.totalMeetings).toBe(4);
+      expect(stats.completedMeetings).toBe(2);
+      expect(stats.recordingMeetings).toBe(1);
+      expect(stats.processingMeetings).toBe(1);
+      expect(stats.totalTranscribedSeconds).toBe((30 + 45 + 15) * 60);
+      expect(stats.weekly).toHaveLength(7);
+      expect(stats.weekly[6].count).toBe(2);
+      expect(stats.weekly[4].count).toBe(1);
+      expect(stats.weekly.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(
+        3,
+      );
+    });
+
+    it('returns zeroed stats when the owner has no meetings', async () => {
+      meetingRepository.find.mockResolvedValue([]);
+
+      const stats = await service.stats('owner-1');
+
+      expect(stats.totalMeetings).toBe(0);
+      expect(stats.totalTranscribedSeconds).toBe(0);
+      expect(stats.weekly.every((bucket) => bucket.count === 0)).toBe(true);
+    });
+  });
+
   describe('create', () => {
     it('uses default prompt id and batch mode when optional fields are omitted', async () => {
       const created = buildMeeting({

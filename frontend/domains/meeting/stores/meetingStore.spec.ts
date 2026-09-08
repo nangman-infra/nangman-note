@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { meetingApi } from '../api/meetingApi';
-import { MeetingStatus, MeetingTranscriptionMode, type Meeting } from '../types/meeting.types';
+import { MeetingStatus, MeetingTranscriptionMode, type Meeting, type MeetingPage } from '../types/meeting.types';
 import { useMeetingStore } from './meetingStore';
 
 vi.mock('../api/meetingApi', () => ({
   meetingApi: {
     create: vi.fn(),
     list: vi.fn(),
+    listPage: vi.fn(),
+    stats: vi.fn(),
     listTrash: vi.fn(),
     search: vi.fn(),
     get: vi.fn(),
@@ -48,9 +50,13 @@ describe('useMeetingStore', () => {
       elapsedTime: 0,
       meetings: [],
       trashMeetings: [],
+      meetingsTotal: null,
+      stats: null,
       isLoading: false,
       error: null,
     });
+    // 기본: 집계 API는 조용히 실패 — 각 테스트가 필요하면 덮어쓴다.
+    vi.mocked(meetingApi.stats).mockRejectedValue(new Error('stats unavailable'));
   });
 
   it('startMeeting stores created meeting and sets recording state', async () => {
@@ -145,11 +151,46 @@ describe('useMeetingStore', () => {
 
   it('loads meeting list from API', async () => {
     const meetings = [buildMeeting({ id: 'meeting-1' }), buildMeeting({ id: 'meeting-2' })];
-    vi.mocked(meetingApi.list).mockResolvedValue(meetings);
+    vi.mocked(meetingApi.listPage).mockResolvedValue({ meetings, total: 2 });
 
     await useMeetingStore.getState().fetchMeetings();
 
     expect(useMeetingStore.getState().meetings).toEqual(meetings);
+    expect(useMeetingStore.getState().error).toBeNull();
+  });
+
+  it('exposes the server total and derives hasMore from it instead of the page window', async () => {
+    const page = Array.from({ length: 50 }, (_, index) => buildMeeting({ id: `meeting-${index}` }));
+    vi.mocked(meetingApi.listPage).mockResolvedValue({ meetings: page, total: 120 });
+
+    await useMeetingStore.getState().fetchMeetings();
+
+    expect(useMeetingStore.getState().meetingsTotal).toBe(120);
+    expect(useMeetingStore.getState().hasMoreMeetings).toBe(true);
+  });
+
+  it('stores dashboard stats fetched alongside the list and tolerates stats failures', async () => {
+    vi.mocked(meetingApi.listPage).mockResolvedValue({
+      meetings: [buildMeeting({ id: 'meeting-1' })],
+      total: 1,
+    });
+    vi.mocked(meetingApi.stats).mockResolvedValue({
+      totalMeetings: 1,
+      recordingMeetings: 0,
+      processingMeetings: 0,
+      completedMeetings: 1,
+      totalTranscribedSeconds: 1800,
+      weekly: Array.from({ length: 7 }, () => ({ date: '2026-03-01', count: 0 })),
+    });
+
+    await useMeetingStore.getState().fetchMeetings();
+    await vi.waitFor(() => {
+      expect(useMeetingStore.getState().stats?.totalTranscribedSeconds).toBe(1800);
+    });
+
+    vi.mocked(meetingApi.stats).mockRejectedValueOnce(new Error('stats down'));
+    await useMeetingStore.getState().fetchStats();
+    expect(useMeetingStore.getState().stats?.totalTranscribedSeconds).toBe(1800);
     expect(useMeetingStore.getState().error).toBeNull();
   });
 
@@ -180,8 +221,8 @@ describe('useMeetingStore', () => {
   });
 
   it('does not let an old list response replace a newer search', async () => {
-    const list = deferred<Meeting[]>();
-    vi.mocked(meetingApi.list).mockReturnValue(list.promise);
+    const list = deferred<MeetingPage>();
+    vi.mocked(meetingApi.listPage).mockReturnValue(list.promise);
     vi.mocked(meetingApi.search).mockResolvedValue([
       {
         meetingId: 'search-result',
@@ -196,7 +237,7 @@ describe('useMeetingStore', () => {
 
     const listing = useMeetingStore.getState().fetchMeetings();
     await useMeetingStore.getState().searchMeetings('current query');
-    list.resolve([buildMeeting({ id: 'stale-list' })]);
+    list.resolve({ meetings: [buildMeeting({ id: 'stale-list' })], total: 1 });
     await listing;
 
     expect(useMeetingStore.getState().meetings[0]?.id).toBe('search-result');
@@ -227,20 +268,20 @@ describe('useMeetingStore', () => {
   });
 
   it('clears load-more state when a silent refresh makes its response stale', async () => {
-    const loadMore = deferred<Meeting[]>();
+    const loadMore = deferred<MeetingPage>();
     useMeetingStore.setState({
       meetings: [buildMeeting({ id: 'meeting-1' })],
       meetingsPage: 1,
       hasMoreMeetings: true,
       isLoadingMore: false,
     });
-    vi.mocked(meetingApi.list)
+    vi.mocked(meetingApi.listPage)
       .mockReturnValueOnce(loadMore.promise)
-      .mockResolvedValueOnce([buildMeeting({ id: 'meeting-refreshed' })]);
+      .mockResolvedValueOnce({ meetings: [buildMeeting({ id: 'meeting-refreshed' })], total: 1 });
 
     const loadingMore = useMeetingStore.getState().loadMoreMeetings();
     await useMeetingStore.getState().fetchMeetings({ silent: true });
-    loadMore.resolve([buildMeeting({ id: 'meeting-older' })]);
+    loadMore.resolve({ meetings: [buildMeeting({ id: 'meeting-older' })], total: 2 });
     await loadingMore;
 
     expect(useMeetingStore.getState().isLoadingMore).toBe(false);

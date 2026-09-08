@@ -30,6 +30,8 @@ export function useMeetings() {
   const {
     meetings,
     trashMeetings,
+    meetingsTotal,
+    stats,
     hasMoreMeetings,
     isLoadingMore,
     isLoading,
@@ -37,6 +39,7 @@ export function useMeetings() {
     hasLoadedTrashMeetings,
     error,
     fetchMeetings,
+    fetchStats,
     loadMoreMeetings,
     fetchTrashMeetings,
     searchMeetings,
@@ -53,6 +56,8 @@ export function useMeetings() {
   return {
     meetings,
     trashMeetings,
+    meetingsTotal,
+    stats,
     hasMoreMeetings,
     isLoadingMore,
     isLoading,
@@ -60,6 +65,7 @@ export function useMeetings() {
     hasLoadedTrashMeetings,
     error,
     fetchMeetings,
+    fetchStats,
     loadMoreMeetings,
     fetchTrashMeetings,
     searchMeetings,

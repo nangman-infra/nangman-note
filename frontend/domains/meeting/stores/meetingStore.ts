@@ -6,11 +6,13 @@ import { MeetingProcessingPhase } from '../types/meeting-processing-phase.enum';
 import {
   type CreateMeetingDto,
   type Meeting,
+  type MeetingStats,
   type SearchResult,
 } from '../types/meeting.types';
 
 let latestCollectionRequestSeq = 0;
 let latestLoadMoreRequestSeq = 0;
+let latestStatsRequestSeq = 0;
 
 interface BulkResult {
   succeeded: string[];
@@ -23,6 +25,10 @@ interface MeetingState {
   elapsedTime: number;
   meetings: Meeting[];
   trashMeetings: Meeting[];
+  /** 서버가 보유한 전체 회의 수 (페이지네이션과 무관). 아직 모르면 null */
+  meetingsTotal: number | null;
+  /** 대시보드 집계 (전체 기준). 아직 로드 전이면 null */
+  stats: MeetingStats | null;
   /** 서버에 더 불러올 이전 회의가 남아 있는지 */
   hasMoreMeetings: boolean;
   /** 현재까지 로드한 서버 페이지 수 */
@@ -41,6 +47,8 @@ interface MeetingState {
   }) => Promise<boolean>;
   updatePrompt: (promptId: string) => Promise<Meeting | null>;
   fetchMeetings: (options?: { silent?: boolean }) => Promise<void>;
+  /** 대시보드 집계 갱신. 실패해도 목록에는 영향 주지 않는다. */
+  fetchStats: () => Promise<void>;
   /** 다음 페이지의 이전 회의를 이어서 로드 (서버 페이지네이션) */
   loadMoreMeetings: () => Promise<void>;
   fetchTrashMeetings: (options?: { silent?: boolean }) => Promise<void>;
@@ -103,6 +111,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   elapsedTime: 0,
   meetings: [],
   trashMeetings: [],
+  meetingsTotal: null,
+  stats: null,
   hasMoreMeetings: false,
   meetingsPage: 1,
   isLoadingMore: false,
@@ -178,17 +188,19 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       // 첫 페이지만 새 응답에 섞으면 삭제된 tail 회의를 구분할 수 없어
       // 유령 항목으로 남는다.
       const loadedPageCount = options?.silent ? get().meetingsPage : 1;
+      // 집계는 목록과 함께 갱신하되, 실패해도 목록을 막지 않는다.
+      void get().fetchStats();
       const pages = await Promise.all(
         Array.from({ length: loadedPageCount }, (_, index) =>
-          meetingApi.list({
+          meetingApi.listPage({
             page: index + 1,
             limit: MEETINGS_PAGE_SIZE,
           }),
         ),
       );
       if (requestSeq !== latestCollectionRequestSeq) return;
-      const meetings = pages.flat();
-      const lastPage = pages[pages.length - 1] ?? [];
+      const meetings = pages.flatMap((page) => page.meetings);
+      const total = pages[0]?.total ?? meetings.length;
       set((state) => {
         const seenIds = new Set<string>();
         const uniqueMeetings = meetings.filter((meeting) => {
@@ -199,7 +211,9 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
 
         return {
           meetings: uniqueMeetings,
-          hasMoreMeetings: lastPage.length === MEETINGS_PAGE_SIZE,
+          meetingsTotal: total,
+          // 서버 total 기준 — "마지막 페이지가 꽉 찼는지" 추정보다 정확하다.
+          hasMoreMeetings: uniqueMeetings.length < total,
           meetingsPage: options?.silent ? loadedPageCount : 1,
           error: null,
           isLoading: shouldShowLoading ? false : state.isLoading,
@@ -217,6 +231,17 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     }
   },
 
+  fetchStats: async () => {
+    const requestSeq = ++latestStatsRequestSeq;
+    try {
+      const stats = await meetingApi.stats();
+      if (requestSeq !== latestStatsRequestSeq) return;
+      set({ stats, meetingsTotal: stats.totalMeetings });
+    } catch {
+      // 집계 실패는 조용히 무시 — 목록/카드는 계속 동작해야 한다.
+    }
+  },
+
   loadMoreMeetings: async () => {
     const { meetingsPage, isLoadingMore, hasMoreMeetings } = get();
     if (isLoadingMore || !hasMoreMeetings) return;
@@ -226,7 +251,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     try {
       set({ isLoadingMore: true });
       const nextPage = meetingsPage + 1;
-      const older = await meetingApi.list({
+      const { meetings: older, total } = await meetingApi.listPage({
         page: nextPage,
         limit: MEETINGS_PAGE_SIZE,
       });
@@ -234,10 +259,12 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       set((state) => {
         const existingIds = new Set(state.meetings.map((meeting) => meeting.id));
         const appended = older.filter((meeting) => !existingIds.has(meeting.id));
+        const merged = [...state.meetings, ...appended];
         return {
-          meetings: [...state.meetings, ...appended],
+          meetings: merged,
+          meetingsTotal: total,
           meetingsPage: nextPage,
-          hasMoreMeetings: older.length === MEETINGS_PAGE_SIZE,
+          hasMoreMeetings: merged.length < total && older.length > 0,
           isLoadingMore: false,
         };
       });
@@ -309,6 +336,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         trashMeetings: state.trashMeetings.filter((meeting) => meeting.id !== id),
         isLoading: false,
       }));
+      void get().fetchStats();
       return true;
     } catch (error) {
       set({
@@ -327,6 +355,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         trashMeetings: state.trashMeetings.filter((meeting) => meeting.id !== id),
         isLoading: false,
       }));
+      void get().fetchStats();
       return true;
     } catch (error) {
       set({
@@ -345,6 +374,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         trashMeetings: state.trashMeetings.filter((meeting) => meeting.id !== id),
         isLoading: false,
       }));
+      void get().fetchStats();
       return true;
     } catch (error) {
       set({
@@ -364,6 +394,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         meetings: state.meetings.filter((m) => !succeededSet.has(m.id)),
         isLoading: false,
       }));
+      void get().fetchStats();
       return result;
     } catch (error) {
       set({
@@ -383,6 +414,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         trashMeetings: state.trashMeetings.filter((m) => !succeededSet.has(m.id)),
         isLoading: false,
       }));
+      void get().fetchStats();
       return result;
     } catch (error) {
       set({
@@ -402,6 +434,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         trashMeetings: state.trashMeetings.filter((m) => !succeededSet.has(m.id)),
         isLoading: false,
       }));
+      void get().fetchStats();
       return result;
     } catch (error) {
       set({

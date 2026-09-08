@@ -263,26 +263,24 @@ function MeetingListWithAutoSwitch({
 /* Live Ledger Widget — floating "transaction widget" for the hero    */
 /* ================================================================== */
 
+/**
+ * 대시보드 집계 — 서버 `/meetings/stats`(전체 기준)를 우선 사용하고,
+ * 아직 응답 전이면 로드된 목록으로 임시 계산한다(페이지 창 크기 50에 갇히지 않게).
+ */
 function useMeetingAggregates() {
-  const { meetings } = useMeetings();
+  const { meetings, stats } = useMeetings();
 
-  return useMemo(() => {
+  const fallback = useMemo(() => {
     let totalMs = 0;
     let completed = 0;
     let recording = 0;
     let processing = 0;
-    let latest: (typeof meetings)[number] | null = null;
 
     for (const meeting of meetings) {
       if (!meeting) continue;
       if (meeting.status === 'completed') completed += 1;
       if (meeting.status === 'recording') recording += 1;
       if (meeting.status === 'processing') processing += 1;
-      if (meeting.startedAt) {
-        if (!latest || new Date(meeting.startedAt) > new Date(latest.startedAt)) {
-          latest = meeting;
-        }
-      }
       if (!meeting.startedAt || !meeting.endedAt) continue;
       const start = new Date(meeting.startedAt).getTime();
       const end = new Date(meeting.endedAt).getTime();
@@ -291,14 +289,37 @@ function useMeetingAggregates() {
       if (delta > 0) totalMs += delta;
     }
 
-    return {
-      totalHours: totalMs / (1000 * 60 * 60),
-      completed,
-      recording,
-      processing,
-      latest,
-    };
+    return { totalSeconds: totalMs / 1000, completed, recording, processing };
   }, [meetings]);
+
+  const latest = useMemo(() => {
+    let found: (typeof meetings)[number] | null = null;
+    for (const meeting of meetings) {
+      if (!meeting?.startedAt) continue;
+      if (!found || new Date(meeting.startedAt) > new Date(found.startedAt)) {
+        found = meeting;
+      }
+    }
+    return found;
+  }, [meetings]);
+
+  const source = stats
+    ? {
+        totalSeconds: stats.totalTranscribedSeconds,
+        completed: stats.completedMeetings,
+        recording: stats.recordingMeetings,
+        processing: stats.processingMeetings,
+      }
+    : fallback;
+
+  return {
+    totalHours: source.totalSeconds / 3600,
+    completed: source.completed,
+    recording: source.recording,
+    processing: source.processing,
+    latest,
+    weekly: stats?.weekly ?? null,
+  };
 }
 
 type LedgerStatus = 'live' | 'processing' | 'idle';
@@ -436,6 +457,7 @@ function getBucketFillClass({
 
 function WeeklyMeetingChart() {
   const { meetings } = useMeetings();
+  const { weekly } = useMeetingAggregates();
 
   const { buckets, todayIndex, totalInWindow } = useMemo(() => {
     const now = new Date();
@@ -453,16 +475,24 @@ function WeeklyMeetingChart() {
     });
 
     let total = 0;
-    for (const meeting of meetings) {
-      if (!meeting?.startedAt) continue;
-      const started = new Date(meeting.startedAt);
-      if (Number.isNaN(started.getTime())) continue;
-      if (started < oldestStart) continue;
-      const dayStart = new Date(started.getFullYear(), started.getMonth(), started.getDate());
-      const diffDays = Math.round((dayStart.getTime() - oldestStart.getTime()) / msPerDay);
-      if (diffDays < 0 || diffDays > 6) continue;
-      bucketList[diffDays].count += 1;
-      total += 1;
+    if (weekly && weekly.length === bucketList.length) {
+      // 서버 집계 — 전체 회의 기준, 페이지 창과 무관
+      weekly.forEach((bucket, index) => {
+        bucketList[index].count = bucket.count;
+        total += bucket.count;
+      });
+    } else {
+      for (const meeting of meetings) {
+        if (!meeting?.startedAt) continue;
+        const started = new Date(meeting.startedAt);
+        if (Number.isNaN(started.getTime())) continue;
+        if (started < oldestStart) continue;
+        const dayStart = new Date(started.getFullYear(), started.getMonth(), started.getDate());
+        const diffDays = Math.round((dayStart.getTime() - oldestStart.getTime()) / msPerDay);
+        if (diffDays < 0 || diffDays > 6) continue;
+        bucketList[diffDays].count += 1;
+        total += 1;
+      }
     }
 
     return {
@@ -470,7 +500,7 @@ function WeeklyMeetingChart() {
       todayIndex: 6,
       totalInWindow: total,
     };
-  }, [meetings]);
+  }, [meetings, weekly]);
 
   const maxCount = buckets.reduce((acc, b) => (b.count > acc ? b.count : acc), 0);
   const hasData = totalInWindow > 0;
