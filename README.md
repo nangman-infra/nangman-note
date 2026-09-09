@@ -67,9 +67,17 @@ pnpm dev                # http://localhost:3000
 ## Deployment
 
 ```bash
-docker compose up -d --build
+docker compose config
+docker compose up -d --build --force-recreate backend frontend
 docker compose logs -f
 ```
+
+Backend는 IAM DB 인증과 함께 TLS 서버 인증서 검증을 강제합니다. Compose는 저장소의 AWS 공식
+`deploy/rds/global-bundle.crt`를 컨테이너의 `/run/secrets/rds-ca-bundle.pem`에 읽기 전용으로
+마운트하며, `DB_SSL=true`, `DB_SSL_REJECT_UNAUTHORIZED=true`,
+`DB_SSL_CA_PATH=/run/secrets/rds-ca-bundle.pem`을 전달합니다. 검증을 끄지 마세요. CA bundle을
+갱신할 때는 [AWS RDS 공식 trust store](https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem)의
+파일로 교체한 뒤 backend 이미지를 다시 생성하십시오.
 
 OAuth 운영 배포에서는 루트 `.env`의 `NEXTAUTH_URL`을 브라우저가 접속하는 canonical HTTPS
 origin 하나(예: `https://app.example.com`)로 반드시 지정합니다. Nginx Proxy Manager는

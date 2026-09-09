@@ -17,6 +17,11 @@ services:
     container_name: nangman-note-backend
     network_mode: host
     restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./deploy/rds/global-bundle.crt
+        target: /run/secrets/rds-ca-bundle.pem
+        read_only: true
     env_file: .env
     environment:
       # ─── 서버 ───
@@ -30,7 +35,9 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_SSL: "true"
-      DB_SSL_REJECT_UNAUTHORIZED: "false"
+      # IAM DB 인증은 TLS 서버 인증서 검증을 반드시 유지한다.
+      DB_SSL_REJECT_UNAUTHORIZED: "true"
+      DB_SSL_CA_PATH: /run/secrets/rds-ca-bundle.pem
       DB_MIGRATIONS_RUN: "true"
       DB_POOL_MAX: "10"
 
