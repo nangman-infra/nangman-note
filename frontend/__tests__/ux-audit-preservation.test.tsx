@@ -221,7 +221,7 @@ describe('Preservation 3.6 — New meeting start button works correctly', () => 
 // 3.7: 노트 3초 디바운스 자동 저장 정상
 // ---------------------------------------------------------------------------
 describe('Preservation 3.7 — Note debounce auto-save', () => {
-  it('should use useDebounce with the configurable AUTO_SAVE_DELAY (default 3000ms) for note content', async () => {
+  it('should debounce saves with the configurable AUTO_SAVE_DELAY (default 3000ms)', async () => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     const filePath = path.resolve(__dirname, '../domains/note/hooks/useNote.ts');
@@ -229,11 +229,9 @@ describe('Preservation 3.7 — Note debounce auto-save', () => {
 
     // useNote should debounce noteContent with the AUTO_SAVE_DELAY constant
     // (env NEXT_PUBLIC_AUTO_SAVE_DELAY, default 3000ms)
-    expect(source).toContain('useDebounce');
+    expect(source).toContain('window.setTimeout');
+    expect(source).toContain('window.clearTimeout');
     expect(source).toContain('AUTO_SAVE_DELAY');
-    expect(source).toMatch(
-      /useDebounce\s*\(\s*noteContent\s*,\s*AUTO_SAVE_DELAY\s*\)/,
-    );
 
     // 상수 기본값이 3000ms인지 확인
     const constantsPath = path.resolve(__dirname, '../lib/constants/index.ts');
@@ -247,11 +245,11 @@ describe('Preservation 3.7 — Note debounce auto-save', () => {
     const filePath = path.resolve(__dirname, '../domains/note/hooks/useNote.ts');
     const source = await fs.readFile(filePath, 'utf-8');
 
-    // Should call saveNote when debouncedContent changes
-    expect(source).toContain('debouncedContent');
+    // Autosave remains debounced and only persists dirty, loaded sessions.
+    expect(source).toContain('AUTO_SAVE_DELAY');
     expect(source).toContain('saveNote');
-    // The auto-save effect should check that content actually changed
-    expect(source).toContain('lastPersistedContentRef');
+    expect(source).toContain('!isDirty');
+    expect(source).toContain('!hasLoaded');
   });
 
   it('should display last saved time in NoteEditor', async () => {

@@ -56,14 +56,12 @@ export function TwoColumnLayout({
   const activeView = mobileView ?? internalActiveView;
   const setActiveView = onMobileViewChange ?? setInternalActiveView;
   const mobileResolvedView = showViewer ? activeView : 'dashboard';
-  const desktopResolvedView = showViewer ? 'viewer' : 'dashboard';
 
   return (
     <LayoutContext.Provider value={{ activeView: mobileResolvedView, setActiveView }}>
-      {/* ── Mobile (< lg) ── */}
-      <div className="flex h-dvh flex-col bg-[var(--bg-root)] lg:hidden">
+      <div className="flex h-dvh flex-col bg-[var(--bg-root)] lg:flex-row">
         {/* Mobile top bar */}
-        <header className="border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] px-4 py-2 backdrop-blur-xl">
+        <header className="border-b border-[var(--line-soft)] bg-[var(--bg-elevated)] px-4 py-2 backdrop-blur-xl lg:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <span className="font-headline text-sm text-foreground">TransNote</span>
@@ -100,38 +98,22 @@ export function TwoColumnLayout({
           {mobileNavigation ? <div className="mt-2">{mobileNavigation}</div> : null}
         </header>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {mobileResolvedView === 'dashboard' ? (
-            <div className="h-full overflow-y-auto">
-              <ErrorBoundary>{dashboard}</ErrorBoundary>
-            </div>
-          ) : (
-            <div className="h-full overflow-hidden">
-              <ErrorBoundary>{viewer}</ErrorBoundary>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Desktop (≥ lg): Fixed sidebar + Main content ── */}
-      <div className="hidden h-dvh lg:flex">
         {/* Fixed Sidebar — void rail, Border Smoke hairline */}
-        <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-[var(--line-soft)] bg-[var(--bg-root)]">
+        <aside className="hidden h-full w-64 flex-shrink-0 flex-col border-r border-[var(--line-soft)] bg-[var(--bg-root)] lg:flex">
           <ErrorBoundary>{sidebar}</ErrorBoundary>
         </aside>
 
         {/* Main Content Area */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {desktopResolvedView === 'viewer' && showViewer ? (
-            <div className="h-full overflow-hidden bg-[var(--bg-root)]">
-              <ErrorBoundary>{viewer}</ErrorBoundary>
-            </div>
-          ) : (
-            <div className="h-full overflow-y-auto bg-[var(--bg-root)]">
-              <ErrorBoundary>{dashboard}</ErrorBoundary>
-            </div>
-          )}
-        </div>
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+          {/* Mount each workspace once. CSS switches visibility without losing
+              editor history, in-flight saves, or mobile panel state. */}
+          <div className={`h-full overflow-y-auto ${mobileResolvedView === 'dashboard' ? 'block' : 'hidden'} ${showViewer ? 'lg:hidden' : 'lg:block'}`}>
+            <ErrorBoundary>{dashboard}</ErrorBoundary>
+          </div>
+          <div className={`h-full overflow-hidden ${mobileResolvedView === 'viewer' ? 'block' : 'hidden'} ${showViewer ? 'lg:block' : 'lg:hidden'}`}>
+            <ErrorBoundary>{showViewer ? viewer : null}</ErrorBoundary>
+          </div>
+        </main>
       </div>
     </LayoutContext.Provider>
   );

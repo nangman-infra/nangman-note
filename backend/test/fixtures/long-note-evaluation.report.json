@@ -1,0 +1,38 @@
+{
+  "evaluatedAt": "2026-09-09",
+  "fixture": "test/evaluate-long-notes.ts",
+  "inputType": "synthetic Korean transcript with 108-minute timestamps",
+  "sourceChars": 25560,
+  "expectedTasks": 18,
+  "model": "global.anthropic.claude-sonnet-5",
+  "region": "ap-northeast-2",
+  "configuredMaxTokens": 16384,
+  "baseline": {
+    "source": "deployed service before these changes",
+    "primaryTopics": 8,
+    "coveredTopicIdentifiers": 9,
+    "completeOwnerDeadlineActions": 8,
+    "missingValueCount": 9,
+    "actionCount": 8,
+    "inventedRejectedAction": false,
+    "normalizedJsonChars": 4233,
+    "elapsedSeconds": 82
+  },
+  "improved": {
+    "sourceChunks": 3,
+    "overviewSynthesis": true,
+    "primaryTopics": 19,
+    "coveredTopicIdentifiers": 18,
+    "completeOwnerDeadlineActions": 18,
+    "missingValueCount": 0,
+    "actionCount": 18,
+    "inventedRejectedAction": false,
+    "normalizedJsonChars": 16496,
+    "elapsedSeconds": 86
+  },
+  "notes": [
+    "The improved result includes 18 task topics and a separate rejected-idea topic.",
+    "Identifier and literal-value coverage are diagnostic checks, not a complete semantic accuracy score.",
+    "No audio transcription or real user meeting data was used in this evaluation."
+  ]
+}

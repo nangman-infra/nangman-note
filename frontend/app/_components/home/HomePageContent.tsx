@@ -8,6 +8,7 @@ import { Sidebar, type SidebarTimeFilter, type SidebarView } from '@/components/
 import { meetingApi, useMeetingStore } from '@/domains/meeting';
 import { formatPromptLabel, usePrompt } from '@/domains/prompt';
 import { ResultViewer, useResultStore } from '@/domains/result';
+import { NoteEditor, useNoteStore } from '@/domains/note';
 import { goBack } from '@/lib/navigation/goBack';
 import { DashboardView } from './DashboardView';
 import { PromptsInlineView } from './PromptsInlineView';
@@ -276,6 +277,8 @@ export function HomePageContent() {
             <ResultViewer
               key={selectedMeetingId}
               meetingId={selectedMeetingId}
+              notePanel={<NoteEditor meetingId={selectedMeetingId} />}
+              beforeRegenerate={() => useNoteStore.getState().saveNote(selectedMeetingId)}
               onMeetingUnavailable={() => handleSelectMeeting(null)}
               promptOptions={prompts.map((prompt) => ({
                 id: prompt.id,

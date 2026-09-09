@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface MarkdownWysiwygEditorProps {
   value: string;
@@ -15,6 +15,7 @@ export function MarkdownWysiwygEditor({
   placeholder,
   height = '100%',
 }: MarkdownWysiwygEditorProps) {
+  const [loadFailed, setLoadFailed] = useState(false);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<{
     getMarkdown: () => string;
@@ -94,6 +95,8 @@ export function MarkdownWysiwygEditor({
     let disposeEditorEvents: (() => void) | undefined;
     void mountEditor().then((dispose) => {
       disposeEditorEvents = dispose;
+    }).catch(() => {
+      if (!isUnmounted) setLoadFailed(true);
     });
 
     return () => {
@@ -122,6 +125,16 @@ export function MarkdownWysiwygEditor({
       isSyncingRef.current = false;
     });
   }, [value]);
+
+  if (loadFailed) {
+    return (
+      <div className="flex h-full flex-col gap-2 p-3">
+        <p role="status" className="text-xs text-[var(--ink-muted)]">서식 편집기를 불러오지 못해 Markdown 입력 모드로 전환했습니다.</p>
+        <textarea aria-label="Markdown 노트 편집" className="min-h-0 flex-1 resize-none bg-transparent p-2 font-mono text-sm"
+          value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+      </div>
+    );
+  }
 
   return (
     <div className="markdown-wysiwyg h-full min-h-0">

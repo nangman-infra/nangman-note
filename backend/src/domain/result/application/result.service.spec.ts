@@ -855,7 +855,20 @@ describe('ResultService', () => {
         meetingId: 'meeting-1',
         content: '테스트 노트',
       } as NoteEntity);
-      transcriptRepository.find.mockResolvedValue([]);
+      transcriptRepository.find.mockResolvedValue(
+        Array.from(
+          { length: 20 },
+          (_, index) =>
+            ({
+              id: `segment-${index}`,
+              meetingId: 'meeting-1',
+              startTime: index * 60,
+              endTime: index * 60 + 59,
+              text: `전사 원문 구간 ${index + 1}`,
+              confidence: 0.95,
+            }) as TranscriptSegmentEntity,
+        ),
+      );
       bedrockService.extractStructuredNotes.mockRejectedValue(
         new Error('Bedrock error'),
       );
@@ -874,6 +887,7 @@ describe('ResultService', () => {
       expect(bedrockService.extractStructuredNotes).toHaveBeenCalledTimes(3);
       expect(bedrockService.generateMeetingResult).toHaveBeenCalledTimes(1);
       expect(result.content).toContain('AI 회의록 생성에 일시적 문제가 발생');
+      expect(result.content).toContain('전사 원문 구간 20');
     });
   });
 

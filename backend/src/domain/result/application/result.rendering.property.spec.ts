@@ -378,6 +378,36 @@ describe('Lecture Rendering Property Tests', () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     (service as any).renderLectureMarkdown(meeting, extracted);
 
+  it('retains every takeaway and the source range for a long lecture', () => {
+    const takeaways = Array.from(
+      { length: 12 },
+      (_, index) => `복습 포인트 ${index + 1}`,
+    );
+    const markdown = render({
+      documentType: PromptDocumentType.LECTURE,
+      summary: '첫 구간의 개요입니다.\n\n두 번째 구간의 개요입니다.',
+      concepts: [
+        {
+          name: '후반부 개념',
+          definition: '구체적인 정의',
+          example: '적용 사례',
+          keyPoints: ['중요한 조건'],
+          sourceLabel: '전사 구간 3 · 60:00–90:00',
+        },
+      ],
+      practiceItems: [],
+      keyTakeaways: takeaways,
+      keywords: [],
+      uncertainties: [],
+    });
+    for (const takeaway of takeaways) expect(markdown).toContain(takeaway);
+    expect(markdown).toContain('기억해야 할 12가지');
+    expect(markdown).toContain('분석 범위: 전사 구간 3 · 60:00–90:00');
+    expect(markdown).toContain(
+      '첫 구간의 개요입니다.\n\n두 번째 구간의 개요입니다.',
+    );
+  });
+
   // Feature: ai-output-quality, Property 1: Summary는 서술형 문단으로 렌더링된다
   /** Validates: Requirements 4.1 */
   it('Property 1: summary is rendered as narrative paragraph without bullets', () => {

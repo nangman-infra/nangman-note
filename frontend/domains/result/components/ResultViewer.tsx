@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFeedback } from '@/components/feedback/FeedbackProvider';
 import { copyToClipboard } from '@/lib/utils/markdown';
 import { useResult } from '../hooks/useResult';
@@ -21,6 +21,8 @@ interface ResultViewerProps {
   onMeetingUnavailable?: (meetingId: string) => void;
   promptOptions?: ResultPromptOption[];
   onTitleUpdate: (meetingId: string, title: string) => Promise<boolean>;
+  notePanel?: ReactNode;
+  beforeRegenerate?: () => Promise<boolean>;
 }
 
 export function ResultViewer({
@@ -28,6 +30,8 @@ export function ResultViewer({
   onMeetingUnavailable,
   promptOptions = [],
   onTitleUpdate,
+  notePanel,
+  beforeRegenerate,
 }: ResultViewerProps) {
   const {
     result,
@@ -116,10 +120,12 @@ export function ResultViewer({
 
   if (!result) {
     return (
-      <ResultViewerEmptyState
-        isPending={isPending}
-        isMissingMeeting={isMissingMeeting}
-      />
+      <div className="flex h-full flex-col overflow-y-auto">
+        <div className={notePanel && !isMissingMeeting ? 'shrink-0' : 'h-full'}>
+          <ResultViewerEmptyState isPending={isPending} isMissingMeeting={isMissingMeeting} />
+        </div>
+        {notePanel && !isMissingMeeting && <div className="min-h-[480px] flex-1">{notePanel}</div>}
+      </div>
     );
   }
 
@@ -171,6 +177,11 @@ export function ResultViewer({
   const handleRegenerate = async () => {
     if (!resolvedRegeneratePromptId.trim()) return;
     setShowRegenerateConfirm(false);
+    if (beforeRegenerate && !(await beforeRegenerate())) {
+      setActiveTab('note');
+      pushToast({ title: '최신 노트를 먼저 저장해주세요', description: '노트의 저장 오류나 충돌을 해결한 뒤 다시 생성할 수 있습니다.', variant: 'error' });
+      return;
+    }
     const success = await regenerateResult(resolvedRegeneratePromptId.trim());
     if (!success) return;
 
@@ -272,7 +283,15 @@ export function ResultViewer({
         tabIndex={0}
         className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-8 sm:px-8 lg:px-10"
       >
-        <ResultViewerTabContent
+        {notePanel && (
+          <div hidden={activeTab !== 'note'} className="h-[min(680px,75dvh)] min-h-[420px]">
+            <div className="flex h-full flex-col">
+              <p className="mb-3 text-xs text-[var(--ink-muted)]">원본 노트를 수정하면 자동 저장됩니다. AI 회의록에 반영하려면 저장 후 재생성해주세요.</p>
+              <div className="min-h-0 flex-1">{notePanel}</div>
+            </div>
+          </div>
+        )}
+        {!(notePanel && activeTab === 'note') && <ResultViewerTabContent
           activeTab={activeTab}
           isEditing={isEditing}
           result={result}
@@ -283,7 +302,7 @@ export function ResultViewer({
           visibleTranscriptError={visibleTranscriptError}
           visibleNoteError={visibleNoteError}
           onEditContentChange={setEditContent}
-        />
+        />}
       </section>
 
       {!isEditing && activeTab === 'result' && (

@@ -162,6 +162,16 @@ pnpm migration:revert
 - `GET /api/v1/meetings/:meetingId/note`
 - `PUT /api/v1/meetings/:meetingId/note`
 
+Note reads include `revision` (`0` for an unsaved, virtual note). Writes require
+`{ "content": "Markdown", "expectedRevision": 0 }`, using the revision from the
+last successful read/save. The server compares and increments the revision in an
+atomic update; a stale edit returns `409 Conflict` without overwriting content.
+Fetch the current note and let the user resolve the conflict before retrying.
+Retrying content already stored is idempotent, including a lost save response.
+Missing/invalid revisions and content over 100,000 characters return `400`.
+Existing PostgreSQL installations must run `20260909100000-add-note-revision`
+before deploying the updated note API and frontend together.
+
 ### Result
 
 - `GET /api/v1/meetings/:meetingId/result`

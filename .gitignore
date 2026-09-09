@@ -57,6 +57,8 @@ frontend/.env.production
 # Tests
 coverage/
 .nyc_output/
+frontend/test-results/
+frontend/playwright-report/
 
 # Temp files
 *.tmp

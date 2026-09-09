@@ -11,6 +11,8 @@ export interface StructuredActionItem {
 
 export interface StructuredMeetingAgendaItem {
   title: string;
+  /** Source chunk label computed by the server, not an invented model citation. */
+  sourceLabel?: string;
   context?: string;
   discussionPoints: string[];
   decisions: string[];
@@ -32,6 +34,7 @@ export interface StructuredMeetingExtraction {
 
 export interface StructuredLectureConcept {
   name: string;
+  sourceLabel?: string;
   context?: string;
   definition: string;
   example: string;
@@ -51,6 +54,7 @@ export interface StructuredLectureExtraction {
 
 export interface StructuredMentoringTopic {
   title: string;
+  sourceLabel?: string;
   context?: string;
   keyPoints: string[];
   practicalTips: string[];

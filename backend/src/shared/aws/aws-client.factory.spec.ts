@@ -1,6 +1,5 @@
 import { ConfigService } from '@nestjs/config';
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
-import type { AwsCredentialIdentity } from '@aws-sdk/types';
 import type { AppEnv } from '../config/env.validation';
 import { AwsClientFactory } from './aws-client.factory';
 
@@ -8,7 +7,8 @@ jest.mock('@aws-sdk/credential-providers', () => ({
   fromNodeProviderChain: jest.fn(),
 }));
 
-type CredentialsProvider = () => Promise<AwsCredentialIdentity>;
+type CredentialsProvider = ReturnType<typeof fromNodeProviderChain>;
+type AwsCredentialIdentity = Awaited<ReturnType<CredentialsProvider>>;
 
 function createFactory(profile: string, provider: CredentialsProvider) {
   jest.mocked(fromNodeProviderChain).mockReturnValue(provider);

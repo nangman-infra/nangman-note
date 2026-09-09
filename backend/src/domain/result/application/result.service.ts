@@ -620,6 +620,7 @@ export class ResultService {
           transcriptText,
           meetingTitle: meeting.title?.trim(),
           meetingAgenda: meeting.agenda?.trim(),
+          translateTargetLanguage: meeting.translateTargetLanguage?.trim(),
         });
 
         // 짧은 전사는 결정·액션 아이템 등 일부 세부 필드가 비는 것이 정상이다.
@@ -688,8 +689,8 @@ export class ResultService {
             error instanceof Error ? error.message : 'Unknown error',
         });
 
-        // max_tokens 잘림은 같은 파라미터로 재시도해도 동일하게 실패하므로
-        // 즉시 레거시 폴백 경로로 넘어간다.
+        // BedrockService의 제한적 구간 분할로도 해결하지 못한 출력 잘림은
+        // 같은 파라미터로 반복하지 않고 레거시 폴백으로 전환한다.
         if (error instanceof BedrockMaxTokensError) {
           break;
         }
@@ -831,6 +832,9 @@ export class ResultService {
             return [
               `### 안건 ${index + 1}: ${item.title}`,
               '',
+              ...(item.sourceLabel
+                ? [`_분석 범위: ${item.sourceLabel}_`, '']
+                : []),
               ...(contextParagraph ? [contextParagraph] : []),
               '**핵심 논의:**',
               this.renderNumberedList(
@@ -903,6 +907,9 @@ export class ResultService {
             return [
               `### ${index + 1}. ${concept.name}`,
               '',
+              ...(concept.sourceLabel
+                ? [`_분석 범위: ${concept.sourceLabel}_`, '']
+                : []),
               ...(contextParagraph ? [contextParagraph] : []),
               '**정의:**',
               concept.definition || '_정의 추출 없음_',
@@ -934,9 +941,9 @@ export class ResultService {
       this.renderChecklist(extracted.practiceItems, '실습/과제 추출 없음'),
       '',
       extracted.keyTakeaways.length > 0
-        ? `## 기억해야 할 ${Math.min(extracted.keyTakeaways.length, 5)}가지`
+        ? `## 기억해야 할 ${extracted.keyTakeaways.length}가지`
         : '## 핵심 정리',
-      this.renderOrderedList(extracted.keyTakeaways, 5),
+      this.renderNumberedList(extracted.keyTakeaways, '핵심 정리 추출 없음'),
       '',
       '## 핵심 키워드',
       this.renderKeywordLine(extracted.keywords),
@@ -958,6 +965,9 @@ export class ResultService {
             return [
               `### 주제 ${index + 1}: ${topic.title}`,
               '',
+              ...(topic.sourceLabel
+                ? [`_분석 범위: ${topic.sourceLabel}_`, '']
+                : []),
               ...(contextParagraph ? [contextParagraph] : []),
               '**핵심 포인트:**',
               this.renderNumberedList(topic.keyPoints, '핵심 포인트 추출 없음'),
@@ -1085,10 +1095,16 @@ export class ResultService {
     }
 
     const normalized = text
-      .split('\n')
-      .map((line) => this.normalizeNarrativeLine(line))
-      .filter((line) => line.length > 0)
-      .join(' ')
+      .split(/\n\s*\n/)
+      .map((paragraph) =>
+        paragraph
+          .split('\n')
+          .map((line) => this.normalizeNarrativeLine(line))
+          .filter((line) => line.length > 0)
+          .join(' '),
+      )
+      .filter(Boolean)
+      .join('\n\n')
       .trim();
 
     return normalized.length > 0 ? normalized : emptyText;
@@ -1147,7 +1163,6 @@ export class ResultService {
     const generatedAt = new Date().toLocaleString('ko-KR');
     const transcriptHighlights = transcripts
       .filter((segment) => segment.text?.trim())
-      .slice(0, 8)
       .map(
         (segment) =>
           `- [${segment.startTime.toFixed(1)}s ~ ${segment.endTime.toFixed(1)}s] ${segment.text.trim()}`,
@@ -1163,7 +1178,7 @@ export class ResultService {
       '## 노트 내용',
       noteContent || '_작성된 노트가 없습니다._',
       '',
-      '## 전사 하이라이트',
+      '## 전사 원문 (AI 정리 실패 시 보존)',
       transcriptHighlights.length > 0
         ? transcriptHighlights.join('\n')
         : '_수집된 전사 데이터가 없습니다._',
@@ -1410,11 +1425,14 @@ export class ResultService {
       if (item && typeof item === 'object') {
         const hasDetail = Object.entries(item as Record<string, unknown>).some(
           ([key, value]) =>
-            key !== 'title' &&
-            key !== 'name' &&
-            key !== 'context' &&
-            Array.isArray(value) &&
-            value.length > 0,
+            (key !== 'title' &&
+              key !== 'name' &&
+              key !== 'context' &&
+              Array.isArray(value) &&
+              value.length > 0) ||
+            (['definition', 'example'].includes(key) &&
+              typeof value === 'string' &&
+              value.trim().length > 0),
         );
         if (hasDetail) return true;
       }

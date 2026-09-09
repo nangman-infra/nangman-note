@@ -72,6 +72,7 @@ export function useInProgressEndMeetingFlow({
 }: UseInProgressEndMeetingFlowParams) {
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const endingRef = useRef(false);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [uploadFailed, setUploadFailed] = useState(false);
   /** 이미 업로드·확정된 세션 ID — 재시도 시 중복 업로드(전사 중복) 방지 */
@@ -275,24 +276,38 @@ export function useInProgressEndMeetingFlow({
    * 치명적 결함이 있어 제거했습니다. 확인은 다이얼로그가 담당합니다.
    */
   const handleEndConfirm = async () => {
+    if (endingRef.current) return;
+    endingRef.current = true;
     setIsEnding(true);
-
-    if (meetingId) {
-      try {
-        const { saveNote } = useNoteStore.getState();
-        await saveNote(meetingId);
-      } catch {
-        // 저장 실패해도 종료 플로우는 계속 진행
+    try {
+      if (meetingId) {
+        const saved = await useNoteStore.getState().saveNote(meetingId);
+        if (!saved) {
+          pushToast({
+            title: '노트를 저장한 뒤 회의를 종료해주세요',
+            description: useNoteStore.getState().error || '최신 메모를 저장하지 못했습니다. 노트의 저장 상태를 확인해주세요.',
+            variant: 'error',
+          });
+          setShowEndDialog(false);
+          setIsEnding(false);
+          return;
+        }
       }
-    }
 
-    if (isRealtimeMode) {
-      stopStreaming();
-      await stopTranscriptionSession();
-    }
+      if (isRealtimeMode) {
+        stopStreaming();
+        await stopTranscriptionSession();
+      }
 
-    setShowEndDialog(false);
-    await proceedWithEndMeeting();
+      setShowEndDialog(false);
+      await proceedWithEndMeeting();
+    } catch {
+      setIsEnding(false);
+      setShowEndDialog(false);
+      pushToast({ title: '회의 종료를 완료하지 못했습니다', description: '노트와 녹음의 저장 상태를 확인한 뒤 다시 시도해주세요.', variant: 'error' });
+    } finally {
+      endingRef.current = false;
+    }
   };
 
   const handleContinueWithoutAudioInternal = useCallback(async () => {

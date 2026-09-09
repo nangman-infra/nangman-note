@@ -13,7 +13,10 @@ NestJS + Next.js + AWS Bedrock/Transcribe.
 
 - Amazon Transcribe Streaming 기반 한국어 실시간 전사 (WebSocket)
 - Amazon Bedrock으로 요약 / 액션아이템 / 결정사항 추출
-- 마크다운 에디터, 자동저장
+- 마크다운 에디터, 자동저장·수동 저장 (`Ctrl/⌘ S`)
+- 입력 즉시 기기 초안 보존, 오프라인 복구·재연결 저장, 다중 탭 편집 충돌 감지
+- 회의 종료 후 원본 노트 편집 및 Markdown 다운로드
+- 장문 전 구간 분할 추출, 상세 항목 보존, 전체 개요·제목 재구성
 - Markdown / PDF / DOCX export
 - OIDC 인증 (Authentik 등)
 - IAM Roles Anywhere — long-lived AWS 키 불필요
@@ -54,7 +57,22 @@ pnpm dev                # http://localhost:3000
 
 개발 기본값은 `DB_ENGINE=sqljs` (파일 기반 SQLite)로 외부 DB 없이 동작합니다.
 
+## Note reliability
+
+- 서버 저장은 `revision`을 기준으로 비교 후 갱신합니다. 다른 탭에서 먼저 수정했다면
+  자동 덮어쓰기를 멈추고 서버 내용과 현재 초안을 확인·합칠 수 있습니다.
+- 초안은 편집 세션별로 브라우저에 즉시 보관됩니다. 빈 내용으로 지운 수정도 복구하며,
+  브라우저 저장이 차단되거나 용량이 부족하면 다운로드 안내를 표시합니다.
+- 일시적 저장 오류는 최대 30초 간격으로 재시도하며, 네트워크 재연결 시 즉시 저장합니다.
+  로그인·권한 오류나 편집 충돌은 해결 전까지 반복 저장하지 않습니다.
+- 회의 종료와 AI 재생성은 최신 노트 저장 성공 후 진행합니다. 종료된 회의의 **원본 노트**
+  탭에서도 원본을 편집할 수 있습니다. 노트 수정 후 AI 회의록에는 재생성으로 반영합니다.
+- PostgreSQL 배포에는 `20260909100000-add-note-revision` 마이그레이션이 필요합니다.
+  노트 저장 API는 이제 `expectedRevision`을 필수로 받으므로 프런트엔드와 백엔드를 함께 배포하세요.
+
 ## Configuration
+
+품질 개선 내역, 공식 모범 사례, 장문 평가 및 검증 명령은 [QUALITY_REVIEW.md](./QUALITY_REVIEW.md)를 참고하세요.
 
 | Profile | Backend | Frontend |
 | --- | --- | --- |

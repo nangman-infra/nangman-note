@@ -210,7 +210,7 @@ describe('BedrockService', () => {
     expect(userText).toContain('## 회의 아젠다\n진행 현황 공유');
   });
 
-  it('keeps both transcript head and tail when transcript is too long', async () => {
+  it('covers the middle as well as head and tail of a very long transcript', async () => {
     const { service, send } = createService();
 
     const headToken = 'H';
@@ -228,16 +228,18 @@ describe('BedrockService', () => {
       transcriptText: longTranscript,
     });
 
-    const input = extractConverseInput(send);
-    const userText = input.messages?.[0]?.content?.[0]?.text ?? '';
+    const userText = send.mock.calls
+      .map(
+        (call: [ConverseCommand]) =>
+          call[0].input.messages?.[0]?.content?.[0]?.text ?? '',
+      )
+      .join('\n');
 
-    expect(userText).toContain('... (중간 전사 구간 생략) ...');
-    expect(userText).toContain(
-      '... (전사 텍스트가 길어 앞/뒤 핵심 구간만 포함되었습니다)',
-    );
+    expect(send.mock.calls.length).toBeGreaterThan(1);
+    expect(userText).not.toContain('중간 전사 구간 생략');
     expect(userText).toContain(headToken.repeat(1024));
     expect(userText).toContain(tailToken.repeat(1024));
-    expect(userText).not.toContain(middleToken.repeat(2048));
+    expect(userText).toContain(middleToken.repeat(2048));
   });
 
   it('extracts structured notes with type-specific JSON schema and modifier block', async () => {

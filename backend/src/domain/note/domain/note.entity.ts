@@ -20,6 +20,9 @@ export class NoteEntity {
   @Column({ type: 'text' })
   content: string;
 
+  @Column({ type: 'integer', default: 1 })
+  revision: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

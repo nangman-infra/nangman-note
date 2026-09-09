@@ -3,10 +3,10 @@ import type { Note } from '../types/note.types';
 
 export const noteApi = {
   // 노트 저장 (자동 저장)
-  save: async (meetingId: string, content: string): Promise<Note> => {
+  save: async (meetingId: string, content: string, expectedRevision: number): Promise<Note> => {
     const response = await apiClient.put<{ data: Note }>(
       `/api/v1/meetings/${meetingId}/note`,
-      { content }
+      { content, expectedRevision }
     );
     return response.data.data;
   },

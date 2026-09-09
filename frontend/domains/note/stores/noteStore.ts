@@ -1,255 +1,265 @@
 import { create } from 'zustand';
 import { noteApi } from '../api/noteApi';
+import { NOTE_MAX_LENGTH, type Note } from '../types/note.types';
+import { newDraftKey, readDrafts, removeDraft, writeDraft, type NoteDraft } from './noteDrafts';
 
-let latestLoadRequestSeq = 0;
-let latestSaveRequestSeq = 0;
-let saveSessionGeneration = 0;
-const saveQueues = new Map<string, Promise<void>>();
-
-const OFFLINE_NOTE_PREFIX = 'transnote_offline_note_';
-
-interface OfflineNoteBackup {
-  content: string;
-  savedAt: number;
-}
-
-function getOfflineKey(meetingId: string) {
-  return `${OFFLINE_NOTE_PREFIX}${meetingId}`;
-}
-
-function saveToLocalStorage(meetingId: string, content: string) {
-  try {
-    const backup: OfflineNoteBackup = { content, savedAt: Date.now() };
-    localStorage.setItem(getOfflineKey(meetingId), JSON.stringify(backup));
-  } catch {
-    // localStorage full or unavailable — silently ignore
-  }
-}
-
-function loadFromLocalStorage(meetingId: string): OfflineNoteBackup | null {
-  try {
-    const raw = localStorage.getItem(getOfflineKey(meetingId));
-    if (raw === null) return null;
-
-    // 신형 포맷 (JSON)
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (
-        parsed &&
-        typeof parsed === 'object' &&
-        typeof (parsed as OfflineNoteBackup).content === 'string'
-      ) {
-        return {
-          content: (parsed as OfflineNoteBackup).content,
-          savedAt:
-            typeof (parsed as OfflineNoteBackup).savedAt === 'number'
-              ? (parsed as OfflineNoteBackup).savedAt
-              : 0,
-        };
-      }
-    } catch {
-      // 구형 포맷 (plain string) 폴백
-    }
-    return { content: raw, savedAt: 0 };
-  } catch {
-    return null;
-  }
-}
-
-function clearLocalStorage(meetingId: string) {
-  try {
-    localStorage.removeItem(getOfflineKey(meetingId));
-  } catch {
-    // silently ignore
-  }
-}
-
-interface NoteState {
+interface NoteSnapshot {
+  activeMeetingId: string | null;
   noteContent: string;
   isDirty: boolean;
+  isLoading: boolean;
+  hasLoaded: boolean;
   isSaving: boolean;
   lastSaved: Date | null;
   error: string | null;
-  /** 마지막 loadNote가 오프라인 백업에서 복원됐는지 여부 */
+  errorKind: 'load' | 'save' | 'conflict' | null;
+  retryable: boolean;
+  saveFailures: number;
+  backupError: boolean;
   restoredFromBackup: boolean;
   contentRevision: number;
+  serverNote: Note | null;
+  conflict: Note | null;
+  recoveryDrafts: NoteDraft[];
+}
+
+interface NoteState extends NoteSnapshot {
   setContent: (content: string) => void;
   saveNote: (meetingId: string) => Promise<boolean>;
   loadNote: (meetingId: string) => Promise<string>;
+  resolveConflict: (choice: 'local' | 'server') => void;
+  restoreDraft: (key: string) => void;
   clearNote: () => void;
 }
 
-export const useNoteStore = create<NoteState>((set, get) => ({
-  noteContent: '',
-  isDirty: false,
-  isSaving: false,
-  lastSaved: null,
-  error: null,
-  restoredFromBackup: false,
-  contentRevision: 0,
+interface NoteSession {
+  state: NoteSnapshot;
+  draftKey: string;
+  baseRevision: number | null;
+  ownDraft: NoteDraft | null;
+  restoredDraft: NoteDraft | null;
+  saving?: Promise<boolean>;
+  loading?: Promise<string>;
+}
 
-  setContent: (content) => {
-    set((state) => ({
-      noteContent: content,
-      isDirty: true,
-      contentRevision: state.contentRevision + 1,
-    }));
-  },
+const emptySnapshot = (): NoteSnapshot => ({
+  activeMeetingId: null, noteContent: '', isDirty: false, isLoading: false,
+  hasLoaded: false, isSaving: false, lastSaved: null, error: null,
+  errorKind: null, retryable: true, saveFailures: 0, backupError: false,
+  restoredFromBackup: false, contentRevision: 0, serverNote: null,
+  conflict: null, recoveryDrafts: [],
+});
 
-  saveNote: async (meetingId) => {
-    const requestSeq = ++latestSaveRequestSeq;
-    const sessionGeneration = saveSessionGeneration;
-    const { noteContent, contentRevision } = get();
-    set({ isSaving: true, error: null });
+function statusCode(error: unknown): number | undefined {
+  return error && typeof error === 'object' && 'statusCode' in error
+    ? Number(error.statusCode) : undefined;
+}
 
-    const runSave = async () => {
-      if (
-        sessionGeneration !== saveSessionGeneration ||
-        requestSeq !== latestSaveRequestSeq
-      ) {
-        return false;
-      }
+function isRetryable(error: unknown): boolean {
+  const status = statusCode(error);
+  return status === undefined || status >= 500 || status === 408 || status === 429;
+}
 
-      try {
-        await noteApi.save(meetingId, noteContent);
-        const savedCurrentRevision =
-          sessionGeneration === saveSessionGeneration &&
-          requestSeq === latestSaveRequestSeq &&
-          get().contentRevision === contentRevision;
-        if (savedCurrentRevision) {
-          clearLocalStorage(meetingId);
-        }
-        set((state) => {
-          if (requestSeq !== latestSaveRequestSeq) return state;
-          return {
-            ...state,
-            isSaving: false,
-            isDirty: savedCurrentRevision ? false : state.isDirty,
-            lastSaved: new Date(),
-            restoredFromBackup: savedCurrentRevision
-              ? false
-              : state.restoredFromBackup,
-          };
-        });
-        return true;
-      } catch (error) {
-        const failedCurrentRevision =
-          sessionGeneration === saveSessionGeneration &&
-          requestSeq === latestSaveRequestSeq &&
-          get().contentRevision === contentRevision;
-        if (failedCurrentRevision) {
-          saveToLocalStorage(meetingId, noteContent);
-        }
-        set((state) => {
-          if (requestSeq !== latestSaveRequestSeq) return state;
-          return {
-            ...state,
-            isSaving: false,
-            error: error instanceof Error ? error.message : 'Failed to save note',
-          };
-        });
-        return false;
-      }
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : '노트를 저장하지 못했습니다.';
+const conflictMessage = '다른 곳에서 수정된 노트가 있습니다. 두 내용을 확인한 뒤 저장할 내용을 선택해주세요.';
+
+export const useNoteStore = create<NoteState>((set) => {
+  let active: NoteSession | null = null;
+  // Sessions survive navigation until their pending writes finish. Requests for
+  // the same meeting are ordered even if the user leaves and immediately returns.
+  const saves = new Map<string, Promise<boolean>>();
+  // If browser storage fails, keep a recoverable copy across SPA navigation.
+  // The close guard must outlive the editor component in this case.
+  const memoryDrafts = new Map<string, NoteDraft>();
+  const protectMemoryDrafts = (event: BeforeUnloadEvent) => {
+    if (memoryDrafts.size === 0) return;
+    event.preventDefault();
+    event.returnValue = '';
+  };
+  const updateMemoryGuard = () => {
+    if (typeof window === 'undefined') return;
+    window.removeEventListener('beforeunload', protectMemoryDrafts);
+    if (memoryDrafts.size > 0) window.addEventListener('beforeunload', protectMemoryDrafts);
+  };
+
+  const publish = (session: NoteSession, patch: Partial<NoteSnapshot>) => {
+    session.state = { ...session.state, ...patch };
+    if (active === session) set(session.state);
+  };
+
+  const backup = (session: NoteSession) => {
+    const draft: NoteDraft = {
+      key: session.draftKey, content: session.state.noteContent,
+      baseRevision: session.baseRevision, savedAt: Date.now(),
     };
-    const previousSave = saveQueues.get(meetingId);
-    const save = previousSave ? previousSave.then(runSave) : runSave();
-    const queueTail = save.then(() => undefined, () => undefined);
-    saveQueues.set(meetingId, queueTail);
-    queueTail.finally(() => {
-      if (saveQueues.get(meetingId) === queueTail) {
-        saveQueues.delete(meetingId);
-      }
-    });
-    return save;
-  },
-
-  loadNote: async (meetingId) => {
-    const requestSeq = ++latestLoadRequestSeq;
-    const backup = loadFromLocalStorage(meetingId);
-
-    try {
-      set({ error: null, restoredFromBackup: false });
-      const note = await noteApi.get(meetingId);
-
-      // 오프라인 백업이 서버 버전보다 최신이고 내용이 다르면 백업을 복원한다.
-      // (저장 실패 후 탭을 닫았다가 재접속한 케이스 — 이전에는 백업이
-      // write-only라서 복원 없이 조용히 사장됐다)
-      const serverUpdatedAt = note.updatedAt
-        ? new Date(note.updatedAt).getTime()
-        : 0;
-      const shouldRestoreBackup =
-        backup !== null &&
-        backup.content.trim().length > 0 &&
-        backup.content !== note.content &&
-        backup.savedAt > serverUpdatedAt;
-
-      const effectiveContent = shouldRestoreBackup
-        ? backup.content
-        : note.content;
-
-      set((state) => {
-        if (requestSeq !== latestLoadRequestSeq) {
-          return state;
-        }
-        // 로드 중 사용자가 이미 타이핑을 시작했다면(dirty) 서버 값으로
-        // 덮어쓰지 않는다 — 진행 중 입력이 유실되고 가드가 풀리는 회귀 방지.
-        if (state.isDirty) {
-          return state;
-        }
-        return {
-          ...state,
-          noteContent: effectiveContent,
-          // 복원한 백업은 아직 서버에 없으므로 dirty로 표시해 자동 저장 유도
-          isDirty: shouldRestoreBackup,
-          restoredFromBackup: shouldRestoreBackup,
-        };
-      });
-      return effectiveContent;
-    } catch (error) {
-      // 서버 로드 실패 시에도 백업이 있으면 복원 (완전 유실 방지)
-      if (backup !== null && backup.content.trim().length > 0) {
-        set((state) => {
-          if (requestSeq !== latestLoadRequestSeq) {
-            return state;
-          }
-          if (state.isDirty) {
-            return state;
-          }
-          return {
-            ...state,
-            noteContent: backup.content,
-            isDirty: true,
-            restoredFromBackup: true,
-            error: null,
-          };
-        });
-        return backup.content;
-      }
-
-      set((state) => {
-        if (requestSeq !== latestLoadRequestSeq) {
-          return state;
-        }
-        return {
-          ...state,
-          error: error instanceof Error ? error.message : 'Failed to load note',
-        };
-      });
-      return '';
+    const ok = writeDraft(draft);
+    if (ok) {
+      session.ownDraft = draft;
+      memoryDrafts.delete(session.state.activeMeetingId!);
+    } else {
+      memoryDrafts.set(session.state.activeMeetingId!, draft);
     }
-  },
+    updateMemoryGuard();
+    publish(session, { backupError: !ok });
+  };
 
-  clearNote: () => {
-    latestSaveRequestSeq += 1;
-    saveSessionGeneration += 1;
-    set((state) => ({
-      noteContent: '',
-      isDirty: false,
-      isSaving: false,
-      lastSaved: null,
-      error: null,
-      restoredFromBackup: false,
-      contentRevision: state.contentRevision + 1,
-    }));
-  },
-}));
+  const clearBackups = (session: NoteSession) => {
+    if (session.ownDraft) removeDraft(session.ownDraft);
+    if (session.restoredDraft) removeDraft(session.restoredDraft);
+    session.ownDraft = null;
+    session.restoredDraft = null;
+    memoryDrafts.delete(session.state.activeMeetingId!);
+    updateMemoryGuard();
+  };
+
+  const acceptServer = (session: NoteSession, note: Note, replaceContent = false) => {
+    session.baseRevision = note.revision;
+    const content = replaceContent ? note.content : session.state.noteContent;
+    const isDirty = content !== note.content;
+    publish(session, {
+      noteContent: content, serverNote: note, hasLoaded: true, isDirty,
+      lastSaved: note.revision > 0 ? new Date(note.updatedAt) : null,
+      error: null, errorKind: null, conflict: null, retryable: true, saveFailures: 0,
+      restoredFromBackup: isDirty && session.state.restoredFromBackup,
+    });
+    if (isDirty) backup(session);
+    else {
+      clearBackups(session);
+      publish(session, { backupError: false });
+    }
+  };
+
+  const loadNote = (meetingId: string): Promise<string> => {
+    if (!meetingId) return Promise.resolve('');
+    if (active?.state.activeMeetingId === meetingId && active.loading) return active.loading;
+    if (active?.state.activeMeetingId !== meetingId) {
+      const drafts = readDrafts(meetingId);
+      const memoryDraft = memoryDrafts.get(meetingId);
+      const restoredDraft = memoryDraft ?? drafts[0] ?? null;
+      active = {
+        state: {
+          ...emptySnapshot(), activeMeetingId: meetingId,
+          noteContent: restoredDraft?.content ?? '', isDirty: restoredDraft !== null,
+          restoredFromBackup: restoredDraft !== null,
+          recoveryDrafts: memoryDraft ? drafts : drafts.slice(1),
+          backupError: Boolean(memoryDraft),
+        },
+        baseRevision: restoredDraft?.baseRevision ?? null,
+        draftKey: newDraftKey(meetingId), ownDraft: null, restoredDraft,
+      };
+    }
+    const session = active;
+    publish(session, { isLoading: true, error: null, errorKind: null });
+    const loading = (async () => {
+      try {
+        await saves.get(meetingId);
+        const note = await noteApi.get(meetingId);
+        if (session.state.isDirty && session.state.noteContent !== note.content && session.baseRevision !== note.revision) {
+          publish(session, {
+            hasLoaded: true, serverNote: note, conflict: note, errorKind: 'conflict',
+            error: conflictMessage, retryable: false,
+            lastSaved: note.revision > 0 ? new Date(note.updatedAt) : null,
+          });
+        } else {
+          acceptServer(session, note, !session.state.isDirty);
+        }
+      } catch (error) {
+        publish(session, { error: errorMessage(error), errorKind: 'load', retryable: isRetryable(error) });
+      } finally {
+        publish(session, { isLoading: false });
+        session.loading = undefined;
+      }
+      return session.state.noteContent;
+    })();
+    session.loading = loading;
+    return loading;
+  };
+
+  const saveNote = (meetingId: string): Promise<boolean> => {
+    const session = active;
+    if (!session || session.state.activeMeetingId !== meetingId) return Promise.resolve(false);
+    if (session.saving) return session.saving;
+    if (session.state.isLoading || !session.state.hasLoaded || session.state.errorKind === 'load' || session.state.errorKind === 'conflict') return Promise.resolve(false);
+    if (!session.state.isDirty) return Promise.resolve(true);
+
+    publish(session, { isSaving: true });
+    const saving = (async () => {
+      try {
+        await saves.get(meetingId);
+        // Drain the latest input as well, so manual save / meeting completion
+        // cannot report success while a newer edit remains unsaved.
+        while (session.state.isDirty) {
+          const content = session.state.noteContent;
+          if (content.length > NOTE_MAX_LENGTH) {
+            publish(session, { error: '노트는 최대 100,000자까지 저장할 수 있습니다. 내용을 줄여주세요.', errorKind: 'save', retryable: false });
+            return false;
+          }
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            publish(session, { error: '오프라인입니다. 연결되면 자동으로 저장합니다.', errorKind: 'save', retryable: true });
+            return false;
+          }
+          publish(session, { error: null, errorKind: null });
+          try {
+            const saved = await noteApi.save(meetingId, content, session.baseRevision!);
+            acceptServer(session, saved);
+          } catch (error) {
+            if (statusCode(error) === 409) {
+              publish(session, { error: conflictMessage, errorKind: 'conflict', retryable: false });
+              try {
+                const current = await noteApi.get(meetingId);
+                if (current.content === session.state.noteContent) acceptServer(session, current);
+                else publish(session, { serverNote: current, conflict: current });
+              } catch {
+                // Keep the draft and conflict barrier until a refresh succeeds.
+              }
+            } else {
+              publish(session, { error: errorMessage(error), errorKind: 'save', retryable: isRetryable(error), saveFailures: session.state.saveFailures + 1 });
+            }
+            return !session.state.isDirty;
+          }
+        }
+        return true;
+      } finally {
+        publish(session, { isSaving: false });
+        session.saving = undefined;
+      }
+    })();
+    session.saving = saving;
+    saves.set(meetingId, saving);
+    void saving.finally(() => { if (saves.get(meetingId) === saving) saves.delete(meetingId); });
+    return saving;
+  };
+
+  return {
+    ...emptySnapshot(), loadNote, saveNote,
+    setContent: (content) => {
+      const session = active;
+      if (!session || session.state.noteContent === content) return;
+      publish(session, {
+        noteContent: content, isDirty: true, contentRevision: session.state.contentRevision + 1,
+        ...(session.state.errorKind === 'save' ? { error: null, errorKind: null, retryable: true, saveFailures: 0 } : {}),
+      });
+      // Persist before returning to the editor, including deliberate empty text.
+      backup(session);
+    },
+    resolveConflict: (choice) => {
+      const session = active;
+      if (!session?.state.conflict) return;
+      acceptServer(session, session.state.conflict, choice === 'server');
+    },
+    restoreDraft: (key) => {
+      const session = active;
+      const draft = session?.state.recoveryDrafts.find((item) => item.key === key);
+      if (!session || !draft || session.state.isDirty || session.state.isSaving) return;
+      session.restoredDraft = draft;
+      session.baseRevision = draft.baseRevision;
+      publish(session, { noteContent: draft.content, isDirty: true, restoredFromBackup: true, recoveryDrafts: session.state.recoveryDrafts.filter((item) => item.key !== key) });
+      backup(session);
+      void loadNote(session.state.activeMeetingId!);
+    },
+    clearNote: () => {
+      active = null;
+      set(emptySnapshot());
+    },
+  };
+});
